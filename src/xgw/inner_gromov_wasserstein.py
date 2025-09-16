@@ -33,7 +33,7 @@ def igw_objective(space_x, space_y, pi):
     return diag + cross
 
 
-def igw_algorithm1():
+def igw_algorithm1_1d():
     mu_a, sigma_a = -0.5, 0.1
     mu_b, sigma_b = 0.5, 0.2
     n_grid_1d_x = 100
@@ -64,4 +64,4 @@ def igw_algorithm1():
         print(f"it {it}: tau={tau}, igw={igw_objective(space_x, space_y, pi_n)}")
 
 if __name__ == "__main__":
-    igw_algorithm1()
+    igw_algorithm1_1d()
