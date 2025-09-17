@@ -133,8 +133,9 @@ def line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1):
 
 
 def igw_algorithm1_2d():
-    mu_a, sigma_a = np.array([-0.5, 0]), 0.3
-    mu_b, sigma_b = np.array([0.5, 0]), 0.2
+    mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
+    r_factor = 0.5
+    mu_b, sigma_b = r_factor*mu_a1, 0.2
     n_grid_1d_x = 50
     n_grid_1d_y = 25
     def make_space_2d(n_grid):
@@ -144,8 +145,11 @@ def igw_algorithm1_2d():
     space_x = make_space_2d(n_grid_1d_x)
     space_y = make_space_2d(n_grid_1d_y)
 
-    marginal_a = np.exp(-0.5 * (((space_x - mu_a) / sigma_a) ** 2).sum(-1))
-    marginal_b = np.exp(-0.5 * (((space_y - mu_b) / sigma_b) ** 2).sum(-1))
+    factor = 0.5
+    marginal_a = factor*np.exp(-0.5 * (((space_x - mu_a1) / sigma_a) ** 2).sum(-1))
+    marginal_a += np.exp(-0.5 * (((space_x + factor*mu_a1) / sigma_a) ** 2).sum(-1))
+    marginal_b = factor*np.exp(-0.5 * (((space_y - mu_b) / sigma_b) ** 2).sum(-1))
+    marginal_b += np.exp(-0.5 * (((space_y + factor*mu_b) / sigma_b) ** 2).sum(-1))
     marginal_a /= marginal_a.sum()
     marginal_b /= marginal_b.sum()
 
@@ -161,7 +165,7 @@ def igw_algorithm1_2d():
         sigma_pi_n = covariance_vectorized_d(space_x, space_y, pi_n)
         cost = cost_function_d(space_x, space_y, sigma_pi_n)
         pi_n_1_hat = ot.emd(marginal_a, marginal_b, -cost)
-        tau, gamma = line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1_hat)
+        tau, gamma = 0.5, None #line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1_hat)
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
         
