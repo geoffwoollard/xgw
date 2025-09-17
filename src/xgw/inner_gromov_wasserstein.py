@@ -4,8 +4,8 @@ import numpy as np
 def double_inner(marginal, space):
     return np.einsum('i,j,i,j->', space**2, space**2, marginal, marginal)
 
-def compute_gamma(marginal_a, marginal_b, space_x, space_y):
-    return double_inner(marginal_a, space_x) + double_inner(marginal_b, space_y)
+def compute_gamma(pi_n, space_x, space_y):
+    return np.einsum('i,j,k,l,ik,jl->', space_x, space_x, space_y, space_y, pi_n, pi_n)
 
 def covariance(space_x, space_y, pi):
     return np.einsum('i,ij,j->', space_x, pi, space_y)
@@ -51,11 +51,10 @@ def igw_algorithm1_1d():
     marginal_a /= marginal_a.sum()
     marginal_b /= marginal_b.sum()
 
-    gamma = compute_gamma(marginal_a, marginal_b, space_x, space_y)
-
     n_iters = 10
     pi_n = np.outer(marginal_a, marginal_b)
-
+    gamma = compute_gamma(pi_n, space_x, space_y)
+    
     for it in range(n_iters):
         sigma_pi_n = covariance(space_x, space_y, pi_n)
         cost = cost_function(space_x.reshape(-1,1), space_y.reshape(1,-1), sigma_pi_n)
@@ -94,8 +93,8 @@ def double_inner_vectorized_d(marginal, space):
     return np.sum(dot_sq * outer_marg)
 
 
-def compute_gamma_d(marginal_a, marginal_b, space_x, space_y):
-    return double_inner_vectorized_d(marginal_a, space_x) + double_inner_vectorized_d(marginal_b, space_y)
+def compute_gamma_d(Gramm_x, Gramm_y, pi_n):
+    return double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n, pi_n)
 
 
 def covariance_vectorized_d(space_x, space_y, pi):
@@ -153,12 +152,12 @@ def igw_algorithm1_2d():
     marginal_a /= marginal_a.sum()
     marginal_b /= marginal_b.sum()
 
-    gamma = compute_gamma_d(marginal_a, marginal_b, space_x, space_y)
     Gramm_x = space_x @ space_x.T        # (n_grid_1d_x, n_grid_1d_x)
     Gramm_y = space_y @ space_y.T        # (n_grid_1d_y, n_grid_1d_y)
 
     n_iters = 50
     pi_n = np.outer(marginal_a, marginal_b)
+    gamma = compute_gamma_d(Gramm_x, Gramm_y, pi_n)
     print(f"igw={igw_objective_d(space_x, space_y, pi_n)}", pi_n.sum())
 
     for it in range(n_iters):
