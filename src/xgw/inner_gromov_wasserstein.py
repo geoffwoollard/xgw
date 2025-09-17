@@ -165,7 +165,7 @@ def igw_algorithm1_2d():
         sigma_pi_n = covariance_vectorized_d(space_x, space_y, pi_n)
         cost = cost_function_d(space_x, space_y, sigma_pi_n)
         pi_n_1_hat = ot.emd(marginal_a, marginal_b, -cost)
-        tau, gamma = 0.5, None #line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1_hat)
+        tau, gamma = line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1_hat)
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
         
