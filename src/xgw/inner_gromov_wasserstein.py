@@ -114,13 +114,13 @@ def cost_function_d(space_x, space_y, sigma_pi_n):
     return (space_x @ sigma_pi_n.T).dot(space_y.T)
 
 
-def double_inner_with_two_joints(Gx, Gy, pi_1, pi_2):
-    return np.trace(pi_1.T @ Gx @ pi_2 @ Gy.T) 
+def double_inner_with_two_joints(Gramm_x, Gramm_y, pi_1, pi_2):
+    return np.trace(pi_1.T @ Gramm_x @ pi_2 @ Gramm_y.T)
 
 
-def line_search_d(gamma, Gx, Gy, pi_n, pi_n_1):
-    alpha = double_inner_with_two_joints(Gx, Gy, pi_n_1, pi_n_1)
-    beta = double_inner_with_two_joints(Gx, Gy, pi_n, pi_n_1)
+def line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1):
+    alpha = double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n_1, pi_n_1)
+    beta = double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n, pi_n_1)
     condition = 2*beta - alpha - gamma
     if condition > 0:
         tau = min(1, max(0,(beta - gamma)/ condition))
@@ -150,8 +150,8 @@ def igw_algorithm1_2d():
     marginal_b /= marginal_b.sum()
 
     gamma = compute_gamma_d(marginal_a, marginal_b, space_x, space_y)
-    Gx = space_x @ space_x.T        # (n_grid_1d_x, n_grid_1d_x)
-    Gy = space_y @ space_y.T        # (n_grid_1d_y, n_grid_1d_y)
+    Gramm_x = space_x @ space_x.T        # (n_grid_1d_x, n_grid_1d_x)
+    Gramm_y = space_y @ space_y.T        # (n_grid_1d_y, n_grid_1d_y)
 
     n_iters = 50
     pi_n = np.outer(marginal_a, marginal_b)
@@ -161,7 +161,7 @@ def igw_algorithm1_2d():
         sigma_pi_n = covariance_vectorized_d(space_x, space_y, pi_n)
         cost = cost_function_d(space_x, space_y, sigma_pi_n)
         pi_n_1_hat = ot.emd(marginal_a, marginal_b, -cost)
-        tau, gamma = line_search_d(gamma, Gx, Gy, pi_n, pi_n_1_hat)
+        tau, gamma = line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1_hat)
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
         
