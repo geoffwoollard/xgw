@@ -14,11 +14,15 @@ def covariance(space_x, space_y, pi):
 def cost_function(space_x, space_y, sigma_pi_n):
     return sigma_pi_n * space_x * space_y
 
-def line_search(gamma, space_x, space_y, pi_n, pi_n_1):
-    alpha = np.einsum('i,j,k,l,ik,jl->', space_x, space_x, space_y, space_y, pi_n_1, pi_n_1)
-    beta = np.einsum('i,j,k,l,ik,jl->', space_x, space_x, space_y, space_y, pi_n_1, pi_n)
+def line_search(gamma, space_x, space_y, pi_n, pi_n_1, tol=1e-11):
+    def _double_inner_with_two_joints(space_x, space_y, pi_1, pi_2):
+        return np.einsum('i,j,k,l,ik,jl->', space_x, space_x, space_y, space_y, pi_1, pi_2)
+
+    alpha = _double_inner_with_two_joints(space_x, space_y, pi_n_1, pi_n_1)
+    beta = _double_inner_with_two_joints(space_x, space_y, pi_n_1, pi_n)
     condition = 2*beta - alpha - gamma
-    if condition > 0:
+    # print(f"alpha={alpha}, beta={beta}, gamma={gamma}, condition={condition}")
+    if condition > tol:
         tau = min(1, max(0,(beta - gamma)/ condition))
     elif alpha > gamma:
         tau = 1
@@ -64,6 +68,8 @@ def igw_algorithm1_1d():
         pi_n = pi_n_1
         print(f"it {it}: tau={tau}, igw={igw_objective(space_x, space_y, pi_n)}")
 
+    np.save("igw_1d_transport.npy", pi_n)
+
 
 def igw_objective_d(space_x, space_y, pi):
 
@@ -94,7 +100,7 @@ def double_inner_vectorized_d(marginal, space):
 
 
 def compute_gamma_d(Gramm_x, Gramm_y, pi_n):
-    return double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n, pi_n)
+    return double_inner_with_two_joints_d(Gramm_x, Gramm_y, pi_n, pi_n)
 
 
 def covariance_vectorized_d(space_x, space_y, pi):
@@ -113,15 +119,17 @@ def cost_function_d(space_x, space_y, sigma_pi_n):
     return (space_x @ sigma_pi_n.T).dot(space_y.T)
 
 
-def double_inner_with_two_joints(Gramm_x, Gramm_y, pi_1, pi_2):
+def double_inner_with_two_joints_d(Gramm_x, Gramm_y, pi_1, pi_2):
     return np.trace(pi_1.T @ Gramm_x @ pi_2 @ Gramm_y.T)
 
 
-def line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1):
-    alpha = double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n_1, pi_n_1)
-    beta = double_inner_with_two_joints(Gramm_x, Gramm_y, pi_n, pi_n_1)
+def line_search_d(gamma, Gramm_x, Gramm_y, pi_n, pi_n_1, tol=1e-11):
+    alpha = double_inner_with_two_joints_d(Gramm_x, Gramm_y, pi_n_1, pi_n_1)
+    beta = double_inner_with_two_joints_d(Gramm_x, Gramm_y, pi_n, pi_n_1)
     condition = 2*beta - alpha - gamma
-    if condition > 0:
+    print(f"alpha={alpha}, beta={beta}, gamma={gamma}, condition={condition}")
+
+    if condition > tol:
         tau = min(1, max(0,(beta - gamma)/ condition))
     elif alpha > gamma:
         tau = 1
@@ -168,7 +176,7 @@ def igw_algorithm1_2d():
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
         
-        print(f"it {it}: tau={tau}, igw={igw_objective_d(space_x, space_y, pi_n)}")
+        print(f"it {it}: tau={tau}, igw={igw_objective_d(space_x, space_y, pi_n)}", end=' ')
 
     np.save("igw_2d_transport.npy", pi_n)
 
