@@ -1,10 +1,8 @@
-
 import itertools
 import numpy as np
 from scipy.optimize import linprog
 import itertools
 import ot
-import numpy as np
 
 def is_in_convex_hull_lp(points, p, tol=1e-9):
     """
@@ -89,10 +87,23 @@ def add_halfspace_and_max_norm(A, b, e, h):
     max_idx = np.argmax(norms2)
     return norms2[max_idx], vertices[max_idx], A_new, b_new
 
+def construct_basis_eij_in_PI(space_x, space_y):
+    N, dx = space_x.shape
+    M, dy = space_y.shape
+    e_ijs_in_PI = np.zeros((N, M, dx, dy))
+    assert dx == dy
+    for i in range(dx):
+        for j in range(dy):
+            e_ijs_in_PI[:,:, i, j] = np.outer(space_x[:,i], space_y[:,j])
+    e_ijs_in_PI /= np.linalg.norm(e_ijs_in_PI[:,:,0,0])
+    return e_ijs_in_PI.reshape(N, M, dx * dy)
 
-def construct_cost_e(pi):
-    # TODO: implement
-    return np.zeros_like(pi)
+
+def construct_cost_at_point_in_P_PI(point_in_p_PI, e_ijs_in_PI):
+    M, N, d2 = e_ijs_in_PI.shape
+    d2_ = len(point_in_p_PI)
+    assert d2 == d2_, f"dimension mismatch between {d2} and {d2_}"
+    return (point_in_p_PI.reshape(1,1,-1) * e_ijs_in_PI).sum(-1)
 
 
 def compute_e_h_from_cost_e(marginal_a, marginal_b, cost_e):
@@ -109,7 +120,8 @@ def project_pi_on_p_pi(space_x, space_y, pi):
 
 
 def update_bdb(e, p_pi_neg, p_pi_plus, c_pi_neg, c_pi_plus, pi_opt, marginal_a, marginal_b, space_x, space_y):
-    cost_e = construct_cost_e(pi_opt)
+    e_ijs_in_PI = construct_basis_eij_in_PI(space_x, space_y)
+    cost_e = construct_cost_at_point_in_P_PI(e, e_ijs_in_PI)
     pi_new, h_new = compute_e_h_from_cost_e(marginal_a, marginal_b, cost_e)
     x = project_pi_on_p_pi(space_x, space_y, pi_new)
     p_pi_neg, added = add_if_outside_lp(p_pi_neg, x) # TODO: handle condition when added is False
