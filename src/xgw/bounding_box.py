@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 from scipy.optimize import linprog
+from scipy.linalg import qr, inv
 import itertools
 import ot
 
@@ -90,13 +91,15 @@ def add_halfspace_and_max_norm(A, b, e, h):
 def construct_basis_eij_in_PI(space_x, space_y):
     N, dx = space_x.shape
     M, dy = space_y.shape
-    e_ijs_in_PI = np.zeros((N, M, dx, dy))
+    stacked_base = np.zeros((N*M, dx*dy))
     assert dx == dy
     for i in range(dx):
         for j in range(dy):
-            e_ijs_in_PI[:,:, i, j] = np.outer(space_x[:,i], space_y[:,j])
-    e_ijs_in_PI /= np.linalg.norm(e_ijs_in_PI[:,:,0,0])
-    return e_ijs_in_PI.reshape(N, M, dx * dy)
+            stacked_base[:, i+j*dx] = np.ravel(np.outer(space_x[:,i], space_y[:,j])) # flattening vectors to use QR decomposition
+    Q, low_dim_cost_mat = qr(stacked_base) # finding orthonormal basis : Q=[e_1,...,e_dx*dy] orthonormal base (ei flatten), [f1,...,f_dx*dy] = Q@low_dim_cost_mat, low_dim_cost_mat triangular superior matrix.
+    assert np.all(np.diag(low_dim_cost_mat)!=0), f"at least one marginal is supported on a d-1 vector space" 
+    e_ijs_in_PI = np.reshape(Q,(N, M, dx*dy)) # check if not  the reshape does not break order here (looks ok from 1 small test)
+    return e_ijs_in_PI, np.transpose(low_dim_cost_mat)
 
 
 def construct_cost_at_point_in_P_PI(point_in_p_PI, e_ijs_in_PI):
@@ -120,12 +123,12 @@ def project_pi_on_p_pi(space_x, space_y, pi):
 
 
 def update_bdb(e, p_pi_neg, p_pi_plus, c_pi_neg, c_pi_plus, pi_opt, marginal_a, marginal_b, space_x, space_y):
-    e_ijs_in_PI = construct_basis_eij_in_PI(space_x, space_y)
+    e_ijs_in_PI, low_dim_cost_mat = construct_basis_eij_in_PI(space_x, space_y)
     cost_e = construct_cost_at_point_in_P_PI(e, e_ijs_in_PI)
     pi_new, h_new = compute_e_h_from_cost_e(marginal_a, marginal_b, cost_e)
     x = project_pi_on_p_pi(space_x, space_y, pi_new)
     p_pi_neg, added = add_if_outside_lp(p_pi_neg, x) # TODO: handle condition when added is False
-    c_pi_neg_test = np.linalg.norm(x)**2
+    c_pi_neg_test = np.linalg.norm(low_dim_cost_mat*x)**2 #x needs to be 1d array
     if c_pi_neg < c_pi_neg_test:
         pi_opt = pi_new
         c_pi_neg = c_pi_neg_test
