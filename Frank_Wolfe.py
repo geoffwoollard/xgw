@@ -29,11 +29,15 @@ def matrix_cofactor_low_dim(mat):
 
 def polynomial_cost(sigma, cost='IGW'):
     if cost == 'IGW':
-        return np.linalg.norm(sigma)
+        return np.linalg.norm(sigma)**2
     elif cost == 'DGW':
-        return det_23d(sigma)
+        l=len(sigma)
+        return factorial(l) *det_23d(sigma)
     else:
         raise ValueError('Cost not implemented')
+    
+def const_cost(sigma_x, sigma_y,  cost='IGW'):
+    return polynomial_cost(sigma_x, cost=cost) + polynomial_cost(sigma_y, cost=cost)
 
 def linearized_cost_matrix(sigma, cost='IGW'):
     if cost == 'IGW':
@@ -47,17 +51,19 @@ def linearized_cost_matrix(sigma, cost='IGW'):
 def linearized_cost_function(space_x, space_y, M): #check implementation 
     return (space_x @ M.T).dot(space_y.T)
    
-def covariance(space_x, space_y, pi):
-    # return np.einsum('i,ij,j->', space_x, pi, space_y)
+def cross_covariance(space_x, space_y, pi):
     return np.einsum('kd,lD,kl->dD', space_x, space_y, pi)
+
+def covariance(space_x, mu):
+    return np.einsum('kd,kD,k->dD', space_x, space_x, mu)
 
 def line_search_IGW(sigma_1, sigma_0):
     if np.linalg.norm(sigma_1)>np.linalg.norm(sigma_0):
             tau = 1
-            T = np.linalg.norm(sigma_1)
+            T = np.linalg.norm(sigma_1)**2
     else :
             tau = 0
-            T = np.linalg.norm(sigma_0)
+            T = np.linalg.norm(sigma_0)**2
     return T,tau
 
 def line_search_DGW_2d(sigma_1, sigma_0):
@@ -134,19 +140,23 @@ def Frank_Wolfe(mu, space_x, nu, space_y, cost='IGW', pi_n=None):
         pi_n = np.outer(mu, nu)
     n_iters = 50
     
+    sigma_x = covariance(space_x, mu)
+    sigma_y = covariance(space_y, nu)
+    initial_cost = const_cost(sigma_x, sigma_y, cost=cost)
+    print('initial_cost', initial_cost)
     for it in range(n_iters):
-        sigma_pi_n = covariance(space_x, space_y, pi_n)
+        sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
         M_pi_n = linearized_cost_matrix(sigma_pi_n, cost=cost)
         lin_cost = linearized_cost_function(space_x, space_y, M_pi_n)
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost)
-        sigma_pi_n_1_hat = covariance(space_x, space_y, pi_n_1_hat)
+        sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat,sigma_pi_n,cost=cost) 
-        print(f"it {it}: tau={tau}, {cost}_cost={T}", end=' ')
+        print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
-    return T, pi_n
+    return initial_cost-2*T, pi_n
 
 def testing_2d():
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
