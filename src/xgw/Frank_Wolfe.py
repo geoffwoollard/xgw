@@ -48,7 +48,7 @@ def linearized_cost_matrix(sigma, cost='IGW'):
     else:
         raise ValueError('Cost not implemented')
 
-def linearized_cost_function(space_x, space_y, M): #check implementation 
+def linearized_cost_function(space_x, space_y, M): 
     return (space_x @ M.T).dot(space_y.T)
    
 def cross_covariance(space_x, space_y, pi):
