@@ -1,35 +1,37 @@
 import numpy as np
-from scipy.linalg import qr, inv
+from scipy.linalg import rq, inv
 import ot
 
-def iteration_loop(mu, nu, P_plus, P_minus, e, U):
+def iteration_loop(mu, nu, P_plus, P_minus, e_base, R):
     x_0, v_0, objective = Hausdorff(P_plus, P_minus)
     g = new_direction(x_0, v_0, P_minus)
-    g_hat, g_star = compute_hyperplane(mu, nu, g, e, U)
+    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, R)
     P_plus, P_minus = update_box(P_plus, P_minus, [g, g_hat], [g_star])
     return P_plus, P_minus, objective
-    
+
+
 def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
-    e, U = construct_basis_eij_in_PI(space_x, space_y)
-    P_plus, P_minus = initial_box(e, mu, nu)
+    e_base, R = construct_basis_eij(space_x, space_y)
+    P_plus, P_minus = initial_box(e_base, mu, nu)
     for iter in range(niter):
-        P_plus, P_minus, objective = iteration_loop(mu, nu, P_plus, P_minus, e, U)
+        P_plus, P_minus, objective = iteration_loop(mu, nu, P_plus, P_minus, e_base, R)
         if objective < epsilon:
             break
+    return P_plus, P_minus, objective
         
 
-def construct_basis_eij_in_PI(space_x, space_y):
+def construct_basis_eij(space_x, space_y):
     N, dx = space_x.shape
     M, dy = space_y.shape
     stacked_base = np.zeros((N*M, dx*dy))
     assert dx == dy
     for i in range(dx):
         for j in range(dy):
-            stacked_base[:, i+j*dx] = np.ravel(np.outer(space_x[:,i], space_y[:,j])) # flattening vectors to use QR decomposition
-    Q, low_dim_cost_mat = qr(stacked_base) # finding orthonormal basis : Q=[e_1,...,e_dx*dy] orthonormal base (ei flatten), [f1,...,f_dx*dy] = Q@low_dim_cost_mat, low_dim_cost_mat triangular superior matrix.
-    assert np.all(np.diag(low_dim_cost_mat)!=0), f"at least one marginal is supported on a d-1 vector space" 
-    e_ijs_in_PI = np.reshape(Q,(N, M, dx*dy)) # check if not  the reshape does not break order here (looks ok from 1 small test)
-    return e_ijs_in_PI, np.transpose(low_dim_cost_mat)   
+            stacked_base[:, i+j*dx] = np.ravel(np.outer(space_x[:,i], space_y[:,j])) # flattening vectors to use QR decomposition, computing f_{i,j}
+    R, Q = rq(stacked_base) # finding orthonormal basis : Q=[e_1,...,e_dx*dy] orthonormal base (ei flatten), [f1,...,f_dx*dy] = R@Q, R triangular superior matrix.
+    assert np.all(np.diag(R)!=0), f"at least one marginal is supported on a d-1 vector space" 
+    e_base = np.reshape(Q,(N, M, dx*dy)) 
+    return e_base, np.transpose(R)
 
 
 class DoubleRepresentation():
@@ -59,7 +61,7 @@ class DoubleRepresentation():
     def add_H(vector, scalar):
         pass
     
-def initial_box(e, mu, nu, U):
+def initial_box(e_base, mu, nu, R):
     '''
     Docstring for initial_box
     
@@ -73,17 +75,17 @@ def initial_box(e, mu, nu, U):
     half_plans_list = []
     
     
-    for e_i in e:
+    for e_i in e_base:
         for sigma in [-1,1]:
-            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e, U)
+            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, R)
             vertex_list.append(g_star)
-            half_plans_list.append([sigma*e, g_hat])
+            half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
     return  P_plus, P_minus
 
-def compute_hyperplane(mu, nu, g, e, U):
-    cost_matrix = function_to_cost(g, e, U)
+def compute_hyperplane(mu, nu, g, e_base, R):
+    cost_matrix = function_to_cost(g, e_base, R)
     cost, log = ot.emd2(mu, nu, M=cost_matrix, log=True)
     return cost, projection(log['T'])
 
@@ -91,7 +93,7 @@ def projection(pi, e):
     # einsum..
     pass
 
-def function_to_cost(g, e, U):
+def function_to_cost(g, e_base, R):
     # einsum..
     pass
 
@@ -116,3 +118,9 @@ def Hausdorff(P_plus, P_minus):
 
 def solve_dist(vertex, P_minus):
     pass # active sets QP HAMMER
+
+def minimal_test_2d():
+    pass
+
+if __name__ == '__main__':
+    run_approx()
