@@ -8,17 +8,19 @@ def iteration_loop(mu, nu, P_plus, P_minus, e, U):
     g_hat, g_star = compute_hyperplane(mu, nu, g, e, U)
     P_plus, P_minus = update_box(P_plus, P_minus, [g, g_hat], [g_star])
     return P_plus, P_minus, objective
-    
+
+
 def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
-    e, U = construct_basis_eij_in_PI(space_x, space_y)
+    e, U = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e, mu, nu)
     for iter in range(niter):
         P_plus, P_minus, objective = iteration_loop(mu, nu, P_plus, P_minus, e, U)
         if objective < epsilon:
             break
+    return P_plus, P_minus, objective
         
 
-def construct_basis_eij_in_PI(space_x, space_y):
+def construct_basis_eij(space_x, space_y):
     N, dx = space_x.shape
     M, dy = space_y.shape
     stacked_base = np.zeros((N*M, dx*dy))
@@ -116,3 +118,9 @@ def Hausdorff(P_plus, P_minus):
 
 def solve_dist(vertex, P_minus):
     pass # active sets QP HAMMER
+
+def minimal_test_2d():
+    pass
+
+if __name__ == '__main__':
+    run_approx()
