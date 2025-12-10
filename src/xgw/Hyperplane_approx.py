@@ -1,12 +1,13 @@
 import numpy as np
 from numpy.linalg import qr
 import ot
+from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
 
 def iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, R)
-    P_plus, P_minus = update_box(P_plus, P_minus, [g, g_hat], [g_star])
+    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
 
@@ -35,54 +36,41 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
-def test_construct_basis(n1, n2):
-    lin = np.linspace(0, 2, n1)
-    xx, yy = np.meshgrid(lin, lin)
-    space_x = np.vstack([xx.ravel(), yy.ravel()]).T
-    lin = np.linspace(-1, 1, n2)
-    xx, yy = np.meshgrid(lin, lin)
-    space_y = np.vstack([xx.ravel(), yy.ravel()]).T
-    
-    N, dx = space_x.shape
-    M, dy = space_y.shape
-    f_base = np.zeros((N, M, dx*dy)) # constructing the function base f_{i,j}
-    for i in range(dx):
-        for j in range(dy):
-            f_base[:,:, i+j*dx] = np.outer(space_x[:,i], space_y[:,j])
-    
-    e_base, R = construct_basis_eij(space_x, space_y)
-    
-    return np.all(np.isclose(e_base@R, f_base))
 
 class DoubleRepresentation():
     def __init__(self):
         self.V = []
-        self.H = []
-        pass
+        self.H = ()
 
-    def get_H(self):
-        return self.H
+    def H_to_V(self):
+        A, b = self.H
+        self.V = compute_polytope_vertices(A, b)
 
-    def get_V(self):
-        return self.V
-
-    def H_to_V():
-        '''does the update'''
-        pass
-
-    def V_to_H():
-        '''does the update'''
-        pass
+    def V_to_H(self):
+        A, b = compute_polytope_halfspaces(self.V)
+        self.H = (A,b)
         
     def __len__(self):
         # number of vertices and constraints
         return len(self.V), len(self.H) 
     
+    # could be optimized for a family of vertices
     def add_V(self, vertex):
+        # vertex is a d^2 by 1 vector
         self.V.append(vertex)
+        self.V_to_H()
     
+    # could be optimized for a family of vectors and scalars
     def add_H(self, vector, scalar):
-        self.H.append([vector,scalar])
+        # vector is a d^2 by 1 vector
+        if self.H == ():
+            A = np.transpose(vector)
+            b = np.array([scalar])
+        else:
+            b = np.hstack((b,np.array([scalar])))
+            A = np.vstack((A, np.transpose(vector)))
+        self.H = [A, b]
+        self.H_to_V()
     
     def get_centroid(self):
         return np.mean(np.array(self.V))
@@ -134,7 +122,7 @@ def new_direction(x_0, v_0, P_minus):
     return v_0-x_0
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
-def Hausdorff(P_plus, P_minus):
+def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
     cost = np.inf
     for vertex in P_plus.get_V():
         x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
@@ -166,5 +154,4 @@ def minimal_test_2d():
     pass
 
 if __name__ == '__main__':
-    # run_approx()
-    print(test_construct_basis(2, 3))
+    run_approx()
