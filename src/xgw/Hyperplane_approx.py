@@ -2,22 +2,23 @@ import numpy as np
 from numpy.linalg import qr
 import ot
 
-def iteration_loop(mu, nu, P_plus, P_minus, e_base, R):
-    x_0, v_0, objective = Hausdorff(P_plus, P_minus)
+def iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse):
+    x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, R)
     P_plus, P_minus = update_box(P_plus, P_minus, [g, g_hat], [g_star])
-    return P_plus, P_minus, objective
+    return P_plus, P_minus, objective, previous_solutions_to_reuse
 
 
 def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
     e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e_base, mu, nu)
+    previous_solutions_to_reuse = {}
     for iter in range(niter):
-        P_plus, P_minus, objective = iteration_loop(mu, nu, P_plus, P_minus, e_base, R)
+        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse)
         if objective < epsilon:
             break
-    return P_plus, P_minus, objective
+    return P_plus, P_minus, objective, previous_solutions_to_reuse
         
 
 def construct_basis_eij(space_x, space_y):
@@ -136,14 +137,30 @@ def new_direction(x_0, v_0, P_minus):
 def Hausdorff(P_plus, P_minus):
     cost = np.inf
     for vertex in P_plus.get_V():
-        x, v, objective = solve_dist(vertex, P_minus)
+        x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
         if objective < cost:
-            x0, v_0 = x, v
+            x0, v_0 = x, vertex
             cost = objective
-    return x0, v_0, objective
+    return x0, v_0, objective, previous_solutions_to_reuse
 
-def solve_dist(vertex, P_minus):
-    pass # active sets QP HAMMER
+def build_constraints(P_minus):
+    pass
+
+def build_new_constraint(P_minus):
+    pass
+
+def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
+    from .qp_incremental_projector import IncrementalQPProjector
+    if vertex.tobytes() not in previous_solutions_to_reuse:
+        A, b = build_constraints(P_minus)
+        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A, b=b)
+        x, objective = qp_solver.solve(vertex)
+    else:
+        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]
+        a_new, b_new = build_new_constraint(P_minus)
+        x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
+    previous_solutions_to_reuse[vertex.tobytes()] = qp_solver
+    return x, objective, previous_solutions_to_reuse
 
 def minimal_test_2d():
     pass

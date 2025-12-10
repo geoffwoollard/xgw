@@ -34,7 +34,7 @@ class IncrementalQPProjector:
         """
         self.v.value = v_value
         self.problem.solve(solver=solver, warm_start=warm, verbose=False)
-        return self.x.value
+        return self.x.value, self.problem.value
 
     def add_constraint(self, a_new, b_new):
         """
