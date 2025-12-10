@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+include = [
+    "src/xgw",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/xgw",
+]
+
+[project]
+name = "xgw"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name="Geoffrey Woollard", email="geoffwoollard@gmail.com" },
+  { name="Clément Soubrier", email="c.soubrier@math.ubc.ca"},
+]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "numpy",
+  "scipy",
+  "POT",
+]
+
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "mypy",
+  "pre-commit",
+  "ruff",
+]
+
+[project.urls]
+Documentation = "https://github.com/geoffwoollard/xgw/blob/main/README.md"
+Issues = "https://github.com/geoffwoollard/xgw/issues"
+Source = "https://github.com/geoffwoollard/xgw"
+
+[tool.hatch.version]
+path = "src/xgw/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/xgw tests}"
+
+[tool.coverage.run]
+source_pkgs = ["xgw", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/xgw/__about__.py",
+]
+
+[tool.coverage.paths]
+cryo_challenge = ["src/xgw", "*/xgw/src/xgw"]
+tests = ["tests", "*/xgw/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
