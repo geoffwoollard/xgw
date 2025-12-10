@@ -19,7 +19,7 @@ def test_incremental_qp_projector():
 
     # first solve toward v
     v = np.array([2.0, 3.0])
-    x1 = proj.solve(v)
+    x1, _ = proj.solve(v)
     assert np.allclose(x1, v)
     logger.info("Initial projection: %s", x1)
 
@@ -27,6 +27,6 @@ def test_incremental_qp_projector():
     a_new = np.array([1.0, 1.0])
     b_new = x1.sum() - 1.0
 
-    x2 = proj.solve_with_new_constraint(v, a_new, b_new)
+    x2, _ = proj.solve_with_new_constraint(v, a_new, b_new)
     assert np.allclose(x2, np.array([1.5, 2.5]))
     logger.info("After adding half-plane: {}".format(x2))

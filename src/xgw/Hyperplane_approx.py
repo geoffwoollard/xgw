@@ -110,14 +110,21 @@ def new_direction(x_0, v_0, P_minus):
 def Hausdorff(P_plus, P_minus):
     cost = np.inf
     for vertex in P_plus.get_V():
-        x, v, objective = solve_dist(vertex, P_minus)
+        x, objective = solve_dist(vertex, P_minus)
         if objective < cost:
-            x0, v_0 = x, v
+            x0, v_0 = x, vertex
             cost = objective
     return x0, v_0, objective
 
+def build_constraints(P_minus):
+    pass
+
 def solve_dist(vertex, P_minus):
-    pass # active sets QP HAMMER
+    from .qp_incremental_projector import IncrementalQPProjector
+    A, b = build_constraints(P_minus)
+    qp_solver = IncrementalQPProjector(dim=len(vertex), A=A, b=b)
+    x, objective = qp_solver.solve(vertex)
+    return x, objective
 
 def minimal_test_2d():
     pass
