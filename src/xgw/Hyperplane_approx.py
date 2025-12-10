@@ -58,20 +58,21 @@ class DoubleRepresentation():
         return f"Vertices: {self.V}\nHalf-planes: {self.H}"
     
     # could be optimized for a family of vertices
-    def add_V(self, vertex):
+    def add_V(self, vertex_list):
         # vertex is a d^2 by 1 vector
-        self.V.append(vertex)
+        self.V.extend(vertex_list)
         self.V_to_H()
     
     # could be optimized for a family of vectors and scalars
-    def add_H(self, vector, scalar):
+    def add_H(self, constraint_list):
+        vector_list = [np.transpose(elem[0]) for elem in constraint_list]
+        scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
         # vector is a d^2 by 1 vector
-        if self.H == ():
-            A = np.transpose(vector)
-            b = np.array([scalar])
-        else:
-            b = np.hstack((b,np.array([scalar])))
-            A = np.vstack((A, np.transpose(vector)))
+        if self.H != ():
+            vector_list.append(self.H[0])
+            scalar_list.append(self.H[1])
+        A = np.vstack(vector_list)
+        b = np.hstack(scalar_list)
         self.H = [A, b]
         self.H_to_V()
     
