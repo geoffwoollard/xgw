@@ -54,6 +54,9 @@ class DoubleRepresentation():
         # number of vertices and constraints
         return len(self.V), len(self.H) 
     
+    def __str__(self):
+        return f"Vertices: {self.V}\nHalf-planes: {self.H}"
+    
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
         # vertex is a d^2 by 1 vector
@@ -130,7 +133,7 @@ def new_direction(x_0, v_0, P_minus):
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
 def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
     cost = np.inf
-    for vertex in P_plus.get_V():
+    for vertex in P_plus.V:
         x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
         if objective < cost:
             x0, v_0 = x, vertex
@@ -138,7 +141,7 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
     return x0, v_0, objective, previous_solutions_to_reuse
 
 def build_constraints(P_minus):
-    pass
+    return P_minus.H
 
 def build_new_constraint(P_minus):
     pass
