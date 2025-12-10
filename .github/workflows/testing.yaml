@@ -1,5 +1,4 @@
 # GHA workflow for running tests.
-#
 # Largely taken from
 # https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 # Please check the link for more detailed instructions
@@ -14,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", ]
+        python-version: ["3.11", "3.12", "3.13"]
       fail-fast: false
 
 
