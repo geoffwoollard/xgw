@@ -140,23 +140,33 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
             cost = objective
     return x0, v_0, objective, previous_solutions_to_reuse
 
-def build_constraints(P_minus):
-    return P_minus.H
+def build_new_constraint(A_all, b_all, A_old, b_old):
+    # Stack A and b together for comparison
+    all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
+    old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
 
-def build_new_constraint(P_minus):
-    pass
+    # Find index where row is in all_rows but not in old_rows
+    for i, row in enumerate(all_rows):
+        if not any(np.all(row == r) for r in old_rows):
+            new_index = i
+            break
+    a_new = A_all[new_index]
+    b_new = b_all[new_index]
+    return a_new, b_new
 
 def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
     from .qp_incremental_projector import IncrementalQPProjector
     if vertex.tobytes() not in previous_solutions_to_reuse:
-        A, b = build_constraints(P_minus)
-        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A, b=b)
+        A_all, b_all = P_minus.H
+        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
         x, objective = qp_solver.solve(vertex)
     else:
-        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]
-        a_new, b_new = build_new_constraint(P_minus)
+        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
+        A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
+        A_all, b_all = P_minus.H
+        a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
-    previous_solutions_to_reuse[vertex.tobytes()] = qp_solver
+    previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
 
 def minimal_test_2d():
