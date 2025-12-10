@@ -3,10 +3,10 @@ from numpy.linalg import qr
 import ot
 from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
 
-def iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse):
+def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
-    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, R)
+    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base)
     P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
@@ -16,7 +16,7 @@ def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
     P_plus, P_minus = initial_box(e_base, mu, nu)
     previous_solutions_to_reuse = {}
     for iter in range(niter):
-        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse)
+        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse)
         if objective < epsilon:
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse
@@ -79,7 +79,7 @@ class DoubleRepresentation():
     def get_centroid(self):
         return np.mean(np.array(self.V))
     
-def initial_box(e_base, mu, nu, R):
+def initial_box(e_base, mu, nu):
     '''
     Docstring for initial_box
     
@@ -108,7 +108,7 @@ def compute_hyperplane(mu, nu, g, e_base):
     return cost, projection(log['T'])
 
 def projection(pi, e_base):
-    return np.einsum('ijk,ij->k', e_base, pi)
+    return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
 def function_to_cost(g, e_base):
