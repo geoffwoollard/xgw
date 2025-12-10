@@ -88,19 +88,19 @@ def initial_box(e_base, mu, nu, R):
     P_plus, P_minus = DoubleRepresentation(), DoubleRepresentation()
     vertex_list = []
     half_plans_list = []
-    
-    
-    for e_i in e_base:
+    a,b,c = e_base.shape
+    for i in range(c):
         for sigma in [-1,1]:
-            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, R)
+            e_i = e_base[:,:,i]
+            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
     return  P_plus, P_minus
 
-def compute_hyperplane(mu, nu, g, e_base, R):
-    cost_matrix = function_to_cost(g, e_base, R)
+def compute_hyperplane(mu, nu, g, e_base):
+    cost_matrix = function_to_cost(g, e_base)
     cost, log = ot.emd2(mu, nu, M=cost_matrix, log=True)
     return cost, projection(log['T'])
 
@@ -119,8 +119,13 @@ def update_box(P_plus, P_minus, half_plans_list, vertex_list):
     return P_plus, P_minus
 
 def new_direction(x_0, v_0, P_minus):
-    # return v_0 - P_minus.get_centroid()
-    return v_0-x_0
+    if x_0 == v_0:
+        sol = v_0 - P_minus.get_centroid()
+        assert np.all(sol != 0), f' zero direction'
+        return v_0 - P_minus.get_centroid()
+    else:
+        sol = v_0-x_0
+    return (sol)/np.linalg.norm(sol)
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
 def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
