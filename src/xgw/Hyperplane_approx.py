@@ -13,7 +13,7 @@ def iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reu
 def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
     e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e_base, mu, nu)
-    previous_solutions_to_reuse = None
+    previous_solutions_to_reuse = {}
     for iter in range(niter):
         P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse)
         if objective < epsilon:
@@ -125,16 +125,15 @@ def build_new_constraint(P_minus):
 
 def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
     from .qp_incremental_projector import IncrementalQPProjector
-    if previous_solutions_to_reuse is None:
+    if vertex.tobytes() not in previous_solutions_to_reuse:
         A, b = build_constraints(P_minus)
         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A, b=b)
         x, objective = qp_solver.solve(vertex)
-        previous_solutions_to_reuse = {vertex.tobytes(): qp_solver}
     else:
         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]
         a_new, b_new = build_new_constraint(P_minus)
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
-        previous_solutions_to_reuse[vertex.tobytes()] = qp_solver
+    previous_solutions_to_reuse[vertex.tobytes()] = qp_solver
     return x, objective, previous_solutions_to_reuse
 
 def minimal_test_2d():
