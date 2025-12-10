@@ -1,7 +1,7 @@
 import itertools
 import numpy as np
 from scipy.optimize import linprog
-from scipy.linalg import qr, inv
+from numpy.linalg import qr
 import itertools
 import ot
 
