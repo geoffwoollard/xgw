@@ -3,7 +3,6 @@ import logging
 
 from xgw.qp_incremental_projector import IncrementalQPProjector
 
-import logging
 logger = logging.getLogger(__name__)
 
 def test_incremental_qp_projector():
