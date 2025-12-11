@@ -50,6 +50,14 @@ def simple_marginals_2D():
     space_y = np.array([[0,0],[0,2],[1,2]])
     return mu, nu, space_x, space_y
 
+def permut_matrix(permut, dim):
+    sol = np.zeros((dim,dim))
+    for elem in permut:
+        for i in range(dim):
+            sol[i,elem[i]]=1
+    return sol
+        
+
 def test_simple_marginals(niter, tol = 1e-5):
     mu, nu, space_x, space_y = simple_marginals_2D()
     x_1, x_2 = space_x.shape
@@ -62,6 +70,9 @@ def test_simple_marginals(niter, tol = 1e-5):
     print(f'final  Hausdorf {new_obj}')
     # computing Hausdorff distance
     assert new_obj<=objective
+    
+    coupling = [permut_matrix(elem, 3) for elem in permutations([0,1,2])]
+    
     # checking P_minus is included in P_plus 
     A,b = P_plus.H
     check = True
