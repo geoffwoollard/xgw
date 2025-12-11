@@ -40,11 +40,12 @@ def construct_basis_eij(space_x, space_y):
 
 
 class DoubleRepresentation():
-    from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
 
     def __init__(self):
         self.V = []
         self.H = ()
+        from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
+
 
     def H_to_V(self):
         A, b = self.H
