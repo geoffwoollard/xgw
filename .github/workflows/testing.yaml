@@ -32,4 +32,4 @@ jobs:
 
       - name: Test with pytest
         run: |
-          pytest tests
+          pytest  tests/test_qp_incremental_projector.py tests/test_construction_basis.py

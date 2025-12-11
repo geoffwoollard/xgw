@@ -1,7 +1,6 @@
 import numpy as np
 from numpy.linalg import qr
 import ot
-from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
 
 def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
@@ -41,6 +40,8 @@ def construct_basis_eij(space_x, space_y):
 
 
 class DoubleRepresentation():
+    from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
+
     def __init__(self):
         self.V = []
         self.H = ()
