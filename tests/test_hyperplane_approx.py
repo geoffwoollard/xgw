@@ -78,5 +78,5 @@ def projection_2d(niter):
     
     # P_plus, P_minus, objective, previous_solutions_to_reuse = test_overall()
 
-# test_overall(10)
+test_overall(10)
 # test_initial_box()
