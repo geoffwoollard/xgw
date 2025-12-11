@@ -18,7 +18,7 @@ def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=1e-15):
     previous_solutions_to_reuse = {}
     for iter in range(niter):
         print(iter)
-        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, {}) # previous_solutions_to_reuse
+        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse) 
         if objective < epsilon:
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse
