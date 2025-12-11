@@ -1,6 +1,13 @@
 import numpy as np
 from numpy.linalg import qr
 import ot
+import logging
+logger = logging.getLogger(__name__)
+
+try:
+    from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
+except ImportError as e:
+    logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
 def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
@@ -40,11 +47,9 @@ def construct_basis_eij(space_x, space_y):
 
 
 class DoubleRepresentation():
-
     def __init__(self):
         self.V = []
         self.H = ()
-        from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
 
 
     def H_to_V(self):
