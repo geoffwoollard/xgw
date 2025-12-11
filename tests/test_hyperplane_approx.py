@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+@pytest.fixture
 def marginals():
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
@@ -29,8 +30,8 @@ def marginals():
     
     return mu, nu, space_x, space_y
 
-def test_initial_box():
-    mu, nu, space_x, space_y = marginals()
+def test_initial_box(marginals):
+    mu, nu, space_x, space_y = marginals
     e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs={})
     assert len(P_minus.V) == 8
@@ -48,14 +49,46 @@ def test_initial_box():
     assert check
 
     
+def simple_marginals_2D():
+    mu = np.array([1/3,1/3,1/3])
+    nu = mu = np.array([1/3,1/3,1/3])
+    space_x = np.array([[0,0],[0,1],[1,1]])
+    space_y = np.array([[0,0],[0,2],[1,2]])
+    return mu, nu, space_x, space_y
 
 @pytest.fixture
 def niter():
     return 10
 
+def test_simple_marginals(niter, tol = 1e-5):
+    mu, nu, space_x, space_y = simple_marginals_2D()
+    x_1, x_2 = space_x.shape
+    y_1, y_2 = space_y.shape
+    print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
+    
+    P_plus, P_minus, objective, previous_solutions_to_reuse = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+    _, _, new_obj, _ = Hausdorff( P_plus, P_minus, {})
+    
+    print(f'final  Hausdorf {new_obj}')
+    # computing Hausdorff distance
+    assert new_obj<=objective
+    # checking P_minus is included in P_plus 
+    A,b = P_plus.H
+    check = True
+    for i, elem in enumerate(P_minus.V):
+        logger.info(f'Checking vertex {i}')
+        if not np.all(A@elem<=b+tol):
+            logger.info(f'residual {A@elem-b}')
+            check =  False
+    assert check
+    
+@pytest.fixture
+def niter():
+    return 5
 
-def test_overall(niter):
-    mu, nu, space_x, space_y = marginals()
+
+def test_overall(niter, marginals):
+    mu, nu, space_x, space_y = marginals
     x_1, x_2 = space_x.shape
     y_1, y_2 = space_y.shape
     logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
@@ -87,3 +120,10 @@ def projection_2d(niter):
 
 # test_overall(10)
 # # test_initial_box()
+# test_simple_marginals(4)
+# test_initial_box()
+
+
+# innerset smaller than outerset
+# H non increasing over iteration
+# vertices of innerset are in outer set

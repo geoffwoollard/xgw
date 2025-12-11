@@ -15,10 +15,11 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs)
     print('box initialized')
-    previous_solutions_to_reuse = {}
+    
     for iter in range(niter):
+        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        P_plus, P_minus, objective, _ = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         if objective < epsilon:
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse
@@ -108,7 +109,8 @@ def initial_box(e_base, mu, nu, emd_kwargs):
 def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
     cost_matrix = function_to_cost(g, e_base)
     map, log = ot.emd(mu, nu, M=-cost_matrix, log=True, **emd_kwargs)
-    return -log['cost'], -projection(map, e_base)
+    return -log['cost'], projection(map, e_base)
+
 
 def projection(pi, e_base):
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
@@ -117,12 +119,14 @@ def projection(pi, e_base):
 def function_to_cost(g, e_base):
     return np.einsum('ijk,k->ij', e_base, g)
 
+
 def update_box(P_plus, P_minus, half_plans_list, vertex_list):
     P_plus.add_H(half_plans_list)
     P_minus.add_V(vertex_list)
     P_minus.V_to_H()
     P_plus.H_to_V()
     return P_plus, P_minus
+
 
 def new_direction(x_0, v_0, P_minus):
     if np.allclose(x_0, v_0):
@@ -132,6 +136,7 @@ def new_direction(x_0, v_0, P_minus):
     else:
         sol = v_0-x_0
     return (sol)/np.linalg.norm(sol)
+
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
 def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):

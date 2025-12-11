@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from xgw.Hyperplane_approx import DoubleRepresentation, Hausdorff, new_direction,update_box
+import pytest
 
-
+@pytest.fixture
+def niter():
+    return 50
 
 def test_Hausdorff(niter):
     inner_square_vertices = [np.array(v) for v in [
@@ -33,7 +36,16 @@ def test_Hausdorff(niter):
         plt.scatter(list_pl[:,0], list_pl[:,1], c='r')
         plt.plot(np.sin(np.linspace(0, 2*np.pi,1000)),np.cos(np.linspace(0, 2*np.pi,1000)), c='b')
         # plt.clf()
-    plt.show()
+        
+    A,b = P_plus.H
+    check = True
+    for i, elem in enumerate(P_minus.V):
+        print(i)
+        if not np.all(A@elem<=b+1e-15):
+            print(np.max(A@elem-b))
+            check =  False
+    assert check
+    plt.clf()
         
     
 
@@ -45,5 +57,5 @@ def iteration_loop(P_plus, P_minus, previous_solutions_to_reuse):
     P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
-if __name__ == '__main__':
-    test_Hausdorff( 5)
+# if __name__ == '__main__':
+#     test_Hausdorff(50)
