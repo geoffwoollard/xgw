@@ -9,9 +9,14 @@ class IncrementalQPProjector:
 
     Uses CVXPY + OSQP with warm-starting.
     """
-    def __init__(self, dim, A=None, b=None):
+    def __init__(self, dim, A=None, b=None, eps_abs=1e-5, eps_rel=1e-5, max_iter=10000, verbose=False):
         self.dim = dim
         self.x = cp.Variable(dim)
+        self.eps_abs = eps_abs
+        self.eps_rel = eps_rel
+        self.max_iter = max_iter
+        self.solver_opts = {'eps_abs': self.eps_abs, 'eps_rel': self.eps_rel, 'max_iter': self.max_iter}
+        self.verbose = verbose
 
         # initially possibly empty constraint list
         self.constraints = []
@@ -33,7 +38,7 @@ class IncrementalQPProjector:
         warm = True uses warm_start=True in CVXPY.
         """
         self.v.value = v_value
-        self.problem.solve(solver=solver, warm_start=warm, verbose=False)
+        self.problem.solve(solver=solver, warm_start=warm, verbose=self.verbose, **self.solver_opts)
         return self.x.value, self.problem.value
 
     def add_constraint(self, a_new, b_new):

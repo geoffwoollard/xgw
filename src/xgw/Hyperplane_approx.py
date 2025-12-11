@@ -2,20 +2,23 @@ import numpy as np
 from numpy.linalg import qr
 import ot
 
-def iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse):
+def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
-    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, R)
-    P_plus, P_minus = update_box(P_plus, P_minus, [g, g_hat], [g_star])
+    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
 
-def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
+def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu)
-    previous_solutions_to_reuse = {}
+    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs)
+    print('box initialized')
+    
     for iter in range(niter):
-        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, R, previous_solutions_to_reuse)
+        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
+        print(iter)
+        P_plus, P_minus, objective, _ = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         if objective < epsilon:
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse
@@ -35,59 +38,52 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
-def test_construct_basis(n1, n2):
-    lin = np.linspace(0, 2, n1)
-    xx, yy = np.meshgrid(lin, lin)
-    space_x = np.vstack([xx.ravel(), yy.ravel()]).T
-    lin = np.linspace(-1, 1, n2)
-    xx, yy = np.meshgrid(lin, lin)
-    space_y = np.vstack([xx.ravel(), yy.ravel()]).T
-    
-    N, dx = space_x.shape
-    M, dy = space_y.shape
-    f_base = np.zeros((N, M, dx*dy)) # constructing the function base f_{i,j}
-    for i in range(dx):
-        for j in range(dy):
-            f_base[:,:, i+j*dx] = np.outer(space_x[:,i], space_y[:,j])
-    
-    e_base, R = construct_basis_eij(space_x, space_y)
-    
-    return np.all(np.isclose(e_base@R, f_base))
 
 class DoubleRepresentation():
+    from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
+
     def __init__(self):
         self.V = []
-        self.H = []
-        pass
+        self.H = ()
 
-    def get_H(self):
-        return self.H
+    def H_to_V(self):
+        A, b = self.H
+        self.V = compute_polytope_vertices(A, b)
 
-    def get_V(self):
-        return self.V
-
-    def H_to_V():
-        '''does the update'''
-        pass
-
-    def V_to_H():
-        '''does the update'''
-        pass
+    def V_to_H(self):
+        A, b = compute_polytope_halfspaces(self.V)
+        self.H = (A,b)
         
     def __len__(self):
         # number of vertices and constraints
-        return len(self.V), len(self.H) 
+        return len(self.V), self.H[0].shape 
     
-    def add_V(self, vertex):
-        self.V.append(vertex)
+    def __str__(self):
+        return f"Vertices: {self.V}\nHalf-planes: {self.H}"
     
-    def add_H(self, vector, scalar):
-        self.H.append([vector,scalar])
+    # could be optimized for a family of vertices
+    def add_V(self, vertex_list):
+        # vertex is a d^2 by 1 vector
+        self.V.extend(vertex_list)
+        self.V_to_H()
+    
+    # could be optimized for a family of vectors and scalars
+    def add_H(self, constraint_list):
+        vector_list = [np.transpose(elem[0]) for elem in constraint_list]
+        scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
+        # vector is a d^2 by 1 vector
+        if self.H != ():
+            vector_list.append(self.H[0])
+            scalar_list.append(self.H[1])
+        A = np.vstack(vector_list)
+        b = np.hstack(scalar_list)
+        self.H = [A, b]
+        self.H_to_V()
     
     def get_centroid(self):
         return np.mean(np.array(self.V))
     
-def initial_box(e_base, mu, nu, R):
+def initial_box(e_base, mu, nu, emd_kwargs):
     '''
     Docstring for initial_box
     
@@ -99,28 +95,31 @@ def initial_box(e_base, mu, nu, R):
     P_plus, P_minus = DoubleRepresentation(), DoubleRepresentation()
     vertex_list = []
     half_plans_list = []
-    
-    
-    for e_i in e_base:
+    a,b,c = e_base.shape
+    for i in range(c):
         for sigma in [-1,1]:
-            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, R)
+            e_i = np.zeros(c)
+            e_i[i] = 1
+            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
     return  P_plus, P_minus
 
-def compute_hyperplane(mu, nu, g, e_base, R):
-    cost_matrix = function_to_cost(g, e_base, R)
-    cost, log = ot.emd2(mu, nu, M=cost_matrix, log=True)
-    return cost, projection(log['T'])
+def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
+    cost_matrix = function_to_cost(g, e_base)
+    map, log = ot.emd(mu, nu, M=-cost_matrix, log=True, **emd_kwargs)
+    return -log['cost'], projection(map, e_base)
+
 
 def projection(pi, e_base):
-    return np.einsum('ijk,ij->k', e_base, pi)
+    return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
 def function_to_cost(g, e_base):
     return np.einsum('ijk,k->ij', e_base, g)
+
 
 def update_box(P_plus, P_minus, half_plans_list, vertex_list):
     P_plus.add_H(half_plans_list)
@@ -129,42 +128,85 @@ def update_box(P_plus, P_minus, half_plans_list, vertex_list):
     P_plus.H_to_V()
     return P_plus, P_minus
 
+
 def new_direction(x_0, v_0, P_minus):
-    # return v_0 - P_minus.get_centroid()
-    return v_0-x_0
+    if np.allclose(x_0, v_0):
+        sol = v_0 - P_minus.get_centroid()
+        assert np.all(sol != 0), f' zero direction'
+        return v_0 - P_minus.get_centroid()
+    else:
+        sol = v_0-x_0
+    return (sol)/np.linalg.norm(sol)
+
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
-def Hausdorff(P_plus, P_minus):
-    cost = np.inf
-    for vertex in P_plus.get_V():
+def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
+    cost = -np.inf
+    for vertex in P_plus.V:
         x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
-        if objective < cost:
+        # x, objective = solve_dist_brute_force(vertex, P_minus)
+        if objective > cost:
             x0, v_0 = x, vertex
             cost = objective
+    print(f'Hausdorff distance :{objective}')
     return x0, v_0, objective, previous_solutions_to_reuse
 
-def build_constraints(P_minus):
-    pass
 
-def build_new_constraint(P_minus):
-    pass
+# def solve_dist_brute_force(vertex, P_minus, tol = 1e-8):
+#     A, b = P_minus.H
+#     V_list = P_minus.V
+#     opt_x = None
+#     objective = + np.inf
+#     for i, elem  in enumerate(A):
+#         dist = np.dot(elem, vertex)- b[i]
+#         proj = vertex - (dist)*elem 
+#         if np.all(A@proj<=b+tol) and dist<objective :
+#             opt_x = proj
+#             objective = dist
+#     for V in V_list:
+#         dist = np.linalg.norm(vertex-V)
+#         if  dist<objective:
+#             opt_x = V
+#             objective = dist
+    
+#     return opt_x,objective
+            
+            
+            
+        
+        
+    
+def build_new_constraint(A_all, b_all, A_old, b_old):
+    # Stack A and b together for comparison
+    all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
+    old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
+
+    # Find index where row is in all_rows but not in old_rows
+    for i, row in enumerate(all_rows):
+        if not any(np.all(row == r) for r in old_rows):
+            new_index = i
+            break
+    a_new = A_all[new_index]
+    b_new = b_all[new_index]
+    return a_new, b_new
 
 def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
     from .qp_incremental_projector import IncrementalQPProjector
     if vertex.tobytes() not in previous_solutions_to_reuse:
-        A, b = build_constraints(P_minus)
-        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A, b=b)
+        A_all, b_all = P_minus.H
+        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
         x, objective = qp_solver.solve(vertex)
     else:
-        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]
-        a_new, b_new = build_new_constraint(P_minus)
+        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
+        A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
+        A_all, b_all = P_minus.H
+        a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
-    previous_solutions_to_reuse[vertex.tobytes()] = qp_solver
+    previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
 
 def minimal_test_2d():
     pass
 
 if __name__ == '__main__':
-    # run_approx()
-    print(test_construct_basis(2, 3))
+    run_approx()
