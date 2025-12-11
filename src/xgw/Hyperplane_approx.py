@@ -100,7 +100,7 @@ def initial_box(e_base, mu, nu):
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
-    return  P_plus, P_minus
+    return P_plus, P_minus
 
 def compute_hyperplane(mu, nu, g, e_base):
     cost_matrix = function_to_cost(g, e_base)
