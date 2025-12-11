@@ -11,11 +11,13 @@ def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse)
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
 
-def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=0.1):
+def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=1e-15):
     e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = initial_box(e_base, mu, nu)
+    print('box initialized')
     previous_solutions_to_reuse = {}
     for iter in range(niter):
+        print(iter)
         P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse)
         if objective < epsilon:
             break
@@ -52,7 +54,7 @@ class DoubleRepresentation():
         
     def __len__(self):
         # number of vertices and constraints
-        return len(self.V), len(self.H) 
+        return len(self.V), self.H[0].shape 
     
     def __str__(self):
         return f"Vertices: {self.V}\nHalf-planes: {self.H}"
@@ -94,7 +96,8 @@ def initial_box(e_base, mu, nu):
     a,b,c = e_base.shape
     for i in range(c):
         for sigma in [-1,1]:
-            e_i = e_base[:,:,i]
+            e_i = np.zeros(c)
+            e_i[i] = 1
             g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
@@ -104,8 +107,8 @@ def initial_box(e_base, mu, nu):
 
 def compute_hyperplane(mu, nu, g, e_base):
     cost_matrix = function_to_cost(g, e_base)
-    cost, log = ot.emd2(mu, nu, M=cost_matrix, log=True)
-    return cost, projection(log['T'])
+    map, log = ot.emd(mu, nu, M=-cost_matrix, log=True)
+    return -log['cost'], -projection(map, e_base)
 
 def projection(pi, e_base):
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
@@ -122,7 +125,7 @@ def update_box(P_plus, P_minus, half_plans_list, vertex_list):
     return P_plus, P_minus
 
 def new_direction(x_0, v_0, P_minus):
-    if x_0 == v_0:
+    if np.allclose(x_0, v_0):
         sol = v_0 - P_minus.get_centroid()
         assert np.all(sol != 0), f' zero direction'
         return v_0 - P_minus.get_centroid()
@@ -132,14 +135,41 @@ def new_direction(x_0, v_0, P_minus):
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
 def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
-    cost = np.inf
+    cost = -np.inf
     for vertex in P_plus.V:
         x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
-        if objective < cost:
+        # x, objective = solve_dist_brute_force(vertex, P_minus)
+        if objective > cost:
             x0, v_0 = x, vertex
             cost = objective
+    print(f'Hausdorff distance :{objective}')
     return x0, v_0, objective, previous_solutions_to_reuse
 
+
+# def solve_dist_brute_force(vertex, P_minus, tol = 1e-8):
+#     A, b = P_minus.H
+#     V_list = P_minus.V
+#     opt_x = None
+#     objective = + np.inf
+#     for i, elem  in enumerate(A):
+#         dist = np.dot(elem, vertex)- b[i]
+#         proj = vertex - (dist)*elem 
+#         if np.all(A@proj<=b+tol) and dist<objective :
+#             opt_x = proj
+#             objective = dist
+#     for V in V_list:
+#         dist = np.linalg.norm(vertex-V)
+#         if  dist<objective:
+#             opt_x = V
+#             objective = dist
+    
+#     return opt_x,objective
+            
+            
+            
+        
+        
+    
 def build_new_constraint(A_all, b_all, A_old, b_old):
     # Stack A and b together for comparison
     all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
