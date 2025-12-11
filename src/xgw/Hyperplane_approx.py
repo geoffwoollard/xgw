@@ -18,7 +18,7 @@ def run_approx(mu, nu, space_x, space_y, niter=100, epsilon=1e-15):
     previous_solutions_to_reuse = {}
     for iter in range(niter):
         print(iter)
-        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse)
+        P_plus, P_minus, objective, previous_solutions_to_reuse = iteration_loop(mu, nu, P_plus, P_minus, e_base, {}) # previous_solutions_to_reuse
         if objective < epsilon:
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse
@@ -108,7 +108,7 @@ def initial_box(e_base, mu, nu):
 def compute_hyperplane(mu, nu, g, e_base):
     cost_matrix = function_to_cost(g, e_base)
     map, log = ot.emd(mu, nu, M=-cost_matrix, log=True)
-    return -log['cost'], -projection(map, e_base)
+    return -log['cost'], projection(map, e_base)
 
 def projection(pi, e_base):
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)

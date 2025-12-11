@@ -43,7 +43,38 @@ def test_initial_box():
     assert check
 
     
+def simple_marginals_2D():
+    mu = np.array([1/3,1/3,1/3])
+    nu = mu = np.array([1/3,1/3,1/3])
+    space_x = np.array([[0,0],[0,1],[1,1]])
+    space_y = np.array([[0,0],[0,2],[1,2]])
+    return mu, nu, space_x, space_y
 
+def test_simple_marginals(niter, tol = 1e-5):
+    mu, nu, space_x, space_y = simple_marginals_2D()
+    x_1, x_2 = space_x.shape
+    y_1, y_2 = space_y.shape
+    print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
+    
+    P_plus, P_minus, objective, previous_solutions_to_reuse = run_approx(mu, nu, space_x, space_y, niter = niter)
+    _, _, new_obj, _ = Hausdorff( P_plus, P_minus, {})
+    
+    print(f'final  Hausdorf {new_obj}')
+    # computing Hausdorff distance
+    assert new_obj<=objective
+    # checking P_minus is included in P_plus 
+    A,b = P_plus.H
+    check = True
+    for i, elem in enumerate(P_minus.V):
+        print(i)
+        if not np.all(A@elem<=b+tol):
+            print(A@elem-b)
+            check =  False
+    assert check
+    
+    
+    
+    
 
 
 
@@ -78,5 +109,6 @@ def projection_2d(niter):
     
     # P_plus, P_minus, objective, previous_solutions_to_reuse = test_overall()
 
-test_overall(10)
+# test_overall(10)
+test_simple_marginals(4)
 # test_initial_box()

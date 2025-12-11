@@ -33,6 +33,15 @@ def test_Hausdorff(niter):
         plt.scatter(list_pl[:,0], list_pl[:,1], c='r')
         plt.plot(np.sin(np.linspace(0, 2*np.pi,1000)),np.cos(np.linspace(0, 2*np.pi,1000)), c='b')
         # plt.clf()
+        
+    A,b = P_plus.H
+    check = True
+    for i, elem in enumerate(P_minus.V):
+        print(i)
+        if not np.all(A@elem<=b+1e-15):
+            print(np.max(A@elem-b))
+            check =  False
+    assert check
     plt.show()
         
     
@@ -46,4 +55,4 @@ def iteration_loop(P_plus, P_minus, previous_solutions_to_reuse):
     return P_plus, P_minus, objective, previous_solutions_to_reuse
 
 if __name__ == '__main__':
-    test_Hausdorff( 5)
+    test_Hausdorff(50)
