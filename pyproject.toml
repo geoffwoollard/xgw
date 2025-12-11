@@ -51,7 +51,6 @@ dev = [
   "mypy",
   "pre-commit",
   "ruff",
-  "pypoman",
 ]
 
 [project.urls]
