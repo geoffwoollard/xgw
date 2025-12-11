@@ -42,6 +42,7 @@ dependencies = [
   "numpy",
   "scipy",
   "POT",
+  "pypoman",
 ]
 
 
