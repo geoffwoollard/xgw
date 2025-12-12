@@ -33,23 +33,19 @@ def marginals():
     
     return mu, nu, space_x, space_y
 
+
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
     e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu)
+    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs={})
     assert len(P_minus.V) == 8
     assert len(P_plus.V) == 16
     assert P_plus.H[0].shape == (8,4)
     assert P_minus.H[0].shape == (16,4)
     
-    A,b = P_plus.H
-    
-    check = True
-    for elem in P_minus.V:
-        if not np.all(np.logical_or(A@elem<=b, np.isclose(A@elem,b))):
-            logger.info(f'residual {A@elem-b}')
-            check =  False
-    assert check
+    residuals = P_plus_outside_P_minus(P_plus, P_minus)
+    atol = 1e-15
+    assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
 
 def simple_marginals_2D():
@@ -59,6 +55,10 @@ def simple_marginals_2D():
     space_y = np.array([[3,0],[4,2],[1,2]])
     return mu, nu, space_x, space_y
 
+@pytest.fixture
+def niter():
+    return 10
+
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))
     for i,j in enumerate(permut):
@@ -66,19 +66,26 @@ def permut_matrix(permut, dim):
     return sol
         
 
-def test_simple_marginals(niter, tol = 1e-5):
+def test_simple_marginals(niter):
     mu, nu, space_x, space_y = simple_marginals_2D()
     x_1, x_2 = space_x.shape
     y_1, y_2 = space_y.shape
     print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
     
-    P_plus, P_minus, objective, previous_solutions_to_reuse = run_approx(mu, nu, space_x, space_y, niter = niter)
+    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+    logger.info(f'Objective list over iterations: {objective_list}')
+    diffs = np.diff(objective_list)
+    tol = 1e-16
+    assert np.all(diffs < tol), f'Objective not non-increasing, diffs: {diffs}'
     _, _, new_obj, _ = Hausdorff( P_plus, P_minus, {})
     
     print(f'final  Hausdorf {new_obj}')
-    # computing Hausdorff distance
     assert new_obj<=objective
-    
+    residuals = P_plus_outside_P_minus(P_plus, P_minus)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_minus in P_plus : {residuals.max()}')
+
     
     e_base, _ = construct_basis_eij(space_x, space_y)
     coupling_vertices = [permut_matrix(elem, 3)/3 for elem in permutations([0,1,2])] # the true vertices of the coupling polytopes are the permutation matrices
@@ -150,32 +157,18 @@ def test_overall(niter, marginals):
     y_1, y_2 = space_y.shape
     logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
     
-    P_plus, P_minus, objective, previous_solutions_to_reuse = run_approx(mu, nu, space_x, space_y, niter = niter)
+    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
+    logger.info(f'Objective list over iterations: {objective_list}')
+    diffs = np.diff(objective_list)
+    tol = 1e-16
+
+    assert np.all(diffs < tol), f'Objective not non-increasing, diffs: {diffs}'
     _, _, new_obj, _ = Hausdorff( P_plus, P_minus, previous_solutions_to_reuse)
     
     logger.info(f'final  Hausdorf {new_obj - objective}')
-    # computing Hausdorff distance
-    # assert new_obj<=objective
-    # checking P_minus is included in P_plus 
-    # P_minus.V_to_H()
-    # vertices_list = P_minus.V
-    # A,b  = compute_polytope_halfspaces(vertices_list)
-    A,b = P_plus.H
-    check = True
-    for i, elem in enumerate(P_minus.V):
-        logger.info(f'Checking vertex {i}')
-        if not np.all(np.logical_or(A@elem<=b, np.isclose(A@elem,b))):
-            logger.info(f'residual {A@elem-b}')
-            assert False
-    
-    # return P_plus, P_minus, objective, previous_solutions_to_reuse
+    assert new_obj<=objective
 
+    residuals = P_plus_outside_P_minus(P_plus, P_minus)
+    atol = 1e-17
+    assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
-
-# test_overall(10)
-# test_simple_marginals(20)
-# test_initial_box()
-
-
-# innerset smaller than outerset
-# H non increasing over iteration
