@@ -26,5 +26,3 @@ def test_construct_basis():
         e_base, R = construct_basis_eij(space_x, space_y)
         
         assert np.all(np.isclose(e_base@R, f_base))
-
-test_construct_basis()
