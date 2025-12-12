@@ -4,6 +4,7 @@ from xgw.Hyperplane_approx import construct_basis_eij
 
 logger = logging.getLogger(__name__)
 
+
 def test_construct_basis():
     elem = np.meshgrid(np.array([3,5,8]), np.array([2,5,6]))
     n1_arr = np.ravel(elem[0])
