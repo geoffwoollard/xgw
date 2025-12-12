@@ -176,6 +176,8 @@ def test_simple_marginals(simple_marginals_2D):
         atol = 1e-14
         assert np.all(residuals <= atol), f'max residual for inclusion of P_true in P_plus : {residuals.max()}'
 
+    logger.info(f'P_plus volumes over iterations: {P_plus_volumes}')
+    logger.info(f'P_minus volumes over iterations: {P_minus_volumes}')
     true_volume = volume_convex_hull_from_vertices(np.array(projected_couplings))
     assert P_plus_volumes[-1] >= true_volume, f'P_plus volume {P_plus_volumes[-1]} should be at least the true volume {true_volume}'
     assert P_minus_volumes[-1] <= true_volume, f'P_minus volume {P_minus_volumes[-1]} should be at most the true volume {true_volume}'
