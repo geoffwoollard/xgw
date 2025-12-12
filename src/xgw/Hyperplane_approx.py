@@ -56,11 +56,25 @@ class DoubleRepresentation():
     def __init__(self):
         self.V = []
         self.H = ()
+        self.duplicate_tol = 1e-8
 
+    def remove_duplicates_V(self):
+        """
+        Remove duplicates from self.V up to a Euclidean distance tolerance.
+        """
+        V_array = np.array(self.V)
+        keep = []
+        
+        for i, v in enumerate(V_array):
+            if not any(np.linalg.norm(v - np.array(V_array[j])) < self.duplicate_tol for j in keep):
+                keep.append(i)
+        
+        self.V = [V_array[i] for i in keep]
 
     def H_to_V(self):
         A, b = self.H
         self.V = compute_polytope_vertices(A, b)
+        # self.remove_duplicates_V()
 
     def V_to_H(self):
         A, b = compute_polytope_halfspaces(self.V)
@@ -77,6 +91,7 @@ class DoubleRepresentation():
     def add_V(self, vertex_list):
         # vertex is a d^2 by 1 vector
         self.V.extend(vertex_list)
+        self.remove_duplicates_V()
         self.V_to_H()
     
     # could be optimized for a family of vectors and scalars

@@ -1,11 +1,14 @@
 import numpy as np
 import pytest
 import matplotlib.pyplot as plt
-from xgw.Hyperplane_approx import *
 import logging
 import itertools as it
-
+from scipy.spatial import Delaunay
+import math
 from pypoman.polygon import compute_polygon_hull
+
+from xgw.Hyperplane_approx import run_approx, construct_basis_eij, P_plus_outside_P_minus, projection, Hausdorff, initial_box, DoubleRepresentation
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -64,7 +67,12 @@ def permut_matrix(permut, dim):
         
 
 def test_simple_marginals(simple_marginals_2D):
-    for niter in range(1,5):
+    P_plus_volumes = []
+    P_minus_volumes = []
+    max_niter = 10
+    iteration_list = list(range(1, max_niter+1))
+    for niter in iteration_list:
+        logger.info(f'Testing simple marginals with niter={niter}')
         mu, nu, space_x, space_y = simple_marginals_2D
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
@@ -82,6 +90,17 @@ def test_simple_marginals(simple_marginals_2D):
         assert np.all(diffs < overly_high_tolerance), msg # TODO: fix this test, unclear why not passing
         logger.info(msg)
         _, _, new_obj, _ = Hausdorff( P_plus, P_minus, {})
+
+        P_plus_vol = volume_convex_hull_from_vertices(np.array(P_plus.V))
+        try:
+
+            P_minus_vol = volume_convex_hull_from_vertices(np.array(P_minus.V))
+        except Exception as e:
+            logger.error(f'Error computing P_minus volume: {e}')
+            P_minus_vol = np.nan
+        P_plus_volumes.append(P_plus_vol)
+        P_minus_volumes.append(P_minus_vol)
+        logger.info(f'P_plus volume: {P_plus_vol}, P_minus volume: {P_minus_vol}')
         
         print(f'final  Hausdorf {new_obj}')
         # assert new_obj<=objective # TODO: turn back on when fixed
@@ -118,7 +137,6 @@ def test_simple_marginals(simple_marginals_2D):
             logger.info(f'new point on face: {new_point_on_face}')
             axes[idx].scatter(new_point_on_face[i], new_point_on_face[j], c='r', label=r'new $x_0$', marker='*', s=300, alpha=0.5)
             axes[idx].scatter(newly_added_vertex[i], newly_added_vertex[j], c='k', label=r'new $v_0$', marker='x', s=300, alpha=0.5)
-        # ---- COLLECT AND DEDUP LEGEND ITEMS ----
         handles, labels = [], []
         for ax in axes:
             h, l = ax.get_legend_handles_labels()
@@ -140,7 +158,7 @@ def test_simple_marginals(simple_marginals_2D):
         
         
         P_true = DoubleRepresentation()
-        P_true.add_V (projected_couplings)
+        P_true.add_V(projected_couplings)
         P_true.H_to_V()
         
         # checking P_minus is included in P_plus 
@@ -157,11 +175,49 @@ def test_simple_marginals(simple_marginals_2D):
         residuals = P_plus_outside_P_minus(P_plus, P_true)
         atol = 1e-14
         assert np.all(residuals <= atol), f'max residual for inclusion of P_true in P_plus : {residuals.max()}'
+
+    true_volume = volume_convex_hull_from_vertices(np.array(projected_couplings))
+    assert P_plus_volumes[-1] >= true_volume, f'P_plus volume {P_plus_volumes[-1]} should be at least the true volume {true_volume}'
+    assert P_minus_volumes[-1] <= true_volume, f'P_minus volume {P_minus_volumes[-1]} should be at most the true volume {true_volume}'
+    n_panels = 3
+    fig, axes = plt.subplots(n_panels,1, figsize=(8,10))
+    axes[0].plot(iteration_list, P_plus_volumes, color='k', label='P_plus volume')
+    axes[1].plot(iteration_list, P_minus_volumes, color='r', label='P_minus volume')
+    axes[2].plot(range(len(objective_list)), objective_list, color='blue', label='Haussdorff distance')
+    for idx in range(n_panels):
+        axes[idx].set_xlabel('Iteration')
+        if idx < 2:
+            axes[idx].set_ylabel('Volume')
+            axes[idx].hlines(true_volume, 1, max_niter, colors='gray', linestyles='dashed', label='True volume')
+        else:
+            axes[idx].set_ylabel('Hausdorff distance')
+        axes[idx].legend()
+    fig.savefig('tests/results/test_volume_P_plus_minus_simple_marginals.png')
+    plt.close(fig)  
     
 @pytest.fixture
 def niter():
     return 5
 
+
+def volume_convex_hull_from_vertices(vertices):
+    """
+    vertices: (N, d) numpy array of points
+    returns approximate exact volume via Delaunay triangulation
+    """
+    d = vertices.shape[1]
+    
+    # triangulate points
+    tri = Delaunay(vertices)
+    
+    vol = 0.0
+    for simplex in tri.simplices:
+        verts = vertices[simplex]  # shape (d+1, d)
+        base = verts[0]
+        M = verts[1:] - base      # d x d matrix
+        vol += abs(np.linalg.det(M))
+    
+    return vol / math.factorial(d)
 
 def test_overall(niter, marginals):
     mu, nu, space_x, space_y = marginals
