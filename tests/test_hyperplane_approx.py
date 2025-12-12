@@ -116,35 +116,22 @@ def test_simple_marginals(niter):
     P_true.H_to_V()
     
     # checking P_minus is included in P_plus 
-    A,b = P_plus.H
-    check = True
-    for i, elem in enumerate(P_minus.V):
-        logger.info(f'Checking vertex {i}')
-        if not np.all(A@elem<=b+tol):
-            logger.info(f'residual {A@elem-b}')
-            check =  False
-    assert check, f'P_minus no included in P_plus'
+    residuals = P_plus_outside_P_minus(P_plus, P_minus)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_minus in P_plus : {residuals.max()}')
     
     # checking P_minus is included in P_true 
-    A,b = P_true.H
-    check = True
-    for i, elem in enumerate(P_minus.V):
-        logger.info(f'Checking vertex {i}')
-        if not np.all(A@elem<=b+tol):
-            logger.info(f'residual {A@elem-b}')
-            print (A@elem-b)
-            check =  False
-    assert check, f'P_minus no included in P_true'
+    residuals = P_plus_outside_P_minus(P_plus, P_true)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_minus in P_true : {residuals.max()}')
     
     # checking P_true is included in P_plus 
-    A,b = P_plus.H
-    check = True
-    for i, elem in enumerate(P_true.V):
-        logger.info(f'Checking vertex {i}')
-        if not np.all(A@elem<=b+tol):
-            logger.info(f'residual {A@elem-b}')
-            check =  False
-    assert check, f'P_true no included in P_plus'
+    residuals = P_plus_outside_P_minus(P_true, P_plus)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_true in P_plus : {residuals.max()}')
     
 @pytest.fixture
 def niter():
@@ -172,3 +159,5 @@ def test_overall(niter, marginals):
     atol = 1e-17
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
+
+# test_simple_marginals(10)

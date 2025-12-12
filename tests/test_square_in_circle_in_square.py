@@ -70,18 +70,19 @@ def test_minimal_2d(n_iter):
     
 
     np.random.seed(42)
-    for _ in range(n_iter):
+    for iter in range(n_iter):
         P_plus, P_minus, _, previous_solutions_to_reuse = iteration_loop_circle(P_plus=P_plus, P_minus=P_minus, previous_solutions_to_reuse=previous_solutions_to_reuse)
     
         plt.figure()
         list_min = np.array(P_minus.V)
-        plt.scatter(list_min[:,0], list_min[:,1], c='k')
+        plt.scatter(list_min[:,0], list_min[:,1], c='k',  label=r'$P_{\Pi}^=$')
         list_pl = np.array(P_plus.V)
-        plt.scatter(list_pl[:,0], list_pl[:,1], c='r')
+        plt.scatter(list_pl[:,0], list_pl[:,1], c='r', label=r'$P_{\Pi}^+$')
         n_circle = 1000
         theta_grid = np.linspace(0, 2*np.pi,n_circle)
         plt.plot(np.sin(theta_grid),np.cos(theta_grid), c='b')
         plt.title(f'circle approximation iteration n. {iter}')
+        plt.legend()
         plt.savefig(f'img/circle_approx{iter}')
         plt.close()
 
