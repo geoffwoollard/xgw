@@ -83,7 +83,7 @@ def test_minimal_2d(n_iter):
         plt.plot(np.sin(theta_grid),np.cos(theta_grid), c='b')
         plt.title(f'circle approximation iteration n. {iter}')
         plt.legend()
-        plt.savefig(f'img/circle_approx{iter}')
+        plt.savefig(f'tests/results/circle_approx{iter}', dpi=50)
         plt.close()
 
     residuals = P_plus_outside_P_minus(P_plus, P_minus)
