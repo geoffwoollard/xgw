@@ -185,7 +185,7 @@ def test_simple_marginals(simple_marginals_2D):
     fig, axes = plt.subplots(n_panels,1, figsize=(8,10))
     axes[0].plot(iteration_list, P_plus_volumes, color='k', label='P_plus volume')
     axes[1].plot(iteration_list, P_minus_volumes, color='r', label='P_minus volume')
-    axes[2].plot(range(len(objective_list)), objective_list, color='blue', label='Haussdorff distance')
+    axes[2].plot(range(1, len(objective_list) + 1), objective_list, color='blue', label='Haussdorff distance')
     for idx in range(n_panels):
         axes[idx].set_xlabel('Iteration')
         if idx < 2:
