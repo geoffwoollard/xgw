@@ -1,12 +1,13 @@
 import numpy as np
 import pytest
+import matplotlib.pyplot as plt
+from xgw.Hyperplane_approx import *
 import logging
-
-from xgw.Hyperplane_approx import construct_basis_eij, initial_box, run_approx, Hausdorff, P_plus_outside_P_minus
+from itertools import permutations
+from pypoman.polygon import compute_polygon_hull
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-    
 
 @pytest.fixture
 def marginals():
@@ -46,17 +47,24 @@ def test_initial_box(marginals):
     atol = 1e-15
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
-    
+
 def simple_marginals_2D():
     mu = np.array([1/3,1/3,1/3])
     nu = mu = np.array([1/3,1/3,1/3])
-    space_x = np.array([[0,0],[0,1],[1,1]])
-    space_y = np.array([[0,0],[0,2],[1,2]])
+    space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
+    space_y = np.array([[3,0],[4,2],[1,2]])
     return mu, nu, space_x, space_y
 
 @pytest.fixture
 def niter():
     return 10
+
+def permut_matrix(permut, dim):
+    sol = np.zeros((dim,dim))
+    for i,j in enumerate(permut):
+        sol[i,j] = 1
+    return sol
+        
 
 def test_simple_marginals(niter):
     mu, nu, space_x, space_y = simple_marginals_2D()
@@ -73,12 +81,57 @@ def test_simple_marginals(niter):
     
     print(f'final  Hausdorf {new_obj}')
     assert new_obj<=objective
-    
     residuals = P_plus_outside_P_minus(P_plus, P_minus)
     atol = 1e-20
     assert np.all(residuals <= atol)
     logger.info(f'max residual for inclusion of P_minus in P_plus : {residuals.max()}')
 
+    
+    e_base, _ = construct_basis_eij(space_x, space_y)
+    coupling_vertices = [permut_matrix(elem, 3)/3 for elem in permutations([0,1,2])] # the true vertices of the coupling polytopes are the permutation matrices
+
+    projected_couplings = [projection(vertex, e_base) for vertex in coupling_vertices]
+    
+    # ploting the projection in 2d of P_minus, projected_vertices and  P_plus
+    P_minus_proj = np.array(P_minus.V)
+    P_plus_proj = np.array(P_plus.V)
+    
+    P_true_proj_2d = DoubleRepresentation()
+    P_true_proj_2d.add_V (np.array(projected_couplings)[:,:2])
+    A, b = P_true_proj_2d.H
+    true_vertices = np.array(compute_polygon_hull(A, b))
+
+    plt.figure()
+    plt.title('2D projection of the 4D spaces')
+    plt.fill(true_vertices[:,0],true_vertices[:,1],  label=r'$P_{\Pi}$', alpha=0.3 )
+    plt.scatter(P_plus_proj[:,0], P_plus_proj[:,1],c='k', label=r'$P_{\Pi}^+$')
+    plt.scatter(P_minus_proj[:,0], P_minus_proj[:,1],c='r', label=r'$P_{\Pi}^-$')
+    plt.legend()
+    plt.savefig('img/test_projection_coupling_P_plus_minus')
+    plt.close()
+    
+    
+    P_true = DoubleRepresentation()
+    P_true.add_V (projected_couplings)
+    P_true.H_to_V()
+    
+    # checking P_minus is included in P_plus 
+    residuals = P_plus_outside_P_minus(P_plus, P_minus)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_minus in P_plus : {residuals.max()}')
+    
+    # checking P_minus is included in P_true 
+    residuals = P_plus_outside_P_minus(P_plus, P_true)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_minus in P_true : {residuals.max()}')
+    
+    # checking P_true is included in P_plus 
+    residuals = P_plus_outside_P_minus(P_true, P_plus)
+    atol = 1e-20
+    assert np.all(residuals <= atol)
+    logger.info(f'max residual for inclusion of P_true in P_plus : {residuals.max()}')
     
 @pytest.fixture
 def niter():
@@ -106,3 +159,5 @@ def test_overall(niter, marginals):
     atol = 1e-17
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
+
+# test_simple_marginals(10)
