@@ -4,5 +4,5 @@ __pycache__
 *.npy
 .conda
 img
-
+tests/results
 !/**/.gitkeep
