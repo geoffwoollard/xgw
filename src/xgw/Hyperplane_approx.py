@@ -22,13 +22,16 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs)
     print('box initialized')
     
+    objective_list = []
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
         P_plus, P_minus, objective, _ = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        objective_list.append(objective)
+        logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return P_plus, P_minus, objective, previous_solutions_to_reuse
+    return P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list
         
 
 def construct_basis_eij(space_x, space_y):
@@ -178,10 +181,14 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
 #     return opt_x,objective
             
             
-            
+def P_plus_outside_P_minus(P_plus, P_minus):
+    '''Check P_minus is included in P_plus'''
+    A,b = P_plus.H
+    residuals = [A@elem - b for elem in P_minus.V]
+    residuals = np.array(residuals)
+    return residuals        
         
         
-    
 def build_new_constraint(A_all, b_all, A_old, b_old):
     # Stack A and b together for comparison
     all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
@@ -214,5 +221,3 @@ def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
 def minimal_test_2d():
     pass
 
-if __name__ == '__main__':
-    run_approx()
