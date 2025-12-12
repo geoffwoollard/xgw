@@ -35,7 +35,9 @@ def test_Hausdorff(niter):
         list_pl = np.array(P_plus.V)
         plt.scatter(list_pl[:,0], list_pl[:,1], c='r')
         plt.plot(np.sin(np.linspace(0, 2*np.pi,1000)),np.cos(np.linspace(0, 2*np.pi,1000)), c='b')
-        # plt.clf()
+        plt.title(f'circle approximation iteration n. {iter}')
+        plt.savefig(f'img/circle_approx{iter}')
+        plt.close()
         
     A,b = P_plus.H
     check = True

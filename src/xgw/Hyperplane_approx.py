@@ -2,7 +2,6 @@ import numpy as np
 from numpy.linalg import qr
 import ot
 from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
-from itertools import permutations
 
 def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)

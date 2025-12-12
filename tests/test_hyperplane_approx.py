@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
+import matplotlib.pyplot as plt
 from xgw.Hyperplane_approx import *
 import logging
+from itertools import permutations
+from pypoman.polygon import compute_polygon_hull
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -48,19 +51,18 @@ def test_initial_box(marginals):
             check =  False
     assert check
 
-    
+
 def simple_marginals_2D():
     mu = np.array([1/3,1/3,1/3])
     nu = mu = np.array([1/3,1/3,1/3])
-    space_x = np.array([[0,0],[0,1],[1,1]])
-    space_y = np.array([[0,0],[0,2],[1,2]])
+    space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
+    space_y = np.array([[3,0],[4,2],[1,2]])
     return mu, nu, space_x, space_y
 
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))
-    for elem in permut:
-        for i in range(dim):
-            sol[i,elem[i]]=1
+    for i,j in enumerate(permut):
+        sol[i,j] = 1
     return sol
         
 
@@ -77,7 +79,34 @@ def test_simple_marginals(niter, tol = 1e-5):
     # computing Hausdorff distance
     assert new_obj<=objective
     
-    coupling = [permut_matrix(elem, 3) for elem in permutations([0,1,2])]
+    
+    e_base, _ = construct_basis_eij(space_x, space_y)
+    coupling_vertices = [permut_matrix(elem, 3)/3 for elem in permutations([0,1,2])] # the true vertices of the coupling polytopes are the permutation matrices
+
+    projected_couplings = [projection(vertex, e_base) for vertex in coupling_vertices]
+    
+    # ploting the projection in 2d of P_minus, projected_vertices and  P_plus
+    P_minus_proj = np.array(P_minus.V)
+    P_plus_proj = np.array(P_plus.V)
+    
+    P_true_proj_2d = DoubleRepresentation()
+    P_true_proj_2d.add_V (np.array(projected_couplings)[:,:2])
+    A, b = P_true_proj_2d.H
+    true_vertices = np.array(compute_polygon_hull(A, b))
+
+    plt.figure()
+    plt.title('2D projection of the 4D spaces')
+    plt.fill(true_vertices[:,0],true_vertices[:,1],  label=r'$P_{\Pi}$', alpha=0.3 )
+    plt.scatter(P_plus_proj[:,0], P_plus_proj[:,1],c='k', label=r'$P_{\Pi}^+$')
+    plt.scatter(P_minus_proj[:,0], P_minus_proj[:,1],c='r', label=r'$P_{\Pi}^-$')
+    plt.legend()
+    plt.savefig('img/test_projection_coupling_P_plus_minus')
+    plt.close()
+    
+    
+    P_true = DoubleRepresentation()
+    P_true.add_V (projected_couplings)
+    P_true.H_to_V()
     
     # checking P_minus is included in P_plus 
     A,b = P_plus.H
@@ -87,7 +116,28 @@ def test_simple_marginals(niter, tol = 1e-5):
         if not np.all(A@elem<=b+tol):
             logger.info(f'residual {A@elem-b}')
             check =  False
-    assert check
+    assert check, f'P_minus no included in P_plus'
+    
+    # checking P_minus is included in P_true 
+    A,b = P_true.H
+    check = True
+    for i, elem in enumerate(P_minus.V):
+        logger.info(f'Checking vertex {i}')
+        if not np.all(A@elem<=b+tol):
+            logger.info(f'residual {A@elem-b}')
+            print (A@elem-b)
+            check =  False
+    assert check, f'P_minus no included in P_true'
+    
+    # checking P_true is included in P_plus 
+    A,b = P_plus.H
+    check = True
+    for i, elem in enumerate(P_true.V):
+        logger.info(f'Checking vertex {i}')
+        if not np.all(A@elem<=b+tol):
+            logger.info(f'residual {A@elem-b}')
+            check =  False
+    assert check, f'P_true no included in P_plus'
     
 @pytest.fixture
 def niter():
@@ -118,18 +168,14 @@ def test_overall(niter, marginals):
             logger.info(f'residual {A@elem-b}')
             assert False
     
-    return P_plus, P_minus, objective, previous_solutions_to_reuse
+    # return P_plus, P_minus, objective, previous_solutions_to_reuse
 
-def projection_2d(niter):
-    pass
-    
-    # P_plus, P_minus, objective, previous_solutions_to_reuse = test_overall()
+
 
 # test_overall(10)
-# test_simple_marginals(4)
+# test_simple_marginals(20)
 # test_initial_box()
 
 
 # innerset smaller than outerset
 # H non increasing over iteration
-# vertices of innerset are in outer set
