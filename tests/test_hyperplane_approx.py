@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import logging
 import itertools as it
 from scipy.spatial import Delaunay
+from copy import deepcopy
 import math
 from pypoman.polygon import compute_polygon_hull
 
@@ -241,6 +242,30 @@ def test_overall(niter, marginals):
     residuals = P_plus_outside_P_minus(P_plus, P_minus)
     atol = 1e-17
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
+
+
+def test_P_monotonicity(marginals):
+    P_plus_old = DoubleRepresentation
+    P_minus_old = DoubleRepresentation
+    max_niter = 10
+    iteration_list = list(range(1, max_niter+1))
+    for niter in iteration_list:
+        mu, nu, space_x, space_y = marginals
+        x_1, x_2 = space_x.shape
+        y_1, y_2 = space_y.shape
+        
+        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        if niter>1:
+            residuals = P_plus_outside_P_minus(P_plus_old, P_plus)
+            atol = 1e-12
+            assert np.all(residuals <= atol), f'max residual for inclusion of P_plus in P_plus_old : {residuals.max()}'
+            residuals = P_plus_outside_P_minus( P_minus, P_minus_old)
+            atol = 1e-12
+            assert np.all(residuals <= atol), f'max residual for inclusion of  P_minus_old in P_minus : {residuals.max()}'
+            
+        P_plus_old = deepcopy(P_plus)
+        P_minus_old = deepcopy(P_minus)
+
 
 
 # test_simple_marginals(10)
