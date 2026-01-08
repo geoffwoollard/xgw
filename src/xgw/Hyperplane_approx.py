@@ -9,7 +9,7 @@ try:
 except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
-def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
@@ -18,8 +18,7 @@ def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse,
 
 
 def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs)
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     print('box initialized')
     
     objective_list = []
@@ -27,7 +26,7 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, _, x_0, v_0 = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        P_plus, P_minus, objective, _, x_0, v_0 = iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         x_0_list.append(x_0)
         v_0_list.append(v_0)
@@ -51,6 +50,12 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
+def e_to_f(vect, R):
+    dx = len(R)
+    return np.reshape(vect@R,(dx,dx))
+
+def f_to_e(vect, R_inv):
+    return np.ravel(vect) @ R_inv
 
 class DoubleRepresentation():
     def __init__(self):
@@ -110,7 +115,7 @@ class DoubleRepresentation():
     def get_centroid(self):
         return np.mean(np.array(self.V))
     
-def initial_box(e_base, mu, nu, emd_kwargs):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     '''
     Docstring for initial_box
     
@@ -119,6 +124,7 @@ def initial_box(e_base, mu, nu, emd_kwargs):
     :param nu: marginal 2
     creates an initial rectangle bounding 
     '''
+    e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = DoubleRepresentation(), DoubleRepresentation()
     vertex_list = []
     half_plans_list = []
@@ -132,7 +138,7 @@ def initial_box(e_base, mu, nu, emd_kwargs):
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
-    return P_plus, P_minus
+    return e_base, R, P_plus, P_minus
 
 def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
     cost_matrix = function_to_cost(g, e_base)
@@ -179,25 +185,6 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
     return x0, v_0, objective, previous_solutions_to_reuse
 
 
-# def solve_dist_brute_force(vertex, P_minus, tol = 1e-8):
-#     A, b = P_minus.H
-#     V_list = P_minus.V
-#     opt_x = None
-#     objective = + np.inf
-#     for i, elem  in enumerate(A):
-#         dist = np.dot(elem, vertex)- b[i]
-#         proj = vertex - (dist)*elem 
-#         if np.all(A@proj<=b+tol) and dist<objective :
-#             opt_x = proj
-#             objective = dist
-#     for V in V_list:
-#         dist = np.linalg.norm(vertex-V)
-#         if  dist<objective:
-#             opt_x = V
-#             objective = dist
-    
-#     return opt_x,objective
-            
             
 def P_plus_outside_P_minus(P_plus, P_minus):
     '''Check P_minus is included in P_plus'''
@@ -235,7 +222,4 @@ def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
-
-def minimal_test_2d():
-    pass
 
