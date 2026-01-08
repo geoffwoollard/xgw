@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import qr
+from numba import njit
 import ot
 import logging
 logger = logging.getLogger(__name__)
@@ -50,10 +51,12 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
+@njit
 def e_to_f(vect, R):
     dx = len(R)
     return np.reshape(vect@R,(dx,dx))
 
+@njit
 def f_to_e(vect, R_inv):
     return np.ravel(vect) @ R_inv
 
