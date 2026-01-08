@@ -41,8 +41,7 @@ def marginals():
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs={})
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={})
     assert len(P_minus.V) == 8
     assert len(P_plus.V) == 16
     assert P_plus.H[0].shape == (8,4)
