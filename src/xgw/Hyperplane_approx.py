@@ -10,7 +10,7 @@ try:
 except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
-def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+def _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
@@ -18,7 +18,7 @@ def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions
     return P_plus, P_minus, objective, previous_solutions_to_reuse, x_0, v_0
 
 
-def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     print('box initialized')
     
@@ -27,7 +27,7 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, _, x_0, v_0 = iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        P_plus, P_minus, objective, _, x_0, v_0 = _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         x_0_list.append(x_0)
         v_0_list.append(v_0)
@@ -36,6 +36,28 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
         
+
+def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+    x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
+    g = new_direction(x_0, v_0, P_minus)
+    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+    return P_plus, P_minus, objective, previous_solutions_to_reuse
+
+def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    print('box initialized')
+    
+    objective_list = []
+    for iter in range(niter):
+        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
+        print(iter)
+        P_plus, P_minus, objective, previous_solutions_to_reuse  = iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        objective_list.append(objective)
+        logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
+        if objective < epsilon:
+            break
+    return P_minus, objective, R, e_base
 
 def construct_basis_eij(space_x, space_y):
     # finding orthonormal basis : Q = [e_1,...,e_dx*dy] orthonormal base (ei flatten), f_base = [f1,...,f_dx*dy] = e_base@R, R triangular superior matrix of size dx*dy^2, e_base (N, M) by dx*dy tensor, f_base (N, M) by dx*dy tensor

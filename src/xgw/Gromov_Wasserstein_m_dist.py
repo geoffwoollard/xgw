@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 import ot
 from ncpol2sdpa import generate_variables, SdpRelaxation
-from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_cost
+from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_cost, Frank_Wolfe_polynomial
 from .Hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, function_to_cost
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
@@ -134,10 +134,11 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     cost_matrix = function_to_cost(x_minus, e_base)
     pi_opt = ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
     
-    return cst_cost-2*c_plus, pi_opt
+    return cst_cost-2*c_plus, pi_opt, c_plus - c_minus
+
         
 
-def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, FW_iter_max=100, t=0.5):
+def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter = 100, t=0.5):
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
@@ -152,7 +153,7 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
     centro = P_minus.get_centroid()
     init_direc = x_plus - centro
     init_direc/= np.linalg.norm(init_direc)
-    for iter in range(FW_iter_max):
+    for iter in range(iter_max):
         # constraints that will be added to the bounding bow
         vertex_list = []
         half_plans_list = []
@@ -175,7 +176,26 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
         init_direc = x_plus - centro
         init_direc /= np.linalg.norm(init_direc)
     # Once the algorithm converges, the optimal point is x_minus, we find the appropriate transport plan
+    pi = vect_to_coupling(x_minus, mu, nu, e_base) 
+    # Local optimization 
+    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
     
-    pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) #need implementation
+    return cst_cost-2*c_op, pi_opt, c_plus - c_minus
+
+
+def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', iter_max=100, FW_iter = 100, t=0.5):
+    # Computing constant cost
+    sigma_x = covariance(space_x, mu)
+    sigma_y = covariance(space_y, nu)
+    cst_cost = const_cost(sigma_x, sigma_y, cost, t)
+    # Computing bounding box
+    P_minus, Hausdorff_dist, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=1e-15)
+    # Global optimization
+    _, x_op = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
+    # Computing coupling
+    pi = vect_to_coupling(x_op, mu, nu, e_base)
+    # Local optimization 
+    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
     
-    return cst_cost-2*c_minus, pi_opt
+    return cst_cost-2*c_op, pi_opt, Hausdorff_dist
+    

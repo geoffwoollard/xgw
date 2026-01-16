@@ -280,7 +280,7 @@ def _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_
         yield pi_n_1_hat, M_pi_n, M_pi_val
     
     
-def Frank_Wolfe(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5):
+def Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5):
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
@@ -302,6 +302,21 @@ def Frank_Wolfe(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, 
         pi_n = pi_n_1
     return initial_cost-2*T, pi_n
 
+
+def Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max = 50, t=0.5):
+    for _ in range(iter_max):
+        sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
+        M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
+        lin_cost = linearized_cost_function(space_x, space_y, M_pi_n)
+        pi_n_1_hat = ot.emd(mu, nu, -lin_cost)
+        sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
+        T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
+        if tau == 0:
+            break
+        pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
+        pi_n = pi_n_1
+    return T, pi_n
+    
 def testing_2d():
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
@@ -323,8 +338,8 @@ def testing_2d():
     mu /= mu.sum()
     nu /= nu.sum()
     
-    Frank_Wolfe(mu, space_x, nu, space_y, cost='IGW')
-    Frank_Wolfe(mu, space_x, nu, space_y, cost='DGW')
+    Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW')
+    Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='DGW')
     
 def testing_3d():
     mu_a1, sigma_a = np.array([0.5, 0.5, 0.5]), 0.3
@@ -347,8 +362,8 @@ def testing_3d():
     mu /= mu.sum()
     nu /= nu.sum()
     
-    Frank_Wolfe(mu, space_x, nu, space_y, cost='IGW')
-    Frank_Wolfe(mu, space_x, nu, space_y, cost='DGW')
+    Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW')
+    Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='DGW')
 
 if __name__ == "__main__":
     testing_2d()

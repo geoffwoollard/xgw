@@ -8,7 +8,7 @@ from copy import deepcopy
 import math
 from pypoman.polygon import compute_polygon_hull
 
-from xgw.Hyperplane_approx import run_approx, construct_basis_eij, P_plus_outside_P_minus, projection, Hausdorff, initial_box, DoubleRepresentation
+from xgw.Hyperplane_approx import _run_approx, construct_basis_eij, P_plus_outside_P_minus, projection, Hausdorff, initial_box, DoubleRepresentation
 
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ def test_simple_marginals(simple_marginals_2D):
         y_1, y_2 = space_y.shape
         print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
         
-        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         logger.info(f'P_plus vertices: {np.array(P_plus.V)}')
         logger.info(f'P_minus vertices: {np.array(P_minus.V)}')
         logger.info(f'x_0_list over iterations: {np.array(x_0_list)}')
@@ -227,7 +227,7 @@ def test_overall(niter, marginals):
     y_1, y_2 = space_y.shape
     logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
     
-    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
+    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
     logger.info(f'Objective list over iterations: {objective_list}')
     diffs = np.diff(objective_list)
     tol = 1e-16
@@ -252,8 +252,8 @@ def test_P_monotonicity(marginals):
         mu, nu, space_x, space_y = marginals
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
-        
-        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
+        P_plus, P_minus, _, _, _, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         if niter>1:
             residuals = P_plus_outside_P_minus(P_plus_old, P_plus)
             atol = 1e-12
@@ -266,5 +266,3 @@ def test_P_monotonicity(marginals):
         P_minus_old = deepcopy(P_minus)
 
 
-
-# test_simple_marginals(10)
