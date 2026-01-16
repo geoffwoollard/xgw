@@ -1,34 +1,105 @@
 import numpy as np
 from numba import njit
 import ot
+from ncpol2sdpa import generate_variables, SdpRelaxation
 from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_cost
 from .Hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, function_to_cost
+from .qp_incremental_projector import OptimalProjectedCoupling
+import logging
+logger = logging.getLogger(__name__)
 
 
-def optimal_cost_cvx(P, cost, R_inv, t=0.5):
+    
+def optimal_cost_cvx(P, cost, R, t):
     # optimize a convex polynomial cost over a polytope
     vect_list = np.array(P.V)
-    return _optimal_cost_cvx(vect_list, cost, R_inv, t=t)
+    return _optimal_cost_cvx(vect_list, cost, R, t)
 
+def optimal_polynomial_cost(P, cost, relax_level, R, t):
+    
+    n_vars = len(R) # Number of variables
+    # Requested level of relaxation relax_level
+    x = generate_variables('x', n_vars) # polynomial variables
+    obj = non_convex_polynomial_cost(cost, x, R, t) # polynomial cost to optimize
+    (A,b) = P.H
+    inequalities = list(np.ravel(-A@x+b)) # polytope inequalities
+    # Relaxing and solving the problem
+    sdp = SdpRelaxation(x)
+    sdp.get_relaxation(relax_level, objective=obj, inequalities=inequalities)
+    sdp.solve()
+    
+    x_op = np.array([sdp[x[i]] for i in range(n_vars)])
+    c_op = sdp.primal
+    logger.info(f'Polynomial optimization approximate solution : {sdp.status}, with optimal cost {c_op}')
+    
+    return c_op, x_op
+
+
+def non_convex_polynomial_cost(cost, x, R, t):   
+    l = len(x)
+    x = x@R
+    if  cost == 'DGW':
+        if l==1:
+            return x[0]
+        elif l==4:
+            return x[0]*x[3]-x[2]*x[1] 
+        else:
+            return x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2])
+
+    elif cost == 'IDGW':
+        if l==1:
+            return t*x[0]**2+(1-t)*x[0] 
+        elif l==4:
+            return t*(np.sum(np.dot(x, x))) + (1-t)*(x[0]*x[3]-x[2]*x[1])
+        else:
+            return t*(np.sum(np.dot(x, x))) + (1-t)*(x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2]))
+    else:
+        raise ValueError('Cost not implemented')
+    
 @njit
-def _optimal_cost_cvx(vect_list, cost, R_inv, t=0.5):
+def _optimal_cost_cvx(vect_list, cost, R, t):
     x_op = vect_list[0]
-    c_op = vector_cost(x_op, cost, R_inv, t=t)
+    c_op = vector_cost(x_op, cost, R, t)
     for vect in vect_list[1:]:
-        c = vector_cost(vect, cost, R_inv, t=t)
+        c = vector_cost(vect, cost, R, t)
         if c > c_op:
             c_op = c
             x_op = vect
     return c_op, x_op
 
 @njit
-def vector_cost(vect, cost, R_inv, t=0.5):
+def vector_cost(vect, cost, R, t):
     # compute the cost of a vector after changing the base
-    sigma = e_to_f(vect, R_inv)
+    sigma = e_to_f(vect, R)
     return polynomial_cost(sigma, cost, t)
 
+
+
+def vect_to_coupling(x_minus, mu, nu, e_base):
+    l_mu = len(mu)
+    l_nu = len(nu)
+    dim = l_mu*l_nu
+    proj_dim = len(x_minus) 
+    A = -np.eye(dim)
+    b = np.zeros(dim)
+    # Need to check matrix C (marginal constraints), not exactly sure of the implementation
+    C = np.zeros((l_mu, l_nu, l_mu + l_nu))
+    for i in range(l_mu):
+        C[i, :, i] = 1
+    for j in range(l_nu):
+        C[:, j, l_mu+j] = 1
+    C = np.transpose(C.reshape((dim, l_mu + l_nu)))
+    d = np.hstack(np.ravel(mu), np.ravel(nu))
+    conv_solver = OptimalProjectedCoupling(dim, proj_dim, e_base, A=A, b=b, C=C, d=d)
+    pi_opt, objective = conv_solver.solve(x_minus)
+    # can do check on objective being close to 0 (to code later)
+    pi_opt = pi_opt.reshape((l_mu,l_nu))
+    return pi_opt
+    
+    
+
 def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=10000, t=0.5):
-    # This code is specifically designed for a convex cost
+    # This code is specifically designed for a convex cost, as IGW or IDGW with a low enough t
     
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
@@ -37,11 +108,10 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     
     # Bounding box initialization
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
-    R_inv = np.linalg.inv(R)
     
     # Selection of the best direction (lagest score in the bounding box)
-    c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R_inv, t=t)
-    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R_inv, t=t)
+    c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, t)
+    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, t)
     
     centro = P_minus.get_centroid()
     g = x_plus - centro
@@ -50,10 +120,10 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     for iter in range(iter_max):
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-        Tcost = vector_cost(g_star, cost, R_inv, t=t)
+        Tcost = vector_cost(g_star, cost, R, t)
 
         # The optimal values after each iteration is updated
-        c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, t=t)
+        c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, t)
         if Tcost > c_minus:
             c_minus = Tcost
             x_minus = g_star
@@ -67,7 +137,7 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     return cst_cost-2*c_plus, pi_opt
         
 
-def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, FW_iter_max=100, t=0.5):
+def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, FW_iter_max=100, t=0.5):
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
@@ -77,8 +147,8 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     R_inv = np.linalg.inv(R)
     # Initialization of the cost bounds by optimizing non convex function over bounding boxes
-    c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, R_inv, t) #need implementation
-    c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, R_inv, t)
+    c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t) #need implementation
+    c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
     centro = P_minus.get_centroid()
     init_direc = x_plus - centro
     init_direc/= np.linalg.norm(init_direc)
@@ -96,8 +166,8 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1
         # The bounding boxes are updated 
         P_plus, P_minus = update_box(P_plus, P_minus, half_plans_list, vertex_list)
         # The optimal values after each FW loops are updated
-        c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, R_inv, t) 
-        c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, R_inv, t)
+        c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t) 
+        c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t)
         if c_plus - c_minus < cost_tol:
             break
         # Choosing next direction 
@@ -106,6 +176,6 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1
         init_direc /= np.linalg.norm(init_direc)
     # Once the algorithm converges, the optimal point is x_minus, we find the appropriate transport plan
     
-    pi_opt = vect_to_coupling(x_minus, mu, nu) #need implementation
+    pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) #need implementation
     
     return cst_cost-2*c_minus, pi_opt

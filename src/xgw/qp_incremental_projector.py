@@ -58,3 +58,52 @@ class IncrementalQPProjector:
         """
         self.add_constraint(a_new, b_new)
         return self.solve(v_value, warm=warm)
+
+
+
+def flat_basis(e_base):
+    a,b,c = e_base.shape
+    np.reshape((a*b,c))
+
+
+class OptimalProjectedCoupling:
+    """
+    Solve   minimize ||p(x) - v||^2  subject to Ax <= b, and Cx == d
+
+    Uses CVXPY + OSQP. (maybe use other solver)
+    """
+    def __init__(self, dim, proj_dim, e_base, A=None, b=None, C=None, d=None, eps_abs=1e-5, eps_rel=1e-5, max_iter=10000, verbose=False):
+        self.dim = dim
+        self.x = cp.Variable(dim)
+        self.eps_abs = eps_abs
+        self.eps_rel = eps_rel
+        self.max_iter = max_iter
+        self.solver_opts = {'eps_abs': self.eps_abs, 'eps_rel': self.eps_rel, 'max_iter': self.max_iter}
+        self.verbose = verbose
+
+        # initially possibly empty constraint list
+        self.constraints = []
+        if A is not None and b is not None:
+            self.constraints.append(A @ self.x <= b)
+        if C is not None and d is not None:
+            self.constraints.append(C @ self.x -d == 0)
+
+        # v is a parameter so we don't have to rebuild the problem
+        self.v = cp.Parameter(proj_dim)
+
+        # objective = ||p(x) - v||^2
+        e_base = flat_basis(e_base) # flattening the base for the projection
+        self.obj = cp.Minimize(cp.sum_squares(self.x@e_base - self.v))
+
+        # build the problem
+        self.problem = cp.Problem(self.obj, self.constraints)
+
+    def solve(self, v_value, solver=cp.OSQP):
+        """
+        Solve the QP for given v.
+        """
+        self.v.value = v_value
+        self.problem.solve(solver=solver, verbose=self.verbose, **self.solver_opts)
+        return self.x.value, self.problem.value
+    
+    
