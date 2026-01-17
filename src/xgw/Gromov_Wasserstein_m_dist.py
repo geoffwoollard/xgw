@@ -42,17 +42,17 @@ def non_convex_polynomial_cost(cost, x, R, t):
         if l==1:
             return x[0]
         elif l==4:
-            return x[0]*x[3]-x[2]*x[1] 
+            return 2*(x[0]*x[3]-x[2]*x[1] )
         else:
-            return x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2])
+            return 6*(x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2]))
 
-    elif cost == 'IDGW':
+    elif cost == 'CGW':
         if l==1:
             return t*x[0]**2+(1-t)*x[0] 
         elif l==4:
-            return t*(np.sum(np.dot(x, x))) + (1-t)*(x[0]*x[3]-x[2]*x[1])
+            return t*(np.sum(np.dot(x, x))) + 2*(1-t)*(x[0]*x[3]-x[2]*x[1])
         else:
-            return t*(np.sum(np.dot(x, x))) + (1-t)*(x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2]))
+            return t*(np.sum(np.dot(x, x))) + 6*(1-t)*(x[0]*(x[4]*x[8]-x[7]*x[5]) - x[3]*(x[1]*x[8]-x[7]*x[2]) + x[6]*(x[1]*x[5]-x[4]*x[2]))
     else:
         raise ValueError('Cost not implemented')
     
@@ -99,7 +99,7 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     
 
 def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=10000, t=0.5):
-    # This code is specifically designed for a convex cost, as IGW or IDGW with a low enough t
+    # This code is specifically designed for a convex cost, as IGW or CGW with a low enough t
     
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
