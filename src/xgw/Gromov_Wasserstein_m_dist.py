@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
     
-def optimal_cost_cvx(P, cost, R, t):
+def optimal_cost_cvx(P, cost, R, d, t):
     # optimize a convex polynomial cost over a polytope
     vect_list = np.array(P.V)
-    return _optimal_cost_cvx(vect_list, cost, R, t)
+    return _optimal_cost_cvx(vect_list, cost, R, d, t)
 
 def optimal_polynomial_cost(P, cost, relax_level, R, t):
     
@@ -57,20 +57,20 @@ def non_convex_polynomial_cost(cost, x, R, t):
         raise ValueError('Cost not implemented')
     
 @njit
-def _optimal_cost_cvx(vect_list, cost, R, t):
+def _optimal_cost_cvx(vect_list, cost, R, d, t):
     x_op = vect_list[0]
-    c_op = vector_cost(x_op, cost, R, t)
+    c_op = vector_cost(x_op, cost, R, d, t)
     for vect in vect_list[1:]:
-        c = vector_cost(vect, cost, R, t)
+        c = vector_cost(vect, cost, R, d, t)
         if c > c_op:
             c_op = c
             x_op = vect
     return c_op, x_op
 
 @njit
-def vector_cost(vect, cost, R, t):
+def vector_cost(vect, cost, R, d, t):
     # compute the cost of a vector after changing the base
-    sigma = e_to_f(vect, R)
+    sigma = e_to_f(vect, R, d)
     return polynomial_cost(sigma, cost, t)
 
 
@@ -98,9 +98,9 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     
     
 
-def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=10000, t=0.5):
+def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, t=0.5):
     # This code is specifically designed for a convex cost, as IGW or CGW with a low enough t
-    
+    d = space_x.shape[-1]
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
@@ -110,8 +110,8 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     
     # Selection of the best direction (lagest score in the bounding box)
-    c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, t)
-    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, t)
+    c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
     
     centro = P_minus.get_centroid()
     g = x_plus - centro
@@ -120,21 +120,30 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     for iter in range(iter_max):
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-        Tcost = vector_cost(g_star, cost, R, t)
+        Tcost = vector_cost(g_star, cost, R, d, t)
 
         # The optimal values after each iteration is updated
-        c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, t)
+        c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+        
         if Tcost > c_minus:
             c_minus = Tcost
             x_minus = g_star
         if c_plus - c_minus < cost_tol:
             break
+        
+        # update direction
+        centro = P_minus.get_centroid() # not needed after a couple of iterations
+        g = x_plus - centro
+        g /= np.linalg.norm(g)
     
     # Computing the optimal coupling:
     cost_matrix = function_to_cost(x_minus, e_base)
-    pi_opt = ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
+    pi= ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
     
-    return cst_cost-2*c_plus, pi_opt, c_plus - c_minus
+    # Local optimization to finish the optimization  (may not be needed)
+    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = 100, t=t)
+    
+    return cst_cost-2*c_op, pi_opt, c_plus - c_op
 
         
 

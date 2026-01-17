@@ -100,7 +100,7 @@ def line_search_IGW(sigma_1, sigma_0):
     return T,tau
 
 @njit
-def optimize_deg_2_polynomial (alpha, beta, gamma):
+def optimize_deg_2_polynomial(alpha, beta, gamma):
     def q(x):
         return alpha*x**2 + beta*x +gamma
     
@@ -116,10 +116,10 @@ def optimize_deg_2_polynomial (alpha, beta, gamma):
     return T, tau
 
 @njit
-def optimize_deg_3_polynomial (alpha, beta, gamma, delta):
+def optimize_deg_3_polynomial(alpha, beta, gamma, delta):
     
     if alpha == 0:
-        return optimize_deg_2_polynomial (beta, gamma, delta)
+        return optimize_deg_2_polynomial(beta, gamma, delta)
     else:
         A = True
         def q(x):
@@ -154,7 +154,7 @@ def line_search_CGW_2d(sigma_1, sigma_0, t):
     beta = -2*t*n0 + 2*(1-t)*beta 
     gamma = t*n0 + 2*(1-t)*gamma
     
-    T, tau = optimize_deg_2_polynomial (alpha, beta, gamma)
+    T, tau = optimize_deg_2_polynomial(alpha, beta, gamma)
     return T,tau
 
 @njit
@@ -166,7 +166,7 @@ def line_search_DGW_2d(sigma_1, sigma_0):
     beta = 2*(tr - 2*d_0)
     gamma = 2*(d_0)
     
-    T, tau = optimize_deg_2_polynomial (alpha, beta, gamma)
+    T, tau = optimize_deg_2_polynomial(alpha, beta, gamma)
     return T,tau
 
 @njit
@@ -189,7 +189,7 @@ def line_search_DGW_3d(sigma_1, sigma_0):
     beta = 6*(3*d_0 + TR_1 - 2*TR_0)
     gamma = 6*(-3*d_0 + TR_0)
     delta = 6*(d_0)
-    T, tau = optimize_deg_3_polynomial (alpha, beta, gamma, delta)
+    T, tau = optimize_deg_3_polynomial(alpha, beta, gamma, delta)
     return T,tau
 
 @njit
@@ -219,7 +219,7 @@ def line_search_CGW_3d(sigma_1, sigma_0, t):
     gamma = -2*t*n0 + (1-t)*gamma
     delta = t*n0 + (1-t)*delta
     
-    T, tau = optimize_deg_3_polynomial (alpha, beta, gamma, delta)
+    T, tau = optimize_deg_3_polynomial(alpha, beta, gamma, delta)
     return T,tau
 
 
@@ -239,11 +239,12 @@ def line_search(sigma_1, sigma_0, cost, t):
         raise ValueError('Cost not implemented')
     
 def _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_max=50, t=0.5):
+    d = space_x.shape[-1]
     for it in range(iter_max):
         # Initial direction
         if it == 0:
             # init_direc is in the e basis (and not f) and it has the wrong format
-            init_direc = e_to_f(init_direc, R)
+            init_direc = e_to_f(init_direc, R, d)
             sigma_pi_n = init_direc
         else:
             sigma_pi_n = cross_covariance(space_x, space_y, pi_n)

@@ -74,9 +74,9 @@ def construct_basis_eij(space_x, space_y):
     return e_base, R
 
 @njit
-def e_to_f(vect, R):
-    dx = len(R)
-    return np.reshape(vect@R,(dx,dx))
+def e_to_f(vect, R, d):
+    sol = (vect@R).reshape((d,d))
+    return sol
 
 @njit
 def f_to_e(vect, R_inv):
