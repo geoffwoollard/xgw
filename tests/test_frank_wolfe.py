@@ -59,7 +59,7 @@ def testing_3d(marginals_3d):
     c, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
     assert c>1e-5
     # But it converges with better initial conditions
-    pi_n = 0.5*np.outer(mu, mu) + 0.5*np.diag(mu) 
+    pi_n = 0.1*np.outer(mu, mu) + 0.9*np.diag(mu) 
     
     c, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
     assert c<1e-10
