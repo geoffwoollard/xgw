@@ -36,6 +36,10 @@ def marginals():
     nu += np.exp(-0.5 * (((space_y + factor*mu_b) / sigma_b) ** 2).sum(-1))
     mu /= mu.sum()
     nu /= nu.sum()
+
+    # scale space to have zero center of mass
+    space_x -= (space_x * mu[:, None]).sum(axis=0)
+    space_y -= (space_y * nu[:, None]).sum(axis=0)
     
     return mu, nu, space_x, space_y
 
@@ -58,6 +62,10 @@ def simple_marginals_2D():
     nu = mu = np.array([1/3,1/3,1/3])
     space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
     space_y = np.array([[3,0],[4,2],[1,2]])
+
+    # scale space to have zero center of mass
+    space_x -= (space_x * mu[:, None]).sum(axis=0)
+    space_y -= (space_y * nu[:, None]).sum(axis=0)
     return mu, nu, space_x, space_y
 
 def permut_matrix(permut, dim):
@@ -151,6 +159,9 @@ def test_simple_marginals(simple_marginals_2D):
         fig.legend(by_label.values(), by_label.keys(),
                 loc='center left', bbox_to_anchor=(0.9, 0.5))
 
+        # mkdir if not exists
+        if not os.path.exists('tests/results'):
+            os.makedirs('tests/results')
         fig.savefig(
             f'tests/results/test_projection_coupling_P_plus_minus_niter{niter}.png',
             bbox_inches='tight'
