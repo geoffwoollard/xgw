@@ -24,10 +24,10 @@ def matrix_cofactor_low_dim(mat):
     comat = np.zeros((row_l, col_l))
     for row in range(row_l):
         for col in range(col_l):
-            mask_col = np.ones(row_l, dtype=np.bool)
-            mask_col[col] = False
-            mask_row = np.ones(row_l, dtype=np.bool)
-            mask_row[row] = False
+            mask_col = np.ones(row_l, dtype=np.uint8)
+            mask_col[col] = 0
+            mask_row = np.ones(row_l, dtype=np.uint8)
+            mask_row[row] = 0
             minor = mat[mask_row,:][:,mask_col]
             comat[row, col] = (-1)**(row+col) * det_23d(minor)
     return comat
