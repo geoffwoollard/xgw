@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pytest
 import matplotlib.pyplot as plt
@@ -194,6 +195,9 @@ def test_simple_marginals(simple_marginals_2D):
         else:
             axes[idx].set_ylabel('Hausdorff distance')
         axes[idx].legend()
+    # mkdir if not exists
+    if not os.path.exists('tests/results'):
+        os.makedirs('tests/results')
     fig.savefig('tests/results/test_volume_P_plus_minus_simple_marginals.png')
     plt.close(fig)  
     

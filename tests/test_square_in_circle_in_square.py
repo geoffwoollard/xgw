@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
@@ -84,7 +85,6 @@ def test_minimal_2d(n_iter):
         plt.title(f'circle approximation iteration n. {iter}')
         plt.legend()
         # mkdir if not exists
-        import os
         if not os.path.exists('tests/results'):
             os.makedirs('tests/results')
         plt.savefig(f'tests/results/circle_approx{iter}', dpi=50)
