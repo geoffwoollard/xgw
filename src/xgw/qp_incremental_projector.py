@@ -63,7 +63,8 @@ class IncrementalQPProjector:
 
 def flat_basis(e_base):
     a,b,c = e_base.shape
-    np.reshape((a*b,c))
+    e_base = e_base.reshape((a*b,c))
+    return (e_base)
 
 
 class OptimalProjectedCoupling:

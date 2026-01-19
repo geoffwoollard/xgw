@@ -89,7 +89,7 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     for j in range(l_nu):
         C[:, j, l_mu+j] = 1
     C = np.transpose(C.reshape((dim, l_mu + l_nu)))
-    d = np.hstack(np.ravel(mu), np.ravel(nu))
+    d = np.hstack((np.ravel(mu), np.ravel(nu)))
     conv_solver = OptimalProjectedCoupling(dim, proj_dim, e_base, A=A, b=b, C=C, d=d)
     pi_opt, objective = conv_solver.solve(x_minus)
     # can do check on objective being close to 0 (to code later)
@@ -133,15 +133,17 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
         
         # update direction
         centro = P_minus.get_centroid() # not needed after a couple of iterations
-        g = x_plus - centro
+        g = x_plus #- centro
         g /= np.linalg.norm(g)
-    
+        print(c_minus, c_plus)
+        print(P_plus.V)
     # Computing the optimal coupling:
     cost_matrix = function_to_cost(x_minus, e_base)
-    pi= ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
+    pi_opt = ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
+    c_op = c_minus
     
-    # Local optimization to finish the optimization  (may not be needed)
-    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = 100, t=t)
+    # # Local optimization to finish the optimization  (may not be needed)
+    # c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = 100, t=t)
     
     return cst_cost-2*c_op, pi_opt, c_plus - c_op
 
@@ -166,7 +168,7 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
         # constraints that will be added to the bounding bow
         vertex_list = []
         half_plans_list = []
-        for coup_star, g, g_hat in _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, cost=cost, t=t):
+        for coup_star, g, g_hat in _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost=cost, t=t):
             # during the iteration, the OT problem (10) is solved with direction g and cost g_hat
             g_star = projection(coup_star, e_base)
             # g is in the f basis not in the e basis, and with a wrong format
@@ -192,13 +194,13 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
     return cst_cost-2*c_op, pi_opt, c_plus - c_minus
 
 
-def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', iter_max=100, FW_iter = 100, t=0.5):
+def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter = 100, t=0.5):
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     # Computing bounding box
-    P_minus, Hausdorff_dist, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=1e-15)
+    P_minus, Hausdorff_dist, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=Hausdorff_tol)
     # Global optimization
     _, x_op = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
     # Computing coupling
