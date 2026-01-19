@@ -64,6 +64,6 @@ def testing_3d(marginals_3d):
     c, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
     assert c<1e-10
     c, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-    assert c<0.1 # todo: 1e-10
+    assert c<0.02
     c, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='CGW', t= 0.5, pi_n=pi_n)
-    assert c< 0.2 #todo: 1e-10
+    assert c<0.02
