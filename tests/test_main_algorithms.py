@@ -43,9 +43,9 @@ def testing_2d_convex():
     # assert T>1e-3
     
 
-    # T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) # need EMD kwarg tuning I guess
-    # assert c<1e-5
-    # assert T>1e-3
+    T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) # need EMD kwarg tuning I guess
+    assert c<1e-5
+    assert T>1e-3
     
     # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) 
     # assert c<1e-10

@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 import ot
 from ncpol2sdpa import generate_variables, SdpRelaxation
-from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_cost, Frank_Wolfe_polynomial
+from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_cost, Frank_Wolfe_polynomial, center_marginal
 from .Hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, function_to_cost
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
@@ -101,6 +101,7 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
 def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, t=0.5):
     # This code is specifically designed for a convex cost, as IGW or CGW with a low enough t
     d = space_x.shape[-1]
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
@@ -150,13 +151,14 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     c_op = c_minus
     
     # # Local optimization to finish the optimization  (may not be needed)
-    # c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = 100, t=t)
+    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max = 100, t=t)
     
     return cst_cost-2*c_op, pi_opt, c_plus - c_op
 
         
 
 def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter = 100, t=0.5):
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
@@ -202,6 +204,7 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
 
 
 def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter = 100, t=0.5):
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
