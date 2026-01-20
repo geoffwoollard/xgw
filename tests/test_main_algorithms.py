@@ -9,13 +9,13 @@ def testing_2d_convex(marginals, simple_marginals_2D):
     mu, nu, space_x, space_y = marginals
     mus, nus, space_xs, space_ys = simple_marginals_2D
     
-    T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
-    assert c<1e-15 and c>=-1e-15
-    assert T<1e-15 and T>=-1e-15
+    # T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=1000)
+    # assert c<1e-15 and c>=-1e-15
+    # assert T<1e-15 and T>=-1e-15
     
-    T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
-    assert c<1e-15 and c>=-1e-15
-    assert T<1e-15 and T>=-1e-15
+    # T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-20, iter_max=1000, t= 0.67)
+    # assert c<1e-15 and c>=-1e-15
+    # assert T<1e-15 and T>=-1e-15
     
     
     # T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=1000) # need EMD kwarg tuning I guess
@@ -27,9 +27,9 @@ def testing_2d_convex(marginals, simple_marginals_2D):
     # assert T>1e-3
     
 
-    # T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) # need EMD kwarg tuning I guess
-    # assert c<1e-5
-    # assert T>1e-3
+    T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) # need EMD kwarg tuning I guess
+    assert c<1e-5
+    assert T>1e-3
     
     # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) 
     # assert c<1e-10

@@ -36,10 +36,6 @@ def marginals():
     nu += np.exp(-0.5 * (((space_y + factor*mu_b) / sigma_b) ** 2).sum(-1))
     mu /= mu.sum()
     nu /= nu.sum()
-
-    # scale space to have zero center of mass
-    space_x -= (space_x * mu[:, None]).sum(axis=0)
-    space_y -= (space_y * nu[:, None]).sum(axis=0)
     
     return mu, nu, space_x, space_y
 
@@ -61,11 +57,8 @@ def simple_marginals_2D():
     mu = np.array([1/3,1/3,1/3])
     nu = mu = np.array([1/3,1/3,1/3])
     space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
-    space_y = np.array([[3,0],[4,2],[1,2]])
+    space_y = np.array([[3.0,0],[4,2],[1,2]])
 
-    # scale space to have zero center of mass
-    space_x -= (space_x * mu[:, None]).sum(axis=0)
-    space_y -= (space_y * nu[:, None]).sum(axis=0)
     return mu, nu, space_x, space_y
 
 def permut_matrix(permut, dim):
