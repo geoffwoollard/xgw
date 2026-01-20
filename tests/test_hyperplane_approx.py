@@ -15,13 +15,14 @@ from xgw.Hyperplane_approx import _run_approx, construct_basis_eij, P_plus_outsi
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-@pytest.fixture
-def marginals():
+
+def make_marginals(seed):
+    np.random.seed(seed)
+    n_points_xy = np.random.randint(5,15)
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
     mu_b, sigma_b = r_factor*mu_a1, 0.2
-    n_grid_1d_x = 10
-    n_grid_1d_y = 10
+    n_grid_1d_x = n_grid_1d_y = n_points_xy
     def make_space_2d(n_grid):
         lin = np.linspace(-1, 1, n_grid)
         xx, yy = np.meshgrid(lin, lin)
@@ -38,11 +39,16 @@ def marginals():
     nu /= nu.sum()
 
     # scale space to have zero center of mass
+    space_x = space_x.astype(mu.dtype)
+    space_y = space_y.astype(nu.dtype)
     space_x -= (space_x * mu[:, None]).sum(axis=0)
     space_y -= (space_y * nu[:, None]).sum(axis=0)
     
     return mu, nu, space_x, space_y
 
+@pytest.fixture
+def marginals():
+    return make_marginals(seed=0)
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
@@ -56,17 +62,28 @@ def test_initial_box(marginals):
     atol = 1e-15
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
-@pytest.fixture
-def simple_marginals_2D():
-    mu = np.array([1/3,1/3,1/3])
-    nu = mu = np.array([1/3,1/3,1/3])
-    space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
-    space_y = np.array([[3,0],[4,2],[1,2]])
+
+def make_simple_marginals_2D(seed):
+    np.random.seed(seed)
+    n_points = np.random.randint(10,20)
+    print(f'Number of points in simple marginals test: {n_points}')
+    mu = nu = np.ones(n_points) / n_points
+
+    d = 2
+    space_x = np.random.randn(n_points,d)
+    space_y = np.random.randn(n_points,d)
+    # space_x = np.array([[0,1.53],[4.87,1],[5,1/2]]).astype(mu.dtype)
+    # space_y = np.array([[3,0],[4,2],[1,2]]).astype(nu.dtype)
 
     # scale space to have zero center of mass
     space_x -= (space_x * mu[:, None]).sum(axis=0)
     space_y -= (space_y * nu[:, None]).sum(axis=0)
     return mu, nu, space_x, space_y
+
+@pytest.fixture
+def simple_marginals_2D():
+    # default seed when pytest runs
+    return make_simple_marginals_2D(seed=0)
 
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))

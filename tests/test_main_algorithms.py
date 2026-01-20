@@ -1,28 +1,44 @@
 import numpy as np
 from xgw.Gromov_Wasserstein_m_dist import GW_m_convex, GW_m_non_convex, GW_m_non_convex_Hausdorff
 from test_frank_wolfe import marginals_3d
-from test_hyperplane_approx import marginals, simple_marginals_2D
+from test_hyperplane_approx import make_marginals, make_simple_marginals_2D
 
 
 
-def testing_2d_convex(marginals, simple_marginals_2D):
-    mu, nu, space_x, space_y = marginals
-    mus, nus, space_xs, space_ys = simple_marginals_2D
-    
-    T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
-    assert c<1e-15 and c>=-1e-15
-    assert T<1e-15 and T>=-1e-15
-    
-    T, _, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
-    assert c<1e-15 and c>=-1e-15
-    assert T<1e-15 and T>=-1e-15
+def testing_2d_convex():
+
+    n_tests = 3
+    for test_id in range(n_tests):
+        mu, nu, space_x, space_y = make_marginals(test_id)
+        mus, nus, space_xs, space_ys = make_simple_marginals_2D(test_id)
+        
+        T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
+        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+        print('Plan error for identical marginals (IGW, convex): ', plan_error)
+        assert np.isclose(plan_error, 0.0)
+
+        
+        T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
+        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+        print('Plan error for identical marginals (CGW, convex): ', plan_error)
+        assert np.isclose(plan_error, 0.0)
+
+    T, plan, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
+    plan_error = np.linalg.norm(plan - np.eye(len(mu))/len(mu))
+    print('Plan error for identical marginals (IGW, convex): ', plan_error)
+    assert np.isclose(plan_error, 0.0)
+
+    T, plan, c = GW_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
+    plan_error = np.linalg.norm(plan - np.eye(len(mu))/len(mu))
+    print('Plan error for identical marginals (CGW, convex): ', plan_error)
+    assert np.isclose(plan_error, 0.0)
     
     
     # T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=1000) # need EMD kwarg tuning I guess
     # assert c<1e-5
     # assert T>1e-3
     
-    # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=1000) 
+    # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
     # assert c<1e-10
     # assert T>1e-3
     
@@ -34,7 +50,9 @@ def testing_2d_convex(marginals, simple_marginals_2D):
     # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) 
     # assert c<1e-10
     # assert T>1e-3
-    
+
+if __name__ == "__main__":
+    testing_2d_convex()
 
 # def testing_2d_non_convex(marginals):
 #     mu, nu, space_x, space_y = marginals

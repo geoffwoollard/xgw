@@ -108,6 +108,8 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     
     # Bounding box initialization
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    # print('Initial box with ', len(P_minus.V), ' vertices and ', P_minus.H[0].shape[0], ' half-planes.')
+    # print('Vertices: ', P_minus.V)
     
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
@@ -119,11 +121,14 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     
     for iter in range(iter_max):
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+        # print('new half plane: ', g, g_hat)
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
         Tcost = vector_cost(g_star, cost, R, d, t)
+        # c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
 
         # The optimal values after each iteration is updated
         c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+        # print(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, verices in P_plus {len(P_plus.V)}')
         
         if Tcost > c_minus:
             c_minus = Tcost
@@ -133,10 +138,12 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
         
         # update direction
         centro = P_minus.get_centroid() # not needed after a couple of iterations
-        g = x_plus #- centro
+        g = x_plus - centro
         g /= np.linalg.norm(g)
-        print(c_minus, c_plus)
-        print(P_plus.V)
+        # print(c_minus, c_plus, )
+        # print([np.linalg.norm(v) for v in P_plus.V])
+        # print('new direction: ', g_star)
+
     # Computing the optimal coupling:
     cost_matrix = function_to_cost(x_minus, e_base)
     pi_opt = ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)

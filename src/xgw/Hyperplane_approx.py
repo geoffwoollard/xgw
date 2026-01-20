@@ -104,7 +104,7 @@ class DoubleRepresentation():
     def H_to_V(self):
         A, b = self.H
         self.V = compute_polytope_vertices(A, b)
-        # self.remove_duplicates_V()
+        self.remove_duplicates_V()
 
     def V_to_H(self):
         A, b = compute_polytope_halfspaces(self.V)
@@ -138,7 +138,7 @@ class DoubleRepresentation():
         self.H_to_V()
     
     def get_centroid(self):
-        return np.mean(np.array(self.V))
+        return np.mean(np.array(self.V), axis=0)
     
 def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     '''
