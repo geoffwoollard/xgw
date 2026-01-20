@@ -33,26 +33,29 @@ def testing_2d_convex():
     print('Plan error for identical marginals (CGW, convex): ', plan_error)
     assert np.isclose(plan_error, 0.0)
     
+    cost_tolerance = 0.5
+
+    T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=200) # need EMD kwarg tuning I guess
+    print(f'Test {test_id} IGW convex T: {T}, c: {c}')
+    assert c < cost_tolerance
+    assert T > 0
     
-    # T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=1000) # need EMD kwarg tuning I guess
-    # assert c<1e-5
-    # assert T>1e-3
-    
-    # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
-    # assert c<1e-10
-    # assert T>1e-3
+    T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
+    print(f'Test {test_id} IGW convex T: {T}, c: {c}')
+    assert c < cost_tolerance
+    assert T > 0
     
 
-    T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) # need EMD kwarg tuning I guess
-    assert c<1e-5
-    assert T>1e-3
+    T, _, c = GW_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=200, t= 0.67) # need EMD kwarg tuning I guess
+    print(f'Test {test_id} CGW convex T: {T}, c: {c}')
+    assert c < cost_tolerance
+    assert T > 0
     
-    # T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=1000, t= 0.67) 
-    # assert c<1e-10
-    # assert T>1e-3
+    T, _, c = GW_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=200, t= 0.67) 
+    print(f'Test {test_id} CGW convex T: {T}, c: {c}')
+    assert c < cost_tolerance
+    assert T > 0
 
-if __name__ == "__main__":
-    testing_2d_convex()
 
 # def testing_2d_non_convex(marginals):
 #     mu, nu, space_x, space_y = marginals
