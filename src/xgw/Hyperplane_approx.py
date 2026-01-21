@@ -83,7 +83,7 @@ def f_to_e(vect, R_inv):
     return np.ravel(vect) @ R_inv
 
 class DoubleRepresentation():
-    def __init__(self, duplicate_tol=1e-1):
+    def __init__(self, duplicate_tol=1e-5):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
@@ -91,17 +91,28 @@ class DoubleRepresentation():
     def remove_duplicates_V(self):
         """
         Remove duplicates from self.V up to a Euclidean distance tolerance.
+        Uses O(n log n) quantization + np.unique instead of O(n^2) pairwise checks.
         """
-        V_array = np.array(self.V)
-        keep = []
-        
-        for i, v in enumerate(V_array):
-            if not any(np.linalg.norm(v - np.array(V_array[j])) < self.duplicate_tol for j in keep):
-                keep.append(i)
-        
+        V_array = np.asarray(self.V, dtype=float)
+        tol = float(self.duplicate_tol)
+
+        if len(V_array) == 0:
+            return
+
+        # Quantize vertices to tolerance grid
+        scale = 1.0 / tol
+        V_quant = np.round(V_array * scale).astype(np.int64)
+
+        # Find unique rows (lexicographic)
+        _, unique_indices = np.unique(V_quant, axis=0, return_index=True)
+
+        # Preserve original order
+        unique_indices.sort()
+
         print(f"Original number of vertices: {len(self.V)}")
-        self.V = [V_array[i] for i in keep]
+        self.V = [V_array[i] for i in unique_indices]
         print(f"Removed duplicates, new number of vertices: {len(self.V)}")
+
 
     def H_to_V(self):
         A, b = self.H
