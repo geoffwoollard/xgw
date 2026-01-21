@@ -31,9 +31,13 @@ def optimal_polynomial_cost(P, cost, relax_level, R, t):
     (A,b) = P.H
     inequalities = list(np.ravel(-A@x+b)) # polytope inequalities
     # Relaxing and solving the problem
+    logger.info('Starting polynomial optimization over polytope with %d inequalities and %d variables at relaxation level %d', len(inequalities), n_vars, relax_level)
     sdp = SdpRelaxation(x)
+    logger.info('Generating relaxation...')
     sdp.get_relaxation(relax_level, objective=obj, inequalities=inequalities)
+    logger.info('Solving relaxation...')
     sdp.solve()
+    logger.info('Relaxation solved.')
     
     x_op = np.array([sdp[x[i]] for i in range(n_vars)])
     c_op = sdp.primal
@@ -214,7 +218,7 @@ def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='I
     return cst_cost-2*c_op, pi_opt, c_plus - c_minus
 
 
-def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter = 100, t=0.5):
+def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
@@ -223,11 +227,12 @@ def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=
     # Computing bounding box
     P_minus, Hausdorff_dist, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=Hausdorff_tol)
     # Global optimization
+    logger.info('Starting global polynomial optimization over the approximated polytope')
     _, x_op = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
-    # Computing coupling
+    logger.info('Computing optimal coupling from optimal vector')
     pi = vect_to_coupling(x_op, mu, nu, e_base)
-    print('pi before final FW = ', pi)
-    # Local optimization 
+    logger.info(f'pi before final FW = {pi}')
+    logger.info('Local optimization')
     c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
     
     return cst_cost-2*c_op, pi_opt, Hausdorff_dist

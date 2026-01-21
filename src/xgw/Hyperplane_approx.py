@@ -109,9 +109,9 @@ class DoubleRepresentation():
         # Preserve original order
         unique_indices.sort()
 
-        print(f"Original number of vertices: {len(self.V)}")
+        logger.info(f"Original number of vertices: {len(self.V)}")
         self.V = [V_array[i] for i in unique_indices]
-        print(f"Removed duplicates, new number of vertices: {len(self.V)}")
+        logger.info(f"Removed duplicates, new number of vertices: {len(self.V)}")
 
 
     def H_to_V(self):

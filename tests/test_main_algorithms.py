@@ -20,10 +20,10 @@ def testing_2d_convex():
         assert np.isclose(plan_error, 0.0)
 
         
-#         T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
-#         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
-#         print('Plan error for identical marginals (CGW, convex): ', plan_error)
-#         assert np.isclose(plan_error, 0.0)
+        T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
+        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+        print('Plan error for identical marginals (CGW, convex): ', plan_error)
+        assert np.isclose(plan_error, 0.0)
 
 #     mu, nu, space_x, space_y = make_marginals(0)
 
@@ -83,9 +83,9 @@ def testing_2d_convex():
 #         assert np.isclose(plan_error, 0.0)
     
 
-# def test_igw_reflection_invariant():
+# def test_igw_convex_reflection_invariant():
 #     n_tests = 3
-#     for d in [2,3]:
+#     for d in [2]:
 #         for test_id in range(n_tests):
 #             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d)
 #             space_xs_reflected = space_xs.copy()
@@ -95,12 +95,12 @@ def testing_2d_convex():
 #             _, plan, _ = GW_m_convex(mus, space_xs, mus, space_xs_reflected, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
 #             mis_match = (plan*len(mus) != np.eye(len(mus)))
 #             print('Plan (should be id): ', plan)
-#         assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+#             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
 
-# def test_igw_rotation_invariant():
+# def test_igw_convex_rotation_invariant():
 #     n_tests = 3
-#     for d in [3, 2]:
+#     for d in [2]:
 #         for test_id in range(n_tests):
 #             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
 #             random_angle = np.random.rand() * 2 * np.pi
@@ -115,7 +115,48 @@ def testing_2d_convex():
 #             _, plan, _ = GW_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
 #             mis_match = (plan*len(mus) != np.eye(len(mus)))
 #             print('Plan (should be id): ', plan)
-#         assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+#             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
-# if __name__ == "__main__":
-#     test_igw_rotation_invariant()
+def test_cgw_convex_rotation_invariant():
+    np.random.seed(42)
+    n_tests = 3
+    for d in [2]:
+        for test_id in range(n_tests):
+            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
+            random_angle = np.random.rand() * 2 * np.pi
+            if d ==2:
+                rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
+            elif d==3:
+                random_axis = np.random.randn(3)
+                random_axis /= np.linalg.norm(random_axis)
+                rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+            print('Rotation matrix: ', rotation.shape)
+            space_xs_rotated = space_xs @  rotation.T
+            _, plan, _ = GW_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', cost_tol=1e-5, iter_max=50)
+            mis_match = (plan*len(mus) != np.eye(len(mus)))
+            print('Plan (should be id): ', plan)
+            assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+
+def test_cgw_Hausdorff_rotation_invariant():
+    np.random.seed(42)
+    n_tests = 3
+    for d in [2]:
+        for test_id in range(n_tests):
+            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
+            random_angle = np.random.rand() * 2 * np.pi
+            if d ==2:
+                rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
+            elif d==3:
+                random_axis = np.random.randn(3)
+                random_axis /= np.linalg.norm(random_axis)
+                rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+            print('Rotation matrix: ', rotation.shape)
+            space_xs_rotated = space_xs @  rotation.T
+            _, plan, _ = GW_m_non_convex_Hausdorff(mus, space_xs, mus, space_xs_rotated, {}, relax_level=4, cost='CGW', Hausdorff_tol=1e-5, iter_max=50, FW_iter=100, t=0.7)
+            mis_match = (plan*len(mus) != np.eye(len(mus)))
+            print('Plan (should be id): ', plan)
+            assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+
+
+if __name__ == "__main__":
+    test_cgw_convex_rotation_invariant()
