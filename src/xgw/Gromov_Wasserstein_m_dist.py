@@ -98,7 +98,7 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     
     
 
-def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, t=0.5):
+def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
     # This code is specifically designed for a convex cost, as IGW or CGW with a low enough t
     d = space_x.shape[-1]
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
@@ -151,7 +151,7 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     c_op = c_minus
     
     # # Local optimization to finish the optimization  (may not be needed)
-    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max = 100, t=t)
+    c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
     
     return cst_cost-2*c_op, pi_opt, c_plus - c_op
 
@@ -215,6 +215,7 @@ def GW_m_non_convex_Hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=
     _, x_op = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
     # Computing coupling
     pi = vect_to_coupling(x_op, mu, nu, e_base)
+    print('pi before final FW = ', pi)
     # Local optimization 
     c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
     

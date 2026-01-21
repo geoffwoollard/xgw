@@ -63,7 +63,7 @@ def test_initial_box(marginals):
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
 
-def make_simple_marginals_2D(seed):
+def make_simple_marginals(seed, d):
     np.random.seed(seed)
     n_points = np.random.randint(10,20)
     print(f'Number of points in simple marginals test: {n_points}')
@@ -80,7 +80,8 @@ def make_simple_marginals_2D(seed):
 @pytest.fixture
 def simple_marginals_2D():
     # default seed when pytest runs
-    return make_simple_marginals_2D(seed=0)
+    return make_simple_marginals(seed=0, d=2)
+
 
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))
