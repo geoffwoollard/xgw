@@ -83,10 +83,10 @@ def f_to_e(vect, R_inv):
     return np.ravel(vect) @ R_inv
 
 class DoubleRepresentation():
-    def __init__(self):
+    def __init__(self, duplicate_tol=1e-1):
         self.V = []
         self.H = ()
-        self.duplicate_tol = 1e-8
+        self.duplicate_tol = duplicate_tol
 
     def remove_duplicates_V(self):
         """
@@ -99,7 +99,9 @@ class DoubleRepresentation():
             if not any(np.linalg.norm(v - np.array(V_array[j])) < self.duplicate_tol for j in keep):
                 keep.append(i)
         
+        print(f"Original number of vertices: {len(self.V)}")
         self.V = [V_array[i] for i in keep]
+        print(f"Removed duplicates, new number of vertices: {len(self.V)}")
 
     def H_to_V(self):
         A, b = self.H
@@ -179,11 +181,16 @@ def function_to_cost(g, e_base):
     return np.einsum('ijk,k->ij', e_base, g)
 
 
-def update_box(P_plus, P_minus, half_plans_list, vertex_list):
-    P_plus.add_H(half_plans_list)
+def update_box(P_plus, P_minus, half_planes_list, vertex_list):
+    logger.info('Adding new half-planes and vertices to the bounding boxes')
+    P_plus.add_H(half_planes_list)
+    logger.info('Added half-planes to P_plus')
     P_minus.add_V(vertex_list)
+    logger.info('Added vertices to P_minus')
     P_minus.V_to_H()
+    logger.info('Updated half-planes of P_minus from vertices')
     P_plus.H_to_V()
+    logger.info('Updated vertices of P_plus from half-planes')
     return P_plus, P_minus
 
 

@@ -6,8 +6,15 @@ from .Frank_Wolfe import _Frank_Wolfe_iter, covariance, const_cost, polynomial_c
 from .Hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, function_to_cost
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
-logger = logging.getLogger(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+
+logger = logging.getLogger(__name__)
 
     
 def optimal_cost_cvx(P, cost, R, d, t):
@@ -69,7 +76,7 @@ def _optimal_cost_cvx(vect_list, cost, R, d, t):
 
 @njit
 def vector_cost(vect, cost, R, d, t):
-    # compute the cost of a vector after changing the base
+    '''Compute the cost of a vector after changing the base.'''
     sigma = e_to_f(vect, R, d)
     return polynomial_cost(sigma, cost, t)
 
@@ -121,15 +128,21 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     g /= np.linalg.norm(g)
     
     for iter in range(iter_max):
+        logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
-        # print('new half plane: ', g, g_hat)
+        logger.info(f'new half plane: {g}, {g_hat}')
+        logger.info(f'new vertex: {g_star}')
+        logger.info('Updating bounding boxes')
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+        logger.info(f'Updated box with , P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
+        logger.info('Updating c_minus (candidate optimal value)')
         Tcost = vector_cost(g_star, cost, R, d, t)
         # c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
 
         # The optimal values after each iteration is updated
+        logger.info('Updating c_plus and c_minus')
         c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
-        # print(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, verices in P_plus {len(P_plus.V)}')
+        logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, verices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}')
         
         if Tcost > c_minus:
             c_minus = Tcost
@@ -138,12 +151,10 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
             break
         
         # update direction
+        logger.info('Updating direction for next iteration')
         centro = P_minus.get_centroid() # not needed after a couple of iterations
         g = x_plus - centro
         g /= np.linalg.norm(g)
-        # print(c_minus, c_plus, )
-        # print([np.linalg.norm(v) for v in P_plus.V])
-        # print('new direction: ', g_star)
 
     # Computing the optimal coupling:
     cost_matrix = function_to_cost(x_minus, e_base)
@@ -157,7 +168,7 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
 
         
 
-def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter = 100, t=0.5):
+def GW_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
