@@ -185,6 +185,7 @@ def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
 
 
 def projection(pi, e_base):
+    print(f'e_base {e_base.shape}, pi {pi.shape}')
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
