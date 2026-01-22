@@ -20,7 +20,7 @@ def testing_2d_convex():
         assert np.isclose(plan_error, 0.0)
 
         
-        T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
+        T, plan, c = GW_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100)
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (CGW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)

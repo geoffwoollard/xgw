@@ -108,10 +108,27 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     return pi_opt
     
     
+def optimal_t(max_diam, d, cost, t, convex_tol):
+    if cost == 'CGW' and t is None:
+        if d <= 2 :
+            t =  1/2 + convex_tol
+        elif d == 3:
+            assert max_diam is not None, f'Need to define a max_diameter or a t in 3D to check CGW convexity'
+            val = (24*max_diam**2)/(2+24*max_diam**2)
+            if 1-val> 2*convex_tol:
+                t = val + convex_tol
+            else:
+                t = (1+val)/2
+    if t is None:
+        return 0
+    return t 
+    
+def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3):
 
-def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
-    # This code is specifically designed for a convex cost, as IGW or CGW with a low enough t
+    # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
+    # selecting the optimale t in the CGW case, if not pre-selected
+    t = optimal_t(max_diam, d, cost, t, convex_tol)
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
@@ -165,7 +182,7 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     pi_opt = ot.emd(mu, nu, M=-cost_matrix, **emd_kwargs)
     c_op = c_minus
     
-    # # Local optimization to finish the optimization  (may not be needed)
+    # Local optimization to finish the optimization  (may not be needed)
     c_op, pi_opt = Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
     
     return cst_cost-2*c_op, pi_opt, c_plus - c_op
