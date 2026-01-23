@@ -116,13 +116,14 @@ def random_invariance_matrix(cost, d):
         return rotation
     elif cost == 'DGW':
         rotation = random_rotation_matrix(d)
-        sheer_fact = 1+0.2*np.random.rand(d)
-        sheer_fact /= np.prod(sheer_fact)
+        sheer_fact = 1+10*np.random.rand(d)
+        sheer_fact /= np.power(np.prod(sheer_fact), 1/d)
+        print (sheer_fact)
         return np.diag(sheer_fact) @ rotation
     else:
         raise ValueError(f"cost not implemented")
 
-def compute_test(marg, cost, p, action_tolerance=1e-15, non_zero_dist=1e-2):
+def compute_test(marg, cost, p):
     # marginals
     mu, nu, space_x, space_y = marg
     # Initial coupling
@@ -131,27 +132,26 @@ def compute_test(marg, cost, p, action_tolerance=1e-15, non_zero_dist=1e-2):
     d = space_x.shape[-1]
     # Non zero cost for two different marginals
     c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost=cost)
-    assert c>non_zero_dist
+    assert c>1e-3
     # Zero cost for the same marginals
     c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost=cost, pi_n=pi_n)
     assert c<1e-15
     # invariance by Lie group action
     M = random_invariance_matrix(cost, d)
     c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, lie_group_action(space_x, M), cost=cost, pi_n=pi_n)
-    assert c<action_tolerance
+    assert c<1e-15
     
     
 def test_FW_diff_costs(marginals, marginals_3d, simple_marginals_2D):
     p = 0.9
-    compute_test (marginals, 'IGW', p, non_zero_dist=1e-3)
+    compute_test (marginals, 'IGW', p)
     compute_test (marginals_3d, 'IGW', p)
     compute_test (simple_marginals_2D, 'IGW', p)
     
-    # It looks like the DGW cost is close to the numerical tolerance of the computer : scailing the problem could be very interesting to improve performance
     p = 0.9
-    compute_test (marginals, 'DGW', p, non_zero_dist=1e-3, action_tolerance=1e-3)
-    compute_test (marginals_3d, 'DGW', p, non_zero_dist=1e-2, action_tolerance=5e-3)
-    compute_test (simple_marginals_2D, 'DGW', p, non_zero_dist=0.8,  action_tolerance=2e-2)
+    compute_test (marginals, 'DGW', p)
+    compute_test (marginals_3d, 'DGW', p)
+    compute_test (simple_marginals_2D, 'DGW', p)
     
     p = 0.9
     compute_test (marginals, 'CGW', p)

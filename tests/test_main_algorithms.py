@@ -3,7 +3,7 @@ from scipy.spatial.transform import Rotation as R
 
 from xgw.Gromov_Wasserstein_m_dist import GW_m_convex, GW_m_non_convex, GW_m_non_convex_Hausdorff
 
-from test_frank_wolfe import marginals_3d
+from test_frank_wolfe import marginals_3d, random_invariance_matrix
 from test_hyperplane_approx import make_marginals, make_simple_marginals, marginals
 
 
