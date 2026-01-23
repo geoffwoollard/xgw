@@ -129,7 +129,7 @@ def GW_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     d = space_x.shape[-1]
     # selecting the optimale t in the CGW case, if not pre-selected
     t = optimal_t(max_diam, d, cost, t, convex_tol)
-    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)

@@ -89,13 +89,17 @@ def make_simple_marginals_low_num(seed, d, min_points=4, max_points=7):
     # nu = mu = np.array([1/3,1/3,1/3])
     # space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
     # space_y = np.array([[3,0],[4,2],[1,2]])
-    return mu, nu, space_x, space_y, n_points
+    return mu, nu, space_x, space_y
 
 @pytest.fixture
 def simple_marginals_2D():
     # default seed when pytest runs
-    return make_simple_marginals_low_num(seed=0, d=2)
+    return make_simple_marginals(seed=0, d=2)
 
+@pytest.fixture
+def super_simple_marginals_2D():
+    # default seed when pytest runs
+    return make_simple_marginals_low_num(seed=0, d=2)
 
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))
@@ -104,14 +108,15 @@ def permut_matrix(permut, dim):
     return sol
         
 
-def test_simple_marginals(simple_marginals_2D):
+def test_simple_marginals(super_simple_marginals_2D):
     P_plus_volumes = []
     P_minus_volumes = []
     max_niter = 10
     iteration_list = list(range(1, max_niter+1))
     for niter in iteration_list:
         logger.info(f'Testing simple marginals with niter={niter}')
-        mu, nu, space_x, space_y, n_point = simple_marginals_2D
+        mu, nu, space_x, space_y = super_simple_marginals_2D
+        n_point = len(mu)
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
         print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')

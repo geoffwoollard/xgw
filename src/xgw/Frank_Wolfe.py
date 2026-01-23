@@ -79,7 +79,7 @@ def linearized_cost_matrix(sigma, cost, t):
 
 
 def linearized_cost_function(space_x, space_y, M): 
-    return (space_x @ M.T).dot(space_y.T)
+    return (space_x @ M).dot(space_y.T)
    
 def cross_covariance(space_x, space_y, pi):
     return np.einsum('kd,lD,kl->dD', space_x, space_y, pi)
@@ -155,7 +155,7 @@ def line_search_CGW_2d(sigma_1, sigma_0, t):
 @njit
 def line_search_DGW_2d(sigma_1, sigma_0):
     alpha, beta, gamma = DGW_2d_polynomial(sigma_1, sigma_0)
-    print (f'polynomial: {alpha}*x^2+ {beta}*x + {gamma}')
+    # print (f'polynomial: {alpha}*x^2+ {beta}*x + {gamma}')
     T, tau = optimize_deg_2_polynomial(alpha, beta, gamma)
     return T,tau
 
@@ -197,7 +197,7 @@ def line_search_DGW_3d(sigma_1, sigma_0):
     # error in this function
     alpha, beta, gamma, delta = DGW_3d_polynomial(sigma_1, sigma_0)
     T, tau = optimize_deg_3_polynomial(alpha, beta, gamma, delta)
-    print (f'polynomial: {alpha}*x^3+ {beta}*x^2 + {gamma}*x + {delta}')
+    # print (f'polynomial: {alpha}*x^3+ {beta}*x^2 + {gamma}*x + {delta}')
     return T,tau
 
 @njit
@@ -265,7 +265,7 @@ def Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
-    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
     initial_cost = const_cost(sigma_x, sigma_y, cost, t)
@@ -280,7 +280,6 @@ def Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
         print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
-        print (T, polynomial_cost(tau*sigma_pi_n_1_hat + (1-tau)*sigma_pi_n, cost, t))
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
