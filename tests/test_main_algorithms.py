@@ -123,13 +123,7 @@ def test_cgw_convex_rotation_invariant():
     for d in [2]:
         for test_id in range(n_tests):
             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
-            random_angle = np.random.rand() * 2 * np.pi
-            if d ==2:
-                rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
-            elif d==3:
-                random_axis = np.random.randn(3)
-                random_axis /= np.linalg.norm(random_axis)
-                rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+            rotation = random_invariance_matrix('CGW', d)
             print('Rotation matrix: ', rotation.shape)
             space_xs_rotated = space_xs @  rotation.T
             _, plan, _ = GW_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', cost_tol=1e-5, iter_max=50)
@@ -143,13 +137,7 @@ def test_cgw_Hausdorff_rotation_invariant():
     for d in [2]:
         for test_id in range(n_tests):
             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
-            random_angle = np.random.rand() * 2 * np.pi
-            if d ==2:
-                rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
-            elif d==3:
-                random_axis = np.random.randn(3)
-                random_axis /= np.linalg.norm(random_axis)
-                rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+            rotation = random_invariance_matrix('CGW', d)
             print('Rotation matrix: ', rotation.shape)
             space_xs_rotated = space_xs @  rotation.T
             _, plan, _ = GW_m_non_convex_Hausdorff(mus, space_xs, mus, space_xs_rotated, {}, relax_level=4, cost='CGW', Hausdorff_tol=1e-5, iter_max=50, FW_iter=100, t=0.7)
