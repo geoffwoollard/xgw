@@ -101,69 +101,14 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     return mapping[pairs]
 
 
-if __name__ == "__main__":
 
-    # require 
-      # H = A, b halfplanes
-      # V  vertices
-      # E  edges
+def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
+        
 
-    # V = np.array([
-    #     [0.0, 0.0],
-    #     [1.0, 0.0],
-    #     [0.0, 1.0],
-    #     [1.0, 1.0],
-    # ])
-    # E = np.array([
-    #     [0, 1],
-    #     [0, 2],
-    #     [1, 3],
-    #     [2, 3],
-    # ])
-    # 3D cubs
-    V = np.array([
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [1.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [1.0, 0.0, 1.0],
-        [0.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0],
-    ])
-    E = np.array([
-        [0, 1],
-        [0, 2],
-        [0, 4],
-        [1, 3],
-        [1, 5],
-        [2, 3],
-        [2, 6],
-        [3, 7],
-        [4, 5],
-        [4, 6],
-        [5, 7],
-        [6, 7],
-    ])
-    dd = DoubleRepresentation()
-    dd.add_V(V)
-    A, b = dd.H
-    print("A:", A)
-    print("b:", b)
-    # define new h = a, b
-    # plane close to origin cutting off all except one
-    a_new = np.array([-1.0, -1.0, -1.0])
-    b_new = np.array(-0.1)
-    
-    # plane close to corner cutting off one corner
-    # a_new = np.array([-1.0, -1.0, -1.0])
-    # b_new = np.array(-3 + 0.1)
-    dd.add_H([[a_new,b_new]])
-    print(dd.V)
     # find excluded vertices
     v_excluded_bool = a_new.dot(V.T) < b_new
     v_excluded_idx = np.arange(V.shape[0])[v_excluded_bool]
-    print("excluded vertices:", v_excluded_idx)
+    # print("excluded vertices:", v_excluded_idx)
 
     # find edges for new vertices
         # for each edge find v_new vertices
@@ -190,38 +135,39 @@ if __name__ == "__main__":
                     E_old_updated.append([v_new_idx, idx_other])
                     v_new_idx += 1
     E_old_updated = np.array(E_old_updated)
-    print("E_old_updated:", E_old_updated)
-    print("V_new:", V_new)
+    # print("E_old_updated:", E_old_updated)
+    # print("V_new:", V_new)
     # create new edges between new vertices
         # transform new vertices to full rank subspace
     points = np.stack(list(V_new.values()))
-    print("points", points)
+    # print("points", points)
     p0, Q = affine_subspace_basis(points)
-    print("p0:\n", p0)
-    print("Q (basis for plane):\n", Q)
-    print("Q^T Q:\n", Q.T @ Q)
+    # print("p0:\n", p0)
+    # print("Q (basis for plane):\n", Q)
+    # print("Q^T Q:\n", Q.T @ Q)
 
     new_points = []
     for p in points:
         coords = project_to_subspace(p, p0, Q)
         new_points.append(coords)
-        print(p, "→", coords)
+        # print(p, "→", coords)
 
     dd_sub = DoubleRepresentation()
     dd_sub.add_V(new_points)
     dd_sub.V_to_H()
     A_sub, b_sub = dd_sub.H
     edge_test = np.isclose(A_sub @ np.array(new_points).T - b_sub[:, np.newaxis], 0)
-    print("edge test:\n", edge_test)
+    # print("edge test:\n", edge_test)
     n_v_per_pair = 2
+    # print('edge test:', edge_test)
     assert (edge_test.sum(0) == n_v_per_pair).all()
     E_new = np.where(edge_test.T)[1].reshape(edge_test.shape[1], n_v_per_pair) 
-    print("E_new (indices in V_new):\n", E_new)
+    # print("E_new (indices in V_new):\n", E_new)
 
     # re-index V and E accordingly
     delta_v_idx = len(V) - len(v_excluded_idx)
     E_new = E_new + delta_v_idx
-    print("re-indexed E_new:\n", E_new)
+    # print("re-indexed E_new:\n", E_new)
     # E_old_updated = E_old_updated + delta_v_idx
     # print("re-indexed E_old_updated:\n", E_old_updated)
 
@@ -230,18 +176,23 @@ if __name__ == "__main__":
     E_reindexed = reindex_pairs(E, v_excluded_idx, len(V))
     valid = (E_reindexed >= 0).all(axis=1)
     E_reindexed_clean = E_reindexed[valid]
-    print("E_reindexed_clean:\n", E_reindexed_clean)
+    # print("E_reindexed_clean:\n", E_reindexed_clean)
 
     E_old_updated_reindexed = reindex_pairs_with_new(E_old_updated, len(V), v_excluded_idx, len(V_new))
     valid = (E_old_updated_reindexed >= 0).all(axis=1)
     E_old_updated_reindexed_clean = E_old_updated_reindexed[valid]
-    print("E_old_updated_reindexed_clean:\n", E_old_updated_reindexed_clean)
+    # print("E_old_updated_reindexed_clean:\n", E_old_updated_reindexed_clean)
 
         # combine all edges
     E_final = np.vstack([E_reindexed_clean, E_new, E_old_updated_reindexed_clean])
-    print("E_final:\n", E_final)
+    # print("E_final:\n", E_final)
 
         # remove excluded vertices from V
     V_final = np.vstack([V[~v_excluded_bool], np.stack(list(V_new.values()))])
-    print("V_final:\n", V_final)
+    # print("V_final:\n", V_final)
+
+    A_final = np.vstack([A, a_new])
+    b_final = np.hstack([b, b_new])
+
+    return V_final, E_final, A_final, b_final
 
