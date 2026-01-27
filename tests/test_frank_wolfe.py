@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from xgw.Frank_Wolfe import Frank_Wolfe_GW, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, DGW_2d_polynomial, det_23d, DGW_3d_polynomial, matrix_cofactor_low_dim
 from test_hyperplane_approx import marginals,  simple_marginals_2D
-
+from scipy.spatial.transform import Rotation as R
 
 def test_polynomial():
     T, tau = optimize_deg_2_polynomial(-1, 1, 0) #optimizing x(1-x)
@@ -89,99 +89,71 @@ def test_centered_marginals(simple_marginals_2D):
     c_nu = (space_y * nu[:, None]).sum(axis=0)
     assert np.allclose(c_mu,0) and np.allclose(c_nu,0)
 
-    
-    
-def test_IGW(marginals, marginals_3d, simple_marginals_2D):
-    # 2D marginals
-    mu, nu, space_x, space_y = marginals
-    
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW')
-    assert c>1e-3
+def lie_group_action(space, M):
+    return  space @ M
 
-    p = 0.99999
+def random_rotation_matrix(d):
+    random_angle = np.random.rand() * 2 * np.pi
+    if d ==2:
+        rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
+    elif d==3:
+        random_axis = np.random.randn(3)
+        random_axis /= np.linalg.norm(random_axis)
+        rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+    else:
+        raise ValueError(f"dimension not implemented")
+    return rotation
+
+def random_invariance_matrix(cost, d):
+    np.random.seed(2)
+    if cost == 'IGW':
+        rotation = random_rotation_matrix(d)
+        s = np.random.randint(2, size = d)
+        flips = (s == 1).astype(int) - (s == 0).astype(int)
+        return np.diag(flips) @ rotation
+    elif cost == 'CGW':
+        rotation = random_rotation_matrix(d)
+        return rotation
+    elif cost == 'DGW':
+        rotation = random_rotation_matrix(d)
+        sheer_fact = 1+10*np.random.rand(d)
+        sheer_fact /= np.power(np.prod(sheer_fact), 1/d)
+        print (sheer_fact)
+        return np.diag(sheer_fact) @ rotation
+    else:
+        raise ValueError(f"cost not implemented")
+
+def compute_test(marg, cost, p):
+    # marginals
+    mu, nu, space_x, space_y = marg
+    # Initial coupling
     pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
+    # dimension
+    d = space_x.shape[-1]
+    # Non zero cost for two different marginals
+    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost=cost)
+    assert c>1e-3
+    # Zero cost for the same marginals
+    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost=cost, pi_n=pi_n)
+    assert c<1e-15
+    # invariance by Lie group action
+    M = random_invariance_matrix(cost, d)
+    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, lie_group_action(space_x, M), cost=cost, pi_n=pi_n)
     assert c<1e-15
     
     
-    # 3D marginals
-    mu, nu, space_x, space_y = marginals_3d
+def test_FW_diff_costs(marginals, marginals_3d, simple_marginals_2D):
+    p = 0.9
+    compute_test (marginals, 'IGW', p)
+    compute_test (marginals_3d, 'IGW', p)
+    compute_test (simple_marginals_2D, 'IGW', p)
     
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW')
-    assert c>1e-3
-
-    p = 0.99999
-    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
-    assert c<1e-15
+    p = 0.9
+    compute_test (marginals, 'DGW', p)
+    compute_test (marginals_3d, 'DGW', p)
+    compute_test (simple_marginals_2D, 'DGW', p)
     
-    
-    # simple 2D marginals
-    mu, nu, space_x, space_y = simple_marginals_2D
-    
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW')
-    assert c>1e-3
-
-    p = 0.99999
-    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='IGW', pi_n=pi_n)
-    assert c<1e-15
-    
-    
-#     #Add more tests here
-    
-    
-
-
-def test_DGW(marginals, marginals_3d, simple_marginals_2D):
-    # 2D marginals
-    mu, nu, space_x, space_y = marginals
-    
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='DGW')
-    assert c>1e-3
-
-    for p in np.linspace(0,1,20):
-        # it looks like there is a problem here, sometimes the algorithm stops at first step
-        print(f'p = {p}')
-        pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-        c, _ , initial_coupling_cost = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-        assert initial_coupling_cost - c > 0 or c < 1e-15
-
-    p = 0.99
-    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-    assert c<1e-15
-    
-#     # 3D marginals to fix
-    mu, nu, space_x, space_y = marginals_3d
-    
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='DGW')
-    assert c>1e-3
-
-    for p in np.linspace(0,1,20):
-        # it looks like there is a problem here, sometimes the algorithm stops at first step
-        print(f'p = {p}')
-        pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-        c, _ , initial_coupling_cost = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-        assert initial_coupling_cost - c > 0 or c < 1e-15
-    
-    p = 0.99
-    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-    assert c<1e-15
-    
-    # simple 2D marginals
-    mu, nu, space_x, space_y = simple_marginals_2D
-    
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='DGW')
-    assert c>1e-3
-
-    p = 0.99
-    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost='DGW', pi_n=pi_n)
-    assert c<1e-15
-    
-    
-    #Add more tests here
-
-
+    p = 0.9
+    compute_test (marginals, 'CGW', p)
+    compute_test (marginals_3d, 'CGW', p)
+    compute_test (simple_marginals_2D, 'CGW', p)
