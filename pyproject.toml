@@ -42,6 +42,9 @@ dependencies = [
   "numpy",
   "scipy",
   "POT",
+  "numba",
+  "pypoman",
+  "ncpol2sdpa",
 ]
 
 

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
@@ -83,6 +84,9 @@ def test_minimal_2d(n_iter):
         plt.plot(np.sin(theta_grid),np.cos(theta_grid), c='b')
         plt.title(f'circle approximation iteration n. {iter}')
         plt.legend()
+        # mkdir if not exists
+        if not os.path.exists('tests/results'):
+            os.makedirs('tests/results')
         plt.savefig(f'tests/results/circle_approx{iter}', dpi=50)
         plt.close()
 

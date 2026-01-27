@@ -27,9 +27,11 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libcdd-dev
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
       - name: Test with pytest
         run: |
-          pytest  tests/test_qp_incremental_projector.py tests/test_construction_basis.py
+          pytest  tests/

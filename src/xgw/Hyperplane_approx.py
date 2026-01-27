@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import qr
+from numba import njit
 import ot
 import logging
 logger = logging.getLogger(__name__)
@@ -9,7 +10,7 @@ try:
 except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
-def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+def _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
     g = new_direction(x_0, v_0, P_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
@@ -17,9 +18,8 @@ def iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse,
     return P_plus, P_minus, objective, previous_solutions_to_reuse, x_0, v_0
 
 
-def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs)
+def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     print('box initialized')
     
     objective_list = []
@@ -27,7 +27,7 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, _, x_0, v_0 = iteration_loop(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        P_plus, P_minus, objective, _, x_0, v_0 = _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         x_0_list.append(x_0)
         v_0_list.append(v_0)
@@ -36,6 +36,28 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
             break
     return P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
         
+
+def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+    x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
+    g = new_direction(x_0, v_0, P_minus)
+    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+    return P_plus, P_minus, objective, previous_solutions_to_reuse
+
+def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    print('box initialized')
+    
+    objective_list = []
+    for iter in range(niter):
+        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
+        print(iter)
+        P_plus, P_minus, objective, previous_solutions_to_reuse  = iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        objective_list.append(objective)
+        logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
+        if objective < epsilon:
+            break
+    return P_minus, objective, R, e_base
 
 def construct_basis_eij(space_x, space_y):
     # finding orthonormal basis : Q = [e_1,...,e_dx*dy] orthonormal base (ei flatten), f_base = [f1,...,f_dx*dy] = e_base@R, R triangular superior matrix of size dx*dy^2, e_base (N, M) by dx*dy tensor, f_base (N, M) by dx*dy tensor
@@ -51,30 +73,51 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
+@njit
+def e_to_f(vect, R, d):
+    sol = (vect@R).reshape((d,d))
+    return sol
+
+@njit
+def f_to_e(vect, R_inv):
+    return np.ravel(vect) @ R_inv
 
 class DoubleRepresentation():
-    def __init__(self):
+    def __init__(self, duplicate_tol=1e-5):
         self.V = []
         self.H = ()
-        self.duplicate_tol = 1e-8
+        self.duplicate_tol = duplicate_tol
 
     def remove_duplicates_V(self):
         """
         Remove duplicates from self.V up to a Euclidean distance tolerance.
+        Uses O(n log n) quantization + np.unique instead of O(n^2) pairwise checks.
         """
-        V_array = np.array(self.V)
-        keep = []
-        
-        for i, v in enumerate(V_array):
-            if not any(np.linalg.norm(v - np.array(V_array[j])) < self.duplicate_tol for j in keep):
-                keep.append(i)
-        
-        self.V = [V_array[i] for i in keep]
+        V_array = np.asarray(self.V, dtype=float)
+        tol = float(self.duplicate_tol)
+
+        if len(V_array) == 0:
+            return
+
+        # Quantize vertices to tolerance grid
+        scale = 1.0 / tol
+        V_quant = np.round(V_array * scale).astype(np.int64)
+
+        # Find unique rows (lexicographic)
+        _, unique_indices = np.unique(V_quant, axis=0, return_index=True)
+
+        # Preserve original order
+        unique_indices.sort()
+
+        logger.info(f"Original number of vertices: {len(self.V)}")
+        self.V = [V_array[i] for i in unique_indices]
+        logger.info(f"Removed duplicates, new number of vertices: {len(self.V)}")
+
 
     def H_to_V(self):
         A, b = self.H
         self.V = compute_polytope_vertices(A, b)
-        # self.remove_duplicates_V()
+        self.remove_duplicates_V()
 
     def V_to_H(self):
         A, b = compute_polytope_halfspaces(self.V)
@@ -108,9 +151,9 @@ class DoubleRepresentation():
         self.H_to_V()
     
     def get_centroid(self):
-        return np.mean(np.array(self.V))
+        return np.mean(np.array(self.V), axis=0)
     
-def initial_box(e_base, mu, nu, emd_kwargs):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     '''
     Docstring for initial_box
     
@@ -119,6 +162,7 @@ def initial_box(e_base, mu, nu, emd_kwargs):
     :param nu: marginal 2
     creates an initial rectangle bounding 
     '''
+    e_base, R = construct_basis_eij(space_x, space_y)
     P_plus, P_minus = DoubleRepresentation(), DoubleRepresentation()
     vertex_list = []
     half_plans_list = []
@@ -132,7 +176,7 @@ def initial_box(e_base, mu, nu, emd_kwargs):
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(P_plus, P_minus, half_plans_list, vertex_list)
             
-    return P_plus, P_minus
+    return e_base, R, P_plus, P_minus
 
 def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
     cost_matrix = function_to_cost(g, e_base)
@@ -141,6 +185,7 @@ def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
 
 
 def projection(pi, e_base):
+    print(f'e_base {e_base.shape}, pi {pi.shape}')
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
@@ -148,11 +193,16 @@ def function_to_cost(g, e_base):
     return np.einsum('ijk,k->ij', e_base, g)
 
 
-def update_box(P_plus, P_minus, half_plans_list, vertex_list):
-    P_plus.add_H(half_plans_list)
+def update_box(P_plus, P_minus, half_planes_list, vertex_list):
+    logger.info('Adding new half-planes and vertices to the bounding boxes')
+    P_plus.add_H(half_planes_list)
+    logger.info('Added half-planes to P_plus')
     P_minus.add_V(vertex_list)
+    logger.info('Added vertices to P_minus')
     P_minus.V_to_H()
+    logger.info('Updated half-planes of P_minus from vertices')
     P_plus.H_to_V()
+    logger.info('Updated vertices of P_plus from half-planes')
     return P_plus, P_minus
 
 
@@ -179,25 +229,6 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
     return x0, v_0, objective, previous_solutions_to_reuse
 
 
-# def solve_dist_brute_force(vertex, P_minus, tol = 1e-8):
-#     A, b = P_minus.H
-#     V_list = P_minus.V
-#     opt_x = None
-#     objective = + np.inf
-#     for i, elem  in enumerate(A):
-#         dist = np.dot(elem, vertex)- b[i]
-#         proj = vertex - (dist)*elem 
-#         if np.all(A@proj<=b+tol) and dist<objective :
-#             opt_x = proj
-#             objective = dist
-#     for V in V_list:
-#         dist = np.linalg.norm(vertex-V)
-#         if  dist<objective:
-#             opt_x = V
-#             objective = dist
-    
-#     return opt_x,objective
-            
             
 def P_plus_outside_P_minus(P_plus, P_minus):
     '''Check P_minus is included in P_plus'''
@@ -235,7 +266,4 @@ def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
-
-def minimal_test_2d():
-    pass
 

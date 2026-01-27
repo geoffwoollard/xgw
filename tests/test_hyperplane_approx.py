@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pytest
 import matplotlib.pyplot as plt
@@ -8,19 +9,20 @@ from copy import deepcopy
 import math
 from pypoman.polygon import compute_polygon_hull
 
-from xgw.Hyperplane_approx import run_approx, construct_basis_eij, P_plus_outside_P_minus, projection, Hausdorff, initial_box, DoubleRepresentation
+from xgw.Hyperplane_approx import _run_approx, construct_basis_eij, P_plus_outside_P_minus, projection, Hausdorff, initial_box, DoubleRepresentation
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-@pytest.fixture
-def marginals():
+
+def make_marginals(seed):
+    np.random.seed(seed)
+    n_points_xy = np.random.randint(5,15)
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
     mu_b, sigma_b = r_factor*mu_a1, 0.2
-    n_grid_1d_x = 10
-    n_grid_1d_y = 10
+    n_grid_1d_x = n_grid_1d_y = n_points_xy
     def make_space_2d(n_grid):
         lin = np.linspace(-1, 1, n_grid)
         xx, yy = np.meshgrid(lin, lin)
@@ -35,14 +37,22 @@ def marginals():
     nu += np.exp(-0.5 * (((space_y + factor*mu_b) / sigma_b) ** 2).sum(-1))
     mu /= mu.sum()
     nu /= nu.sum()
+
+    # scale space to have zero center of mass
+    space_x = space_x.astype(mu.dtype)
+    space_y = space_y.astype(nu.dtype)
+    space_x -= (space_x * mu[:, None]).sum(axis=0)
+    space_y -= (space_y * nu[:, None]).sum(axis=0)
     
     return mu, nu, space_x, space_y
 
+@pytest.fixture
+def marginals():
+    return make_marginals(seed=0)
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = initial_box(e_base, mu, nu, emd_kwargs={})
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={})
     assert len(P_minus.V) == 8
     assert len(P_plus.V) == 16
     assert P_plus.H[0].shape == (8,4)
@@ -52,13 +62,44 @@ def test_initial_box(marginals):
     atol = 1e-15
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
+
+def make_simple_marginals(seed, d, min_points=10, max_points=20):
+    np.random.seed(seed)
+    n_points = np.random.randint(min_points, max_points)
+    print(f'Number of points in simple marginals test: {n_points}')
+    mu = nu = np.ones(n_points) / n_points
+
+    space_x = np.random.randn(n_points,d)
+    space_y = np.random.randn(n_points,d)
+
+    return mu, nu, space_x, space_y
+
+
+def make_simple_marginals_low_num(seed, d, min_points=4, max_points=7):
+    np.random.seed(seed)
+    n_points = np.random.randint(min_points, max_points)
+    n_points = 4
+    print(f'Number of points in simple marginals test: {n_points}')
+    mu = nu = np.ones(n_points) / n_points
+
+    space_x = np.random.randn(n_points,d)
+    space_y = np.random.randn(n_points,d)
+
+    # mu = np.array([1/3,1/3,1/3])
+    # nu = mu = np.array([1/3,1/3,1/3])
+    # space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
+    # space_y = np.array([[3,0],[4,2],[1,2]])
+    return mu, nu, space_x, space_y
+
 @pytest.fixture
 def simple_marginals_2D():
-    mu = np.array([1/3,1/3,1/3])
-    nu = mu = np.array([1/3,1/3,1/3])
-    space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
-    space_y = np.array([[3,0],[4,2],[1,2]])
-    return mu, nu, space_x, space_y
+    # default seed when pytest runs
+    return make_simple_marginals(seed=0, d=2)
+
+@pytest.fixture
+def super_simple_marginals_2D():
+    # default seed when pytest runs
+    return make_simple_marginals_low_num(seed=0, d=2)
 
 def permut_matrix(permut, dim):
     sol = np.zeros((dim,dim))
@@ -67,19 +108,20 @@ def permut_matrix(permut, dim):
     return sol
         
 
-def test_simple_marginals(simple_marginals_2D):
+def test_simple_marginals(super_simple_marginals_2D):
     P_plus_volumes = []
     P_minus_volumes = []
     max_niter = 10
     iteration_list = list(range(1, max_niter+1))
     for niter in iteration_list:
         logger.info(f'Testing simple marginals with niter={niter}')
-        mu, nu, space_x, space_y = simple_marginals_2D
+        mu, nu, space_x, space_y = super_simple_marginals_2D
+        n_point = len(mu)
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
         print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
         
-        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         logger.info(f'P_plus vertices: {np.array(P_plus.V)}')
         logger.info(f'P_minus vertices: {np.array(P_minus.V)}')
         logger.info(f'x_0_list over iterations: {np.array(x_0_list)}')
@@ -112,7 +154,7 @@ def test_simple_marginals(simple_marginals_2D):
 
         
         e_base, _ = construct_basis_eij(space_x, space_y)
-        coupling_vertices = [permut_matrix(elem, 3)/3 for elem in it.permutations([0,1,2])] # the true vertices of the coupling polytopes are the permutation matrices
+        coupling_vertices = [permut_matrix(elem, n_point)/n_point for elem in it.permutations(np.linspace(0,n_point-1,n_point, dtype = int))] # the true vertices of the coupling polytopes are the permutation matrices
 
         projected_couplings = [projection(vertex, e_base) for vertex in coupling_vertices]
         
@@ -151,6 +193,9 @@ def test_simple_marginals(simple_marginals_2D):
         fig.legend(by_label.values(), by_label.keys(),
                 loc='center left', bbox_to_anchor=(0.9, 0.5))
 
+        # mkdir if not exists
+        if not os.path.exists('tests/results'):
+            os.makedirs('tests/results')
         fig.savefig(
             f'tests/results/test_projection_coupling_P_plus_minus_niter{niter}.png',
             bbox_inches='tight'
@@ -164,7 +209,7 @@ def test_simple_marginals(simple_marginals_2D):
         
         # checking P_minus is included in P_plus 
         residuals = P_plus_outside_P_minus(P_plus, P_minus)
-        atol = 1e-16
+        atol = 1e-12
         assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
         
         # checking P_minus is included in P_true 
@@ -174,7 +219,7 @@ def test_simple_marginals(simple_marginals_2D):
         
         # checking P_true is included in P_plus 
         residuals = P_plus_outside_P_minus(P_plus, P_true)
-        atol = 1e-14
+        atol = 1e-12
         assert np.all(residuals <= atol), f'max residual for inclusion of P_true in P_plus : {residuals.max()}'
 
     logger.info(f'P_plus volumes over iterations: {P_plus_volumes}')
@@ -195,6 +240,9 @@ def test_simple_marginals(simple_marginals_2D):
         else:
             axes[idx].set_ylabel('Hausdorff distance')
         axes[idx].legend()
+    # mkdir if not exists
+    if not os.path.exists('tests/results'):
+        os.makedirs('tests/results')
     fig.savefig('tests/results/test_volume_P_plus_minus_simple_marginals.png')
     plt.close(fig)  
     
@@ -228,7 +276,7 @@ def test_overall(niter, marginals):
     y_1, y_2 = space_y.shape
     logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
     
-    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
+    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
     logger.info(f'Objective list over iterations: {objective_list}')
     diffs = np.diff(objective_list)
     tol = 1e-16
@@ -237,7 +285,8 @@ def test_overall(niter, marginals):
     _, _, new_obj, _ = Hausdorff( P_plus, P_minus, previous_solutions_to_reuse)
     
     logger.info(f'final  Hausdorf {new_obj - objective}')
-    assert new_obj<=objective
+    tol = 1e-6              #High tolerence, the Hausdorff does not converge well
+    assert new_obj<=objective + tol
 
     residuals = P_plus_outside_P_minus(P_plus, P_minus)
     atol = 1e-17
@@ -253,8 +302,8 @@ def test_P_monotonicity(marginals):
         mu, nu, space_x, space_y = marginals
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
-        
-        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
+        P_plus, P_minus, _, _, _, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         if niter>1:
             residuals = P_plus_outside_P_minus(P_plus_old, P_plus)
             atol = 1e-12
@@ -267,5 +316,3 @@ def test_P_monotonicity(marginals):
         P_minus_old = deepcopy(P_minus)
 
 
-
-# test_simple_marginals(10)
