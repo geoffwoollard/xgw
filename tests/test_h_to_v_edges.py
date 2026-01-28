@@ -233,6 +233,93 @@ def test_cube_3d_drop_one_corner(cube_3d):
     V_true, E_true = canonicalize(V_true, E_true)
     assert np.allclose(V_final, V_true)
     assert np.array_equal(E_final, E_true)
+    
+    
+    
+    
+    
+def test_cube_4d_drop_one_corner(cube_4d):
+    '''Test plane close to corner, cutting off one corner.'''
+    V, E, A, b = cube_4d
+
+    a_new = np.array([-1.0, -1.0, -1.0, -1.0])
+    max_L1_distance_to_diag_corner = 4
+    delta = 0.1
+    b_new = np.array(-max_L1_distance_to_diag_corner + delta)
+
+    V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
+    # print("V_final:", V_final)
+    # print("E_final:", E_final)
+
+    V_final, E_final = canonicalize(V_final, E_final)
+    
+    V_true = np.array([
+        [0.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0, 0.0],
+        [1.0, 1.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0, 1.0],
+        [0.0, 1.0, 1.0, 1.0],
+        [0.9, 1.0, 1.0, 1.0],
+        [1.0, 0.9, 1.0, 1.0],
+        [1.0, 1.0, 0.9, 1.0],
+        [1.0, 1.0, 1.0, 0.9],
+    ])
+    
+    E_true = np.array([
+        [0, 1],
+        [0, 2],
+        [0, 4],
+        [1, 3],
+        [1, 5],
+        [2, 3],
+        [2, 6],
+        [3, 7],
+        [4, 5],
+        [4, 6],
+        [5, 7],
+        [6, 7],
+        [8, 9],
+        [8, 10],
+        [8, 12],
+        [9, 11],
+        [9, 13],
+        [10, 11],
+        [10, 14],
+        [12, 13],
+        [12, 14],
+        [0, 8],
+        [1, 9],
+        [2, 10],
+        [3, 11],
+        [4, 12],
+        [5, 13],
+        [6, 14],
+        [7, 18],
+        [14, 15],
+        [13, 16],
+        [11, 17],
+        [15, 16],
+        [15, 17],
+        [15, 18],
+        [16, 17],
+        [16, 18],
+        [17, 18]
+        
+    ])
+    
+    V_true, E_true = canonicalize(V_true, E_true)
+    assert np.allclose(V_final, V_true)
+    assert np.array_equal(E_final, E_true)
 
 def test_find_edges(cube_2d, cube_3d, cube_4d):
     V, E, A, b = cube_2d

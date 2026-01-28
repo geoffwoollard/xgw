@@ -103,11 +103,13 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
 
 @njit
 def compute_constraints_matching(vertex_test, dim):
+    # vertex_test of dimension n_constraints by n_points, boolean array of points solving constraints
     s = vertex_test.shape[1]
     finall_mat = np.zeros((s, s), dtype=np.bool_)
     for i in range (s-1):
         for j in range(i,s):
             common_constr = np.logical_and(vertex_test[:,i], vertex_test[:,j])
+            # detecting the points solving the same dim-1 constraints
             finall_mat[i,j] =  np.sum(common_constr) == dim-1
     return finall_mat
 
@@ -179,18 +181,8 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         new_points.append(coords)
         # print(p, "→", coords)
 
-    dd_sub = DoubleRepresentation()
-    dd_sub.add_V(new_points)
-    # dd_sub.V_to_H() # no need to, it is automatically done in add_V
-    A_sub, b_sub = dd_sub.H
-    edge_test = np.isclose(A_sub @ np.array(new_points).T - b_sub[:, np.newaxis], 0)
-    # print("edge test:\n", edge_test)
-    n_v_per_pair = 2
-    # print('edge test:', edge_test)
-    assert (edge_test.sum(0) == n_v_per_pair).all()
-    E_new = np.where(edge_test.T)[1].reshape(edge_test.shape[1], n_v_per_pair) 
-    # print("E_new (indices in V_new):\n", E_new)
-
+    # find edges between the new points
+    E_new = find_edges(new_points)
     # re-index V and E accordingly
     delta_v_idx = len(V) - len(v_excluded_idx)
     E_new = E_new + delta_v_idx
