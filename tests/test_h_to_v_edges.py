@@ -367,7 +367,7 @@ def test_cube_4d_horizontal_cut(cube_4d):
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
     # print("V_final:", V_final)
-    print("E_final:", E_final)
+    # print("E_final:", E_final)
 
     V_final, E_final = canonicalize(V_final, E_final)
     
@@ -426,8 +426,8 @@ def test_cube_4d_horizontal_cut(cube_4d):
     
     V_true, E_true = canonicalize(V_true, E_true)
     assert np.allclose(V_final, V_true)
-    print(E_final, len(E_final))
-    print(E_true, len(E_true))
+    # print(E_final, len(E_final))
+    # print(E_true, len(E_true))
     assert np.array_equal(E_final, E_true)
 
 def test_find_edges(cube_2d, cube_3d, cube_4d):
