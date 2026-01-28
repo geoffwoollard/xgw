@@ -48,10 +48,9 @@ def affine_subspace_basis(points, tol=1e-12):
 
     # QR decomposition
     Q, R = np.linalg.qr(V)
-
     # Keep only independent directions
-    rank = np.sum(np.abs(np.diag(R)) > tol)
-    Q = Q[:, :rank]
+    rank_mask = np.abs(np.diag(R)) > tol
+    Q = Q[:, rank_mask]
 
     return p0, Q
 
