@@ -320,6 +320,78 @@ def test_cube_4d_drop_one_corner(cube_4d):
     V_true, E_true = canonicalize(V_true, E_true)
     assert np.allclose(V_final, V_true)
     assert np.array_equal(E_final, E_true)
+    
+def test_cube_4d_horizontal_cut(cube_4d):
+    '''Test plane close to corner, cutting off one corner.'''
+    V, E, A, b = cube_4d
+
+    a_new = np.array([-1.0, 0, 0, 0])
+    b_new = np.array(-0.5)
+
+    V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
+    # print("V_final:", V_final)
+    # print("E_final:", E_final)
+
+    V_final, E_final = canonicalize(V_final, E_final)
+    
+    V_true = np.array([
+        [0.0, 0.0, 0.0, 0.0],
+        [0.5, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.5, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.5, 0.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0, 0.0],
+        [0.5, 1.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [0.5, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 1.0],
+        [0.5, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 1.0],
+        [0.5, 0.0, 1.0, 1.0],
+        [0.0, 1.0, 1.0, 1.0],
+        [0.5, 1.0, 1.0, 1.0],
+    ])
+    E_true = np.array([
+        [0, 1],
+        [0, 2],
+        [0, 4],
+        [1, 3],
+        [1, 5],
+        [2, 3],
+        [2, 6],
+        [3, 7],
+        [4, 5],
+        [4, 6],
+        [5, 7],
+        [6, 7],
+        [0+8, 1+8],
+        [0+8, 2+8],
+        [0+8, 4+8],
+        [1+8, 3+8],
+        [1+8, 5+8],
+        [2+8, 3+8],
+        [2+8, 6+8],
+        [3+8, 7+8],
+        [4+8, 5+8],
+        [4+8, 6+8],
+        [5+8, 7+8],
+        [6+8, 7+8],
+        [0, 8],
+        [1, 9],
+        [2, 10],
+        [3, 11],
+        [4, 12],
+        [5, 13],
+        [6, 14],
+        [7, 15]
+    ])
+    
+    V_true, E_true = canonicalize(V_true, E_true)
+    assert np.allclose(V_final, V_true)
+    print(E_final, len(E_final))
+    print(E_true, len(E_true))
+    assert np.array_equal(E_final, E_true)
 
 def test_find_edges(cube_2d, cube_3d, cube_4d):
     V, E, A, b = cube_2d
