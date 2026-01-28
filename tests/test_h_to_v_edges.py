@@ -453,5 +453,5 @@ def test_find_edges(cube_2d, cube_3d, cube_4d):
     assert np.allclose(E_canon, Computed_E)
     
 
-if __name__ == "__main__":
-    test_cube_3d_cut_in_half()
+# if __name__ == "__main__":
+#     test_cube_3d_cut_in_half()
