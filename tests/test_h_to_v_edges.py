@@ -235,7 +235,43 @@ def test_cube_3d_drop_one_corner(cube_3d):
     assert np.array_equal(E_final, E_true)
     
     
-    
+def test_cube_3d_horizontal_cut(cube_3d):
+    '''Test plane cut in half horizontally.'''
+    V, E, A, b = cube_3d
+
+    a_new = np.array([0, 0, 1.0])
+    half = 1/2
+    b_new = np.array(half)
+
+    V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
+    V_true = np.array([
+        [0. , 0. , 1. ],
+        [1. , 0. , 1. ],
+        [0. , 1. , 1. ],
+        [1. , 1. , 1. ],
+        [0. , 0. , 0.5],
+        [1. , 0. , 0.5],
+        [0. , 1. , 0.5],
+        [1. , 1. , 0.5]
+        ])
+    E_true = np.array([
+        [0, 1],
+        [0, 2],
+        [0, 4],
+        [1, 3],
+        [1, 5],
+        [2, 3],
+        [2, 6],
+        [3, 7],
+        [4, 5],
+        [4, 6],
+        [5, 7],
+        [6, 7],
+    ])
+    V_final, E_final = canonicalize(V_final, E_final)
+    V_true, E_true = canonicalize(V_true, E_true)
+    assert np.allclose(V_final, V_true)
+    assert np.array_equal(E_final, E_true)
     
     
 def test_cube_4d_drop_one_corner(cube_4d):
@@ -320,6 +356,7 @@ def test_cube_4d_drop_one_corner(cube_4d):
     V_true, E_true = canonicalize(V_true, E_true)
     assert np.allclose(V_final, V_true)
     assert np.array_equal(E_final, E_true)
+    
     
 def test_cube_4d_horizontal_cut(cube_4d):
     '''Test plane close to corner, cutting off one corner.'''
@@ -415,3 +452,6 @@ def test_find_edges(cube_2d, cube_3d, cube_4d):
     Computed_E = Computed_E[np.lexsort(Computed_E.T)] 
     assert np.allclose(E_canon, Computed_E)
     
+
+if __name__ == "__main__":
+    test_cube_3d_cut_in_half()
