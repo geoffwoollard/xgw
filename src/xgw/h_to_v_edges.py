@@ -1,5 +1,6 @@
 import numpy as np
 from xgw.Hyperplane_approx import DoubleRepresentation
+from numba import njit
 
 def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
     """
@@ -100,7 +101,33 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     # --- Apply to all pairs ---
     return mapping[pairs]
 
+@njit
+def compute_constraints_matching(vertex_test, dim):
+    s = vertex_test.shape[1]
+    finall_mat = np.zeros((s, s), dtype=np.bool_)
+    for i in range (s-1):
+        for j in range(i,s):
+            common_constr = np.logical_and(vertex_test[:,i], vertex_test[:,j])
+            finall_mat[i,j] =  np.sum(common_constr) == dim-1
+    return finall_mat
 
+
+def find_edges(points):
+    dim = points[0].shape[0]
+    if dim==1:
+        E_new = np.array([0, 1])
+    else:
+        dd_sub = DoubleRepresentation()
+        dd_sub.add_V(points)
+        A_sub, b_sub = dd_sub.H
+        # linking vertices and constraints
+        vertex_test = np.isclose(A_sub @ np.array(points).T - b_sub[:, np.newaxis], 0)
+        # checking that each vertex solves at least dim constraints
+        assert (vertex_test.sum(0) >= dim).all()
+        # two vertices on a same edge solve the same dim-1 constraints 
+        finall_mat = compute_constraints_matching(vertex_test, dim)
+        E_new = np.transpose(np.nonzero(finall_mat))
+    return E_new
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         
@@ -154,7 +181,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
 
     dd_sub = DoubleRepresentation()
     dd_sub.add_V(new_points)
-    dd_sub.V_to_H()
+    # dd_sub.V_to_H() # no need to, it is automatically done in add_V
     A_sub, b_sub = dd_sub.H
     edge_test = np.isclose(A_sub @ np.array(new_points).T - b_sub[:, np.newaxis], 0)
     # print("edge test:\n", edge_test)

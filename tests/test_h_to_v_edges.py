@@ -1,6 +1,6 @@
 import numpy as np
 from xgw.Hyperplane_approx import DoubleRepresentation
-from xgw.h_to_v_edges import update_edges_with_new_halfplane
+from xgw.h_to_v_edges import update_edges_with_new_halfplane, find_edges
 import pytest
 
 
@@ -75,6 +75,65 @@ def cube_2d():
         [0, 2],
         [1, 3],
         [2, 3],
+    ])
+    dd = DoubleRepresentation()
+    dd.add_V(V)
+    A, b = dd.H
+    return V, E, A, b
+
+@pytest.fixture
+def cube_4d():
+    V = np.array([
+        [0.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0, 0.0],
+        [1.0, 1.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0, 1.0],
+        [0.0, 1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0, 1.0],
+    ])
+    E = np.array([
+        [0, 1],
+        [0, 2],
+        [0, 4],
+        [1, 3],
+        [1, 5],
+        [2, 3],
+        [2, 6],
+        [3, 7],
+        [4, 5],
+        [4, 6],
+        [5, 7],
+        [6, 7],
+        [0+8, 1+8],
+        [0+8, 2+8],
+        [0+8, 4+8],
+        [1+8, 3+8],
+        [1+8, 5+8],
+        [2+8, 3+8],
+        [2+8, 6+8],
+        [3+8, 7+8],
+        [4+8, 5+8],
+        [4+8, 6+8],
+        [5+8, 7+8],
+        [6+8, 7+8],
+        [0, 8],
+        [1, 9],
+        [2, 10],
+        [3, 11],
+        [4, 12],
+        [5, 13],
+        [6, 14],
+        [7, 15]
     ])
     dd = DoubleRepresentation()
     dd.add_V(V)
@@ -175,3 +234,25 @@ def test_cube_3d_drop_one_corner(cube_3d):
     assert np.allclose(V_final, V_true)
     assert np.array_equal(E_final, E_true)
 
+def test_find_edges(cube_2d, cube_3d, cube_4d):
+    V, E, A, b = cube_2d
+    V_canon, E_canon = canonicalize(V, E)
+    Computed_E = find_edges(V_canon)
+    Computed_E = np.sort(Computed_E, axis=1)      # sort each edge (i,j) -> (min,max)
+    Computed_E = Computed_E[np.lexsort(Computed_E.T)] 
+    assert np.allclose(E_canon, Computed_E)
+    
+    V, E, A, b = cube_3d
+    V_canon, E_canon = canonicalize(V, E)
+    Computed_E = find_edges(V_canon)
+    Computed_E = np.sort(Computed_E, axis=1)      # sort each edge (i,j) -> (min,max)
+    Computed_E = Computed_E[np.lexsort(Computed_E.T)] 
+    assert np.allclose(E_canon, Computed_E)
+    
+    V, E, A, b = cube_4d
+    V_canon, E_canon = canonicalize(V, E)
+    Computed_E = find_edges(V_canon)
+    Computed_E = np.sort(Computed_E, axis=1)      # sort each edge (i,j) -> (min,max)
+    Computed_E = Computed_E[np.lexsort(Computed_E.T)] 
+    assert np.allclose(E_canon, Computed_E)
+    

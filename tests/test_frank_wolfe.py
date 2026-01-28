@@ -157,3 +157,37 @@ def test_FW_diff_costs(marginals, marginals_3d, simple_marginals_2D):
     compute_test (marginals, 'CGW', p)
     compute_test (marginals_3d, 'CGW', p)
     compute_test (simple_marginals_2D, 'CGW', p)
+
+
+
+def test_optimal_t_cste():
+    # we have an upper bound for the highest eigenvalue of the determinant hessian (on the sphere):4. This is probabaly not tight, let's estimate the optimal upper bound
+    def hess_mat(x):
+        m = np.array([[0,0,0,0,x[8],-x[7],0,-x[5],x[4]],
+                    [0,0,0,-x[8],0,x[6],x[5],0,-x[3]],
+                    [0,0,0,x[7],-x[6],0,-x[4],x[3],0],
+                    [0,0,0,0,0,0,0,x[2],-x[1]],
+                    [0,0,0,0,0,0,-x[2],0,x[0]],
+                    [0,0,0,0,0,0,x[1],-x[0],0],
+                    [0,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0]
+                    ])
+        return m+m.T
+    
+    def test_matrix_eig(niter):
+        max_val = 0
+        for iter in range(niter):
+            x = np.random.rand(9)
+            norm = np.linalg.norm(x)
+            sign = np.random.randint(2, size = 9)
+            sign = (sign == 1).astype(int) + (sign == -1).astype(int)
+            eig = np.linalg.eigvalsh(hess_mat(x))
+            e1, e2 = abs(eig[0]), abs(eig[-1])
+            val = max(e1, e2)
+            if max_val < val:
+                max_val = val
+        return max_val
+    
+    best_cst = test_matrix_eig(100000)
+    assert 2.5<=best_cst<=3
