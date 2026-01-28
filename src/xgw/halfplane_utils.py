@@ -24,10 +24,10 @@ def random_cut(V, rng=None):
 
     return x, r
 
-def split_by_cut(V, x, r):
+def split_by_cut(V, x, r, atol=1e-12):
     vals = V @ x - r
-    left  = V[vals < 0]
-    right = V[vals > 0]
-    on    = V[np.isclose(vals, 0)]
+    left  = V[vals < -atol]
+    right = V[vals > atol]
+    on    = V[np.isclose(vals, 0, atol=atol)]
     return left, right, on
 

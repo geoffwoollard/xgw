@@ -1,7 +1,9 @@
 import numpy as np
+import pytest
+
 from xgw.Hyperplane_approx import DoubleRepresentation
 from xgw.h_to_v_edges import update_edges_with_new_halfplane, find_edges
-import pytest
+from xgw.halfplane_utils import random_cut, split_by_cut
 
 
 def canonicalize(V, E):
@@ -81,64 +83,64 @@ def cube_2d():
     A, b = dd.H
     return V, E, A, b
 
-@pytest.fixture
-def cube_4d():
-    V = np.array([
-        [0.0, 0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [1.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [1.0, 0.0, 1.0, 0.0],
-        [0.0, 1.0, 1.0, 0.0],
-        [1.0, 1.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0],
-        [1.0, 0.0, 0.0, 1.0],
-        [0.0, 1.0, 0.0, 1.0],
-        [1.0, 1.0, 0.0, 1.0],
-        [0.0, 0.0, 1.0, 1.0],
-        [1.0, 0.0, 1.0, 1.0],
-        [0.0, 1.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0, 1.0],
-    ])
-    E = np.array([
-        [0, 1],
-        [0, 2],
-        [0, 4],
-        [1, 3],
-        [1, 5],
-        [2, 3],
-        [2, 6],
-        [3, 7],
-        [4, 5],
-        [4, 6],
-        [5, 7],
-        [6, 7],
-        [0+8, 1+8],
-        [0+8, 2+8],
-        [0+8, 4+8],
-        [1+8, 3+8],
-        [1+8, 5+8],
-        [2+8, 3+8],
-        [2+8, 6+8],
-        [3+8, 7+8],
-        [4+8, 5+8],
-        [4+8, 6+8],
-        [5+8, 7+8],
-        [6+8, 7+8],
-        [0, 8],
-        [1, 9],
-        [2, 10],
-        [3, 11],
-        [4, 12],
-        [5, 13],
-        [6, 14],
-        [7, 15]
-    ])
-    dd = DoubleRepresentation()
-    dd.add_V(V)
-    A, b = dd.H
-    return V, E, A, b
+# @pytest.fixture
+# def cube_4d():
+#     V = np.array([
+#         [0.0, 0.0, 0.0, 0.0],
+#         [1.0, 0.0, 0.0, 0.0],
+#         [0.0, 1.0, 0.0, 0.0],
+#         [1.0, 1.0, 0.0, 0.0],
+#         [0.0, 0.0, 1.0, 0.0],
+#         [1.0, 0.0, 1.0, 0.0],
+#         [0.0, 1.0, 1.0, 0.0],
+#         [1.0, 1.0, 1.0, 0.0],
+#         [0.0, 0.0, 0.0, 1.0],
+#         [1.0, 0.0, 0.0, 1.0],
+#         [0.0, 1.0, 0.0, 1.0],
+#         [1.0, 1.0, 0.0, 1.0],
+#         [0.0, 0.0, 1.0, 1.0],
+#         [1.0, 0.0, 1.0, 1.0],
+#         [0.0, 1.0, 1.0, 1.0],
+#         [1.0, 1.0, 1.0, 1.0],
+#     ])
+#     E = np.array([
+#         [0, 1],
+#         [0, 2],
+#         [0, 4],
+#         [1, 3],
+#         [1, 5],
+#         [2, 3],
+#         [2, 6],
+#         [3, 7],
+#         [4, 5],
+#         [4, 6],
+#         [5, 7],
+#         [6, 7],
+#         [0+8, 1+8],
+#         [0+8, 2+8],
+#         [0+8, 4+8],
+#         [1+8, 3+8],
+#         [1+8, 5+8],
+#         [2+8, 3+8],
+#         [2+8, 6+8],
+#         [3+8, 7+8],
+#         [4+8, 5+8],
+#         [4+8, 6+8],
+#         [5+8, 7+8],
+#         [6+8, 7+8],
+#         [0, 8],
+#         [1, 9],
+#         [2, 10],
+#         [3, 11],
+#         [4, 12],
+#         [5, 13],
+#         [6, 14],
+#         [7, 15]
+#     ])
+#     dd = DoubleRepresentation()
+#     dd.add_V(V)
+#     A, b = dd.H
+#     return V, E, A, b
 
 def test_cube_3d_keep_one_corner(cube_3d):
     '''Test plane close to origin cutting off all except one.'''
@@ -451,7 +453,58 @@ def test_find_edges(cube_2d, cube_3d, cube_4d):
     Computed_E = np.sort(Computed_E, axis=1)      # sort each edge (i,j) -> (min,max)
     Computed_E = Computed_E[np.lexsort(Computed_E.T)] 
     assert np.allclose(E_canon, Computed_E)
-    
+
+def make_cube_any_d(d):
+    V = np.array(np.meshgrid(*[[0,1]]*d)).T.reshape(-1, d)
+
+    # Map vertex -> index for fast lookup
+    index = {tuple(v): i for i, v in enumerate(V)}
+
+    edges = []
+
+    for i, v in enumerate(V):
+        for k in range(d):
+            u = v.copy()
+            u[k] ^= 1   # flip one bit
+            j = index[tuple(u)]
+
+            # avoid duplicates (i,j) and (j,i)
+            if i < j:
+                edges.append((i, j))
+
+    E = np.array(edges, dtype=int)
+
+    # Your polytope stuff
+    dd = DoubleRepresentation()
+    dd.add_V(V)
+    A, b = dd.H
+
+    return V, E, A, b
+
+@pytest.fixture
+def cube_9d():
+    return make_cube_any_d(9)
+
+@pytest.fixture
+def cube_4d():
+    return make_cube_any_d(4)
+
+def test_cube_d_random_plane_cut(cube_3d, cube_4d, cube_9d):
+    '''Test random plane cut in 9D cube.'''
+
+    n_trials = 10
+    for d in [3, 4, 5]:
+        V, E, A, b = make_cube_any_d(d)
+
+
+        for _trial in range(n_trials):
+            a_new, b_new = random_cut(V, rng=np.random.default_rng(_trial))
+            left, right, on = split_by_cut(V, a_new, b_new)
+            print(d, len(left), len(right), len(on))
+
+            V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A=A, b=b, a_new=a_new, b_new=b_new)
+            # Just check that some vertices remain
+            assert len(V_final) > 0, 'failed for d={}, trial={}'.format(d, _trial)
 
 # if __name__ == "__main__":
 #     test_cube_3d_cut_in_half()
