@@ -498,8 +498,6 @@ def test_cube_d_random_plane_cut():
         for _trial in range(n_trials):
             print(f'trial {_trial}', end=' ')
             a_new, b_new = random_cut(V, rng=np.random.default_rng(_trial)) 
-                # 3d 3789 fails for V_to_H when V not rounded to 10 decimals
-                # 6d 13 with decimal round 2, needs to be >= 5
             # print("New halfplane:", a_new, b_new)
             left, right, on = split_by_cut(V, a_new, b_new)
             # print('split by cut', d, len(left), len(right), len(on))

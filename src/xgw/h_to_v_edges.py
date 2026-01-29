@@ -117,7 +117,6 @@ def find_edges(points):
         dd_sub = DoubleRepresentation()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
-        # dd_sub.H_to_V()
         # normalizing normal vectors
         c = 1/np.linalg.norm(A_sub, axis=-1)
         b_sub *= c
@@ -128,7 +127,13 @@ def find_edges(points):
         # checking that each vertex solves at least dim constraints
         # print(vertex_test.sum(0))
         # print((A_sub @ np.array(points).T - b_sub[:, np.newaxis]).T)
-        # assert (vertex_test.sum(0) >= dim).all()
+
+        # TODO: investigate why this assertion fails sometimes
+        try:
+            assert (vertex_test.sum(0) >= dim).all()
+        except AssertionError:
+            print("Warning: some vertices do not satisfy enough constraints. Numerical issues may be present.")
+            pass
         # two vertices on a same edge solve the same dim-1 constraints 
         final_mat = compute_constraints_matching(vertex_test, dim)
         E_new = np.transpose(np.nonzero(final_mat))
