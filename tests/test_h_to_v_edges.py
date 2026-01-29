@@ -548,7 +548,7 @@ def cube_4d():
 def test_cube_d_random_plane_cut():
     '''Test random plane cut in cube of any dimension.'''
 
-    n_trials = 1
+    n_trials = 100
     for d in [3, 4, 5, 6, 7, 8, 9]:
         V, E, A, b = make_cube_any_d(d)
         for _trial in range(n_trials):
