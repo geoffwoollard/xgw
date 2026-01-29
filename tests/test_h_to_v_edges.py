@@ -404,18 +404,18 @@ def test_cube_4d_horizontal_cut(cube_4d):
         [4, 6],
         [5, 7],
         [6, 7],
-        [0+8, 1+8],
-        [0+8, 2+8],
-        [0+8, 4+8],
-        [1+8, 3+8],
-        [1+8, 5+8],
-        [2+8, 3+8],
-        [2+8, 6+8],
-        [3+8, 7+8],
-        [4+8, 5+8],
-        [4+8, 6+8],
-        [5+8, 7+8],
-        [6+8, 7+8],
+        [8, 9],
+        [8, 10],
+        [8, 12],
+        [9, 11],
+        [9, 13],
+        [10, 11],
+        [10, 14],
+        [11, 15],
+        [12, 13],
+        [12, 14],
+        [13, 15],
+        [14, 15],
         [0, 8],
         [1, 9],
         [2, 10],
@@ -492,7 +492,7 @@ def cube_4d():
 def test_cube_d_random_plane_cut():
     '''Test random plane cut in cube of any dimension.'''
 
-    n_trials = 10
+    n_trials = 50
     for d in [3, 4, 5]:
         V, E, A, b = make_cube_any_d(d)
 
@@ -505,6 +505,7 @@ def test_cube_d_random_plane_cut():
             V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A=A, b=b, a_new=a_new, b_new=b_new)
             # Just check that some vertices remain
             assert len(V_final) > 0, 'failed for d={}, trial={}'.format(d, _trial)
+            print(f'trial {_trial}')
 
 if __name__ == "__main__":
     test_cube_d_random_plane_cut()

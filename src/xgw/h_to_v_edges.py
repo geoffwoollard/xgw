@@ -33,34 +33,30 @@ def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
         return None
 
 
-def affine_subspace_basis(points, tol=1e-12):
+def affine_subspace_basis(points, normal_vec):
     """
     points: array of shape (n_points, d)
+    normal_vec: vector normal to the plane supporting the points
     Returns:
-        p0: origin of affine space
         Q : orthonormal basis (d, k) for the subspace
     """
+    dim = len(normal_vec)
     points = np.asarray(points, float)
-    p0 = points[0]
+    
+    Q,R = np.linalg.qr(normal_vec.reshape((dim,1)), mode = 'complete')
+    print (R[0,0])
+    assert np.allclose(np.abs(R[0,0]), 1)
+    Q = Q[:,1:]
 
-    # Build difference matrix
-    V = (points[1:] - p0).T   # shape (d, n_points-1)
-
-    # QR decomposition
-    Q, R = np.linalg.qr(V)
-    # Keep only independent directions
-    rank_mask = np.abs(np.diag(R)) > tol
-    Q = Q[:, rank_mask]
-
-    return p0, Q
+    return  Q
 
 
-def project_to_subspace(x, p0, Q):
+def project_to_subspace(x,  Q):
     """
     Project x into coordinates of the subspace.
     Returns coordinates in R^(d-1)
     """
-    return Q.T @ (x - p0)
+    return Q.T @ x 
 
 
 def reindex_pairs(pairs, excluded, n):
@@ -121,9 +117,17 @@ def find_edges(points):
         dd_sub = DoubleRepresentation()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
+        dd_sub.H_to_V()
+        # normalizing normal vectors
+        c = 1/np.linalg.norm(A_sub, axis=-1)
+        b_sub *= c
+        A_sub *= np.tile(c,(A_sub.shape[1], 1)).T
+        print( f' number of points not changed: {len(points)- len(dd_sub.V)==0}')
         # linking vertices and constraints
         vertex_test = np.isclose(A_sub @ np.array(points).T - b_sub[:, np.newaxis], 0)
         # checking that each vertex solves at least dim constraints
+        print(vertex_test.sum(0))
+        # print((A_sub @ np.array(points).T - b_sub[:, np.newaxis]).T)
         assert (vertex_test.sum(0) >= dim).all()
         # two vertices on a same edge solve the same dim-1 constraints 
         finall_mat = compute_constraints_matching(vertex_test, dim)
@@ -131,8 +135,10 @@ def find_edges(points):
     return E_new
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
-        
-
+    # check if  a_new is normalized (can remove later)
+    a_norm = np.linalg.norm(a_new)
+    a_new /= a_norm
+    b_new /= a_norm
     # find excluded vertices
     v_excluded_bool = a_new.dot(V.T) < b_new
     v_excluded_idx = np.arange(V.shape[0])[v_excluded_bool]
@@ -169,14 +175,14 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         # transform new vertices to full rank subspace
     points = np.stack(list(V_new.values()))
     # print("points", points)
-    p0, Q = affine_subspace_basis(points)
+    Q = affine_subspace_basis(points, a_new)
     # print("p0:\n", p0)
     # print("Q (basis for plane):\n", Q)
     # print("Q^T Q:\n", Q.T @ Q)
 
     new_points = []
     for p in points:
-        coords = project_to_subspace(p, p0, Q)
+        coords = project_to_subspace(p, Q)
         new_points.append(coords)
         # print(p, "→", coords)
 
