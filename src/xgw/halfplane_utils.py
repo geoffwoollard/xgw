@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def random_cut(V, rng=None, tol = 0.1):
     """
     V : (n, d) array of vertices
@@ -26,6 +27,7 @@ def random_cut(V, rng=None, tol = 0.1):
     r = rng.uniform(x_min+dist, x_max-dist)
 
     return x, r
+
 
 def split_by_cut(V, x, r, atol=1e-12):
     vals = V @ x - r

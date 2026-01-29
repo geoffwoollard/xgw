@@ -10,16 +10,17 @@ try:
 except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
-def _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
-    x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
-    g = new_direction(x_0, v_0, P_minus)
+
+def _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
+    g = new_direction(x_0, v_0, p_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
-    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-    return P_plus, P_minus, objective, previous_solutions_to_reuse, x_0, v_0
+    p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
+    return p_plus, p_minus, objective, previous_solutions_to_reuse, x_0, v_0
 
 
 def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     print('box initialized')
     
     objective_list = []
@@ -27,37 +28,39 @@ def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, _, x_0, v_0 = _iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        p_plus, p_minus, objective, _, x_0, v_0 = _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         x_0_list.append(x_0)
         v_0_list.append(v_0)
         logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
+    return p_plus, p_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
         
 
-def iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
-    x_0, v_0, objective, previous_solutions_to_reuse = Hausdorff(P_plus, P_minus, previous_solutions_to_reuse)
-    g = new_direction(x_0, v_0, P_minus)
+def iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
+    g = new_direction(x_0, v_0, p_minus)
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
-    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-    return P_plus, P_minus, objective, previous_solutions_to_reuse
+    p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
+    return p_plus, p_minus, objective, previous_solutions_to_reuse
+
 
 def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
     print('box initialized')
     
     objective_list = []
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         print(iter)
-        P_plus, P_minus, objective, previous_solutions_to_reuse  = iteration_loop_Hausdorff(mu, nu, P_plus, P_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        p_plus, p_minus, objective, previous_solutions_to_reuse  = iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
-        logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
+        logger.info(f'Iteration {iter}, hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return P_minus, objective, R, e_base
+    return p_minus, objective, R, e_base
+
 
 def construct_basis_eij(space_x, space_y):
     # finding orthonormal basis : Q = [e_1,...,e_dx*dy] orthonormal base (ei flatten), f_base = [f1,...,f_dx*dy] = e_base@R, R triangular superior matrix of size dx*dy^2, e_base (N, M) by dx*dy tensor, f_base (N, M) by dx*dy tensor
@@ -73,16 +76,19 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
+
 @njit
 def e_to_f(vect, R, d):
     sol = (vect@R).reshape((d,d))
     return sol
 
+
 @njit
 def f_to_e(vect, R_inv):
     return np.ravel(vect) @ R_inv
 
-class DoubleRepresentation():
+
+class DoubleDescription():
     def __init__(self, duplicate_tol=1e-5):
         self.V = []
         self.H = ()
@@ -207,7 +213,8 @@ class DoubleRepresentation():
     
     def get_centroid(self):
         return np.mean(np.array(self.V), axis=0)
-    
+
+
 def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     '''
     Docstring for initial_box
@@ -218,7 +225,7 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     creates an initial rectangle bounding 
     '''
     e_base, R = construct_basis_eij(space_x, space_y)
-    P_plus, P_minus = DoubleRepresentation(), DoubleRepresentation()
+    p_plus, p_minus = DoubleDescription(), DoubleDescription()
     vertex_list = []
     half_plans_list = []
     a,b,c = e_base.shape
@@ -229,9 +236,10 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs):
             g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
-    update_box(P_plus, P_minus, half_plans_list, vertex_list)
+    update_box(p_plus, p_minus, half_plans_list, vertex_list)
             
-    return e_base, R, P_plus, P_minus
+    return e_base, R, p_plus, p_minus
+
 
 def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
     cost_matrix = function_to_cost(g, e_base)
@@ -248,35 +256,35 @@ def function_to_cost(g, e_base):
     return np.einsum('ijk,k->ij', e_base, g)
 
 
-def update_box(P_plus, P_minus, half_planes_list, vertex_list):
+def update_box(p_plus, p_minus, half_planes_list, vertex_list):
     logger.info('Adding new half-planes and vertices to the bounding boxes')
-    P_plus.add_H(half_planes_list)
-    logger.info('Added half-planes to P_plus')
-    P_minus.add_V(vertex_list)
-    logger.info('Added vertices to P_minus')
-    P_minus.V_to_H()
-    logger.info('Updated half-planes of P_minus from vertices')
-    P_plus.H_to_V()
-    logger.info('Updated vertices of P_plus from half-planes')
-    return P_plus, P_minus
+    p_plus.add_H(half_planes_list)
+    logger.info('Added half-planes to p_plus')
+    p_minus.add_V(vertex_list)
+    logger.info('Added vertices to p_minus')
+    p_minus.V_to_H()
+    logger.info('Updated half-planes of p_minus from vertices')
+    p_plus.H_to_V()
+    logger.info('Updated vertices of p_plus from half-planes')
+    return p_plus, p_minus
 
 
-def new_direction(x_0, v_0, P_minus):
+def new_direction(x_0, v_0, p_minus):
     if np.allclose(x_0, v_0):
-        sol = v_0 - P_minus.get_centroid()
+        sol = v_0 - p_minus.get_centroid()
         assert np.all(sol != 0), f' zero direction'
-        return v_0 - P_minus.get_centroid()
+        return v_0 - p_minus.get_centroid()
     else:
         sol = v_0-x_0
     return (sol)/np.linalg.norm(sol)
 
 
 #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
-def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
+def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
     cost = -np.inf
-    for vertex in P_plus.V:
-        x, objective, _ = solve_dist(vertex, P_minus, previous_solutions_to_reuse)
-        # x, objective = solve_dist_brute_force(vertex, P_minus)
+    for vertex in p_plus.V:
+        x, objective, _ = solve_dist(vertex, p_minus, previous_solutions_to_reuse)
+        # x, objective = solve_dist_brute_force(vertex, p_minus)
         if objective > cost:
             x0, v_0 = x, vertex
             cost = objective
@@ -285,10 +293,10 @@ def Hausdorff(P_plus, P_minus, previous_solutions_to_reuse):
 
 
             
-def P_plus_outside_P_minus(P_plus, P_minus):
-    '''Check P_minus is included in P_plus'''
-    A,b = P_plus.H
-    residuals = [A@elem - b for elem in P_minus.V]
+def p_plus_outside_p_minus(p_plus, p_minus):
+    '''Check p_minus is included in p_plus'''
+    A,b = p_plus.H
+    residuals = [A@elem - b for elem in p_minus.V]
     residuals = np.array(residuals)
     return residuals        
         
@@ -307,16 +315,16 @@ def build_new_constraint(A_all, b_all, A_old, b_old):
     b_new = b_all[new_index]
     return a_new, b_new
 
-def solve_dist(vertex, P_minus, previous_solutions_to_reuse):
+def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
     from .qp_incremental_projector import IncrementalQPProjector
     if vertex.tobytes() not in previous_solutions_to_reuse:
-        A_all, b_all = P_minus.H
+        A_all, b_all = p_minus.H
         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
         x, objective = qp_solver.solve(vertex)
     else:
         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
         A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
-        A_all, b_all = P_minus.H
+        A_all, b_all = p_minus.H
         a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}

@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
-from xgw.Frank_Wolfe import Frank_Wolfe_GW, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, DGW_2d_polynomial, det_23d, DGW_3d_polynomial, matrix_cofactor_low_dim
-from test_hyperplane_approx import marginals,  simple_marginals_2D
 from scipy.spatial.transform import Rotation as R
+
+from xgw.frank_wolfe import frank_wolfe_gw, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, dgw_2d_polynomial, det_23d, dgw_3d_polynomial, matrix_cofactor_low_dim
+from test_hyperplane_approx import marginals,  simple_marginals_2D
+
 
 def test_polynomial():
     T, tau = optimize_deg_2_polynomial(-1, 1, 0) #optimizing x(1-x)
@@ -22,12 +24,11 @@ def test_polynomial():
     assert np.allclose(0, tau) 
 
 
-
 def test_determinant_interpolation():
     A = np.array([[1,0.0],[4,5]])
     B = np.array([[5,2.0],[0,5]])
     
-    alpha, beta, gamma = DGW_2d_polynomial(A, B)
+    alpha, beta, gamma = dgw_2d_polynomial(A, B)
     for p in np.linspace(0,1,10):
         assert np.allclose(2*det_23d(p*A + (1-p)*B), alpha*p**2 + beta*p + gamma)
     
@@ -35,11 +36,12 @@ def test_determinant_interpolation():
     A = np.array([[1,0,0.0],[4,5,3], [2,6,1]])
     B = np.array([[5,2,4.0],[0,5,8], [0,0,1]])
     
-    alpha, beta, gamma, delta = DGW_3d_polynomial(A, B)
+    alpha, beta, gamma, delta = dgw_3d_polynomial(A, B)
     for p in np.linspace(0,1,10):
         assert np.allclose(det_23d(p*A + (1-p)*B), np.linalg.det(p*A + (1-p)*B))
         assert np.allclose(6*det_23d(p*A + (1-p)*B), alpha*p**3 + beta*p**2 + gamma*p + delta)
-        
+
+
 def test_comatrix():
     A = np.array([[1,0,0],[4,5,3], [2,6,1]])
     invA = 1/det_23d(A)*np.transpose(matrix_cofactor_low_dim(A))
@@ -51,7 +53,6 @@ def test_comatrix():
     real_inv = np.linalg.inv(A)
     print(invA, real_inv)
     assert np.allclose(invA, real_inv)
-    
     
     
 @pytest.fixture
@@ -77,6 +78,7 @@ def marginals_3d():
     nu /= nu.sum()
     return mu, nu, space_x, space_y
 
+
 def test_centered_marginals(simple_marginals_2D):
     mu, nu, space_x, space_y = simple_marginals_2D
     c_mu = (space_x * mu[:, None]).sum(axis=0)
@@ -89,8 +91,10 @@ def test_centered_marginals(simple_marginals_2D):
     c_nu = (space_y * nu[:, None]).sum(axis=0)
     assert np.allclose(c_mu,0) and np.allclose(c_nu,0)
 
+
 def lie_group_action(space, M):
     return  space @ M
+
 
 def random_rotation_matrix(d):
     random_angle = np.random.rand() * 2 * np.pi
@@ -103,6 +107,7 @@ def random_rotation_matrix(d):
     else:
         raise ValueError(f"dimension not implemented")
     return rotation
+
 
 def random_invariance_matrix(cost, d):
     np.random.seed(2)
@@ -123,6 +128,7 @@ def random_invariance_matrix(cost, d):
     else:
         raise ValueError(f"cost not implemented")
 
+
 def compute_test(marg, cost, p):
     # marginals
     mu, nu, space_x, space_y = marg
@@ -131,14 +137,14 @@ def compute_test(marg, cost, p):
     # dimension
     d = space_x.shape[-1]
     # Non zero cost for two different marginals
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, nu, space_y, cost=cost)
+    c, _, _ = frank_wolfe_gw(mu, space_x, nu, space_y, cost=cost)
     assert c>1e-3
     # Zero cost for the same marginals
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, space_x, cost=cost, pi_n=pi_n)
+    c, _, _ = frank_wolfe_gw(mu, space_x, mu, space_x, cost=cost, pi_n=pi_n)
     assert c<1e-15
     # invariance by Lie group action
     M = random_invariance_matrix(cost, d)
-    c, _, _ = Frank_Wolfe_GW(mu, space_x, mu, lie_group_action(space_x, M), cost=cost, pi_n=pi_n)
+    c, _, _ = frank_wolfe_gw(mu, space_x, mu, lie_group_action(space_x, M), cost=cost, pi_n=pi_n)
     assert c<1e-15
     
     
@@ -157,7 +163,6 @@ def test_FW_diff_costs(marginals, marginals_3d, simple_marginals_2D):
     compute_test (marginals, 'CGW', p)
     compute_test (marginals_3d, 'CGW', p)
     compute_test (simple_marginals_2D, 'CGW', p)
-
 
 
 def test_optimal_t_cste():
