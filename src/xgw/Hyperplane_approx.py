@@ -113,14 +113,29 @@ class DoubleRepresentation():
         self.V = [V_array[i] for i in unique_indices]
         logger.info(f"Removed duplicates, new number of vertices: {len(self.V)}")
 
+    def check_feasibility_V(self, A, b):
+        import numpy as np
+        from scipy.optimize import linprog
+
+        # A x <= b
+        c = np.zeros(A.shape[1])
+        res = linprog(c, A_ub=A, b_ub=b)
+        print(res.success)
+        print(res)
 
     def H_to_V(self):
         A, b = self.H
+        print(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
+        print(f'Half-planes: {A}, {b}')
+        assert not self.check_feasibility_V(A, b)
         self.V = compute_polytope_vertices(A, b)
         self.remove_duplicates_V()
 
     def V_to_H(self):
         A, b = compute_polytope_halfspaces(self.V)
+        a_norm = np.linalg.norm(A, axis=1)
+        b /= a_norm
+        A /= a_norm[:, np.newaxis]
         self.H = (A,b)
         
     def __len__(self):

@@ -122,11 +122,11 @@ def find_edges(points):
         c = 1/np.linalg.norm(A_sub, axis=-1)
         b_sub *= c
         A_sub *= np.tile(c,(A_sub.shape[1], 1)).T
-        print( f' number of points not changed: {len(points)- len(dd_sub.V)==0}')
+        # print( f' number of points not changed: {len(points)- len(dd_sub.V)==0}')
         # linking vertices and constraints
         vertex_test = np.isclose(A_sub @ np.array(points).T - b_sub[:, np.newaxis], 0)
         # checking that each vertex solves at least dim constraints
-        print(vertex_test.sum(0))
+        # print(vertex_test.sum(0))
         # print((A_sub @ np.array(points).T - b_sub[:, np.newaxis]).T)
         assert (vertex_test.sum(0) >= dim).all()
         # two vertices on a same edge solve the same dim-1 constraints 

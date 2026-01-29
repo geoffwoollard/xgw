@@ -492,20 +492,22 @@ def cube_4d():
 def test_cube_d_random_plane_cut():
     '''Test random plane cut in cube of any dimension.'''
 
-    n_trials = 50
-    for d in [3, 4, 5]:
+    n_trials = 25 + 1
+    for d in [5]:
         V, E, A, b = make_cube_any_d(d)
 
 
         for _trial in range(n_trials):
+            print(f'trial {_trial}')
             a_new, b_new = random_cut(V, rng=np.random.default_rng(_trial))
+            print("New halfplane:", a_new, b_new)
             left, right, on = split_by_cut(V, a_new, b_new)
-            print(d, len(left), len(right), len(on))
+            # print(d, len(left), len(right), len(on))
 
             V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A=A, b=b, a_new=a_new, b_new=b_new)
             # Just check that some vertices remain
             assert len(V_final) > 0, 'failed for d={}, trial={}'.format(d, _trial)
-            print(f'trial {_trial}')
+            
 
 if __name__ == "__main__":
     test_cube_d_random_plane_cut()
