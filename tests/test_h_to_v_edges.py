@@ -489,8 +489,8 @@ def cube_9d():
 def cube_4d():
     return make_cube_any_d(4)
 
-def test_cube_d_random_plane_cut(cube_3d, cube_4d, cube_9d):
-    '''Test random plane cut in 9D cube.'''
+def test_cube_d_random_plane_cut():
+    '''Test random plane cut in cube of any dimension.'''
 
     n_trials = 10
     for d in [3, 4, 5]:
@@ -506,5 +506,5 @@ def test_cube_d_random_plane_cut(cube_3d, cube_4d, cube_9d):
             # Just check that some vertices remain
             assert len(V_final) > 0, 'failed for d={}, trial={}'.format(d, _trial)
 
-# if __name__ == "__main__":
-#     test_cube_3d_cut_in_half()
+if __name__ == "__main__":
+    test_cube_d_random_plane_cut()
