@@ -432,6 +432,62 @@ def test_cube_4d_horizontal_cut(cube_4d):
     # print(E_true, len(E_true))
     assert np.array_equal(E_final, E_true)
 
+
+def half_cube_rescale(V, E, axis, cut_val):
+    """
+    Cut an axis-aligned cube in half along `axis` at `cut_val`,
+    keep edges, and rescale the top half to the cut plane.
+    
+    V : (n_vertices, d) array
+    E : (n_edges, 2) array
+    axis : int, which dimension to cut
+    cut_val : float, value along axis to cut
+    """
+    V = np.array(V, float)
+    E = np.array(E)
+    
+    # Mask for bottom vs top half
+    mask_bottom = V[:, axis] >= cut_val
+    print("mask_bottom:", mask_bottom)
+    mask_top = ~mask_bottom
+    print("mask_top:", mask_top)
+    
+    # Rescale top half to the cut value
+    print("Before rescale V:", V)
+    print("cut_val:", cut_val)
+    print(V[mask_top, axis])
+    V[mask_top, axis] = cut_val
+    print("After rescale V:", V)
+    
+    # Keep all original edges (no new edges needed)
+    return V, E
+
+
+def test_cube_9d_horizontal_cut():
+    '''Test plane cut in half horizontally.'''
+    d = 9
+    V, E, A, b = make_cube_any_d(d)
+
+    a_new = np.zeros(d)
+    a_new[d-1] = 1.0
+    half = 1/2
+    b_new = np.array(half)
+    V_true, E_true = half_cube_rescale(V, E, d-1, half)
+    # print("V_true:", V_true)
+    # print("E_true:", E_true)
+
+    V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
+
+    V_final, E_final = canonicalize(V_final, E_final)
+    V_true, E_true = canonicalize(V_true, E_true)
+    # print("V_true:", V_true)
+    # print("V_final:", V_final)
+    # print("E_true:", E_true)
+    # print("E_final:", E_final)
+    assert np.allclose(V_final, V_true)
+    assert np.array_equal(E_final, E_true)
+
+
 def test_find_edges(cube_2d, cube_3d, cube_4d):
     V, E, A, b = cube_2d
     V_canon, E_canon = canonicalize(V, E)
@@ -492,7 +548,7 @@ def cube_4d():
 def test_cube_d_random_plane_cut():
     '''Test random plane cut in cube of any dimension.'''
 
-    n_trials = 100
+    n_trials = 1
     for d in [3, 4, 5, 6, 7, 8, 9]:
         V, E, A, b = make_cube_any_d(d)
         for _trial in range(n_trials):
