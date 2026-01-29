@@ -149,7 +149,7 @@ class DoubleRepresentation():
             for decimals in range(decimals_start, decimals_end, -1):
                 try:
                     # 1. Round vertices to reduce numerical noise
-                    V_rounded = [np.round(v, decimals=decimals) for v in self.V]
+                    V_rounded = [np.round(v, decimals=decimals) for v in V]
 
                     # 2. Keep only unique vertices
                     V_rounded_unique = np.unique(V_rounded, axis=0)
