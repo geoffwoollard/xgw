@@ -1,6 +1,8 @@
 import numpy as np
+
 from xgw.halfplane_utils import random_cut, split_by_cut
 from test_h_to_v_edges import cube_3d
+
 
 def test_random_cut_and_split(cube_3d):
     # Example: cube in 3D

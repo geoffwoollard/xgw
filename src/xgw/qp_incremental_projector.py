@@ -32,6 +32,7 @@ class IncrementalQPProjector:
         # build the problem
         self.problem = cp.Problem(self.obj, self.constraints)
 
+
     def solve(self, v_value, warm=True, solver=cp.OSQP):
         """
         Solve the QP for given v.
@@ -40,6 +41,7 @@ class IncrementalQPProjector:
         self.v.value = v_value
         self.problem.solve(solver=solver, warm_start=warm, verbose=self.verbose, **self.solver_opts)
         return self.x.value, self.problem.value
+
 
     def add_constraint(self, a_new, b_new):
         """
@@ -52,13 +54,13 @@ class IncrementalQPProjector:
         self.constraints.append(cons)
         self.problem = cp.Problem(self.obj, self.constraints)
 
+
     def solve_with_new_constraint(self, v_value, a_new, b_new, warm=True):
         """
         Convenience: add a constraint and solve immediately (warm-start).
         """
         self.add_constraint(a_new, b_new)
         return self.solve(v_value, warm=warm)
-
 
 
 def flat_basis(e_base):
@@ -98,6 +100,7 @@ class OptimalProjectedCoupling:
 
         # build the problem
         self.problem = cp.Problem(self.obj, self.constraints)
+
 
     def solve(self, v_value, solver=cp.OSQP):
         """

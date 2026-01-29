@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 import ot
 
-from .Hyperplane_approx import e_to_f
+from .hyperplane_approx import e_to_f
 
 @njit
 def det_23d(mat):
@@ -88,7 +88,7 @@ def covariance(space_x, mu):
     return np.einsum('kd,kD,k->dD', space_x, space_x, mu)
 
 @njit
-def line_search_IGW(sigma_1, sigma_0):
+def line_search_igw(sigma_1, sigma_0):
     n0 = sq_norm(sigma_0)
     n1 = sq_norm(sigma_1)
     if n1>n0:
@@ -144,7 +144,7 @@ def optimize_deg_3_polynomial(alpha, beta, gamma, delta):
 def line_search_CGW_2d(sigma_1, sigma_0, t):
     n1 = sq_norm(sigma_1)
     n0 = sq_norm(sigma_0)
-    alpha, beta, gamma = DGW_2d_polynomial(sigma_1, sigma_0)
+    alpha, beta, gamma = dgw_2d_polynomial(sigma_1, sigma_0)
     alpha = t*(n1+n0) + (1-t)*alpha
     beta = -2*t*n0 + (1-t)*beta 
     gamma = t*n0 + (1-t)*gamma
@@ -154,13 +154,13 @@ def line_search_CGW_2d(sigma_1, sigma_0, t):
 
 @njit
 def line_search_DGW_2d(sigma_1, sigma_0):
-    alpha, beta, gamma = DGW_2d_polynomial(sigma_1, sigma_0)
+    alpha, beta, gamma = dgw_2d_polynomial(sigma_1, sigma_0)
     # print (f'polynomial: {alpha}*x^2+ {beta}*x + {gamma}')
     T, tau = optimize_deg_2_polynomial(alpha, beta, gamma)
     return T,tau
 
 @njit
-def DGW_2d_polynomial(sigma_1, sigma_0):
+def dgw_2d_polynomial(sigma_1, sigma_0):
     d_1 = det_23d(sigma_1)
     d_0 = det_23d(sigma_0)
     tr = np.trace(sigma_1)*np.trace(sigma_0) - np.trace(sigma_1@sigma_0)
@@ -170,7 +170,7 @@ def DGW_2d_polynomial(sigma_1, sigma_0):
     return alpha, beta, gamma
 
 @njit
-def DGW_3d_polynomial(sigma_1, sigma_0):
+def dgw_3d_polynomial(sigma_1, sigma_0):
     d_1 = det_23d(sigma_1)
     d_0 = det_23d(sigma_0)
     
@@ -195,7 +195,7 @@ def DGW_3d_polynomial(sigma_1, sigma_0):
 @njit
 def line_search_DGW_3d(sigma_1, sigma_0):
     # error in this function
-    alpha, beta, gamma, delta = DGW_3d_polynomial(sigma_1, sigma_0)
+    alpha, beta, gamma, delta = dgw_3d_polynomial(sigma_1, sigma_0)
     T, tau = optimize_deg_3_polynomial(alpha, beta, gamma, delta)
     # print (f'polynomial: {alpha}*x^3+ {beta}*x^2 + {gamma}*x + {delta}')
     return T,tau
@@ -204,7 +204,7 @@ def line_search_DGW_3d(sigma_1, sigma_0):
 def line_search_CGW_3d(sigma_1, sigma_0, t):
     n1 = sq_norm(sigma_1)
     n0 = sq_norm(sigma_0)
-    alpha, beta, gamma, delta = DGW_3d_polynomial(sigma_1, sigma_0)
+    alpha, beta, gamma, delta = dgw_3d_polynomial(sigma_1, sigma_0)
     
     beta = t*(n1+n0) + (1-t)*beta
     gamma = -2*t*n0 + (1-t)*gamma
@@ -217,7 +217,7 @@ def line_search_CGW_3d(sigma_1, sigma_0, t):
 @njit
 def line_search(sigma_1, sigma_0, cost, t):
     if cost == 'IGW':
-        return line_search_IGW(sigma_1, sigma_0)
+        return line_search_igw(sigma_1, sigma_0)
     elif  cost == 'DGW' and len(sigma_0)==2:
         return line_search_DGW_2d(sigma_1, sigma_0)
     elif  cost == 'DGW' and len(sigma_0)==3:
@@ -235,7 +235,7 @@ def center_marginal(mu, space_x, nu, space_y):
     return space_x, space_y
 
 
-def _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_max=50, t=0.5):
+def _frank_wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_max=50, t=0.5):
     d = space_x.shape[-1]
     for it in range(iter_max):
         # Initial direction
@@ -261,7 +261,7 @@ def _Frank_Wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_
         yield pi_n_1_hat, M_pi_n, M_pi_val
     
     
-def Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
+def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
@@ -287,7 +287,7 @@ def Frank_Wolfe_GW(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
     return initial_cost-2*T, pi_n, initial_cost-2*initial_coupling_cost
 
 
-def Frank_Wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max = 50, t=0.5, emd_kwargs={}):
+def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max = 50, t=0.5, emd_kwargs={}):
     for _ in range(iter_max):
         sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
         M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)

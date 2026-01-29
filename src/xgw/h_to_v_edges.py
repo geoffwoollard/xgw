@@ -1,6 +1,8 @@
 import numpy as np
-from xgw.Hyperplane_approx import DoubleRepresentation
 from numba import njit
+
+from xgw.hyperplane_approx import DoubleDescription
+
 
 def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
     """
@@ -74,6 +76,7 @@ def reindex_pairs(pairs, excluded, n):
     # Step 3: apply mapping to pairs
     return new_index[pairs]
 
+
 def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     excluded = np.asarray(excluded)
 
@@ -96,6 +99,7 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     # --- Apply to all pairs ---
     return mapping[pairs]
 
+
 @njit
 def compute_constraints_matching(vertex_test, dim):
     # vertex_test of dimension n_constraints by n_points, boolean array of points solving constraints
@@ -114,7 +118,7 @@ def find_edges(points):
     if dim==1:
         E_new = np.array([0, 1])
     else:
-        dd_sub = DoubleRepresentation()
+        dd_sub = DoubleDescription()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
         # normalizing normal vectors
@@ -138,6 +142,7 @@ def find_edges(points):
         final_mat = compute_constraints_matching(vertex_test, dim)
         E_new = np.transpose(np.nonzero(final_mat))
     return E_new
+
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
     # check if  a_new is normalized (can remove later)

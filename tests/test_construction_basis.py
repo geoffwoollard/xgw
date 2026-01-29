@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-from xgw.Hyperplane_approx import construct_basis_eij
+from xgw.hyperplane_approx import construct_basis_eij
 
 logger = logging.getLogger(__name__)
 
