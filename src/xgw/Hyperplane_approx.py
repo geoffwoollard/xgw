@@ -87,6 +87,7 @@ class DoubleRepresentation():
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
+        # self.n_decimals_for_v_round = 30
 
     def remove_duplicates_V(self):
         """
@@ -132,7 +133,32 @@ class DoubleRepresentation():
         self.remove_duplicates_V()
 
     def V_to_H(self):
-        A, b = compute_polytope_halfspaces(self.V)
+        # loop over high to low decimals to ensure numerical stability. take largest that works
+        for decimals in range(10, 3, -1):
+            try:
+                # 1. Round vertices to reduce numerical noise
+                V_rounded = [np.round(v, decimals=decimals) for v in self.V]
+
+                # 2. Keep only unique vertices
+                V_rounded_unique = np.unique(V_rounded, axis=0)
+
+                # 3. Try compute_polytope_halfspaces
+                try:
+                    A, b = compute_polytope_halfspaces(V_rounded_unique)
+                except RuntimeError as e:
+                    # 4. If it fails due to numerical issues, add tiny jitter
+                    scale = 0.5 * 10**(-decimals)
+                    jitter = scale * np.random.randn(*V_rounded_unique.shape)
+                    V_perturbed = V_rounded_unique + jitter
+                    A, b = compute_polytope_halfspaces(V_perturbed)
+
+            except Exception as e:
+                # print(f'Failed with rounding to {decimals} decimals: {e}')
+                continue  # try next lower precision
+
+            else:
+                # print(f"Success with {decimals} decimals!")
+                break
         a_norm = np.linalg.norm(A, axis=1)
         b /= a_norm
         A /= a_norm[:, np.newaxis]

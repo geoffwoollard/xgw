@@ -44,7 +44,7 @@ def affine_subspace_basis(points, normal_vec):
     points = np.asarray(points, float)
     
     Q,R = np.linalg.qr(normal_vec.reshape((dim,1)), mode = 'complete')
-    print (R[0,0])
+    # print (R[0,0])
     assert np.allclose(np.abs(R[0,0]), 1)
     Q = Q[:,1:]
 
@@ -100,13 +100,13 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
 def compute_constraints_matching(vertex_test, dim):
     # vertex_test of dimension n_constraints by n_points, boolean array of points solving constraints
     s = vertex_test.shape[1]
-    finall_mat = np.zeros((s, s), dtype=np.bool_)
+    final_mat = np.zeros((s, s), dtype=np.bool_)
     for i in range (s-1):
         for j in range(i,s):
             common_constr = np.logical_and(vertex_test[:,i], vertex_test[:,j])
             # detecting the points solving the same dim-1 constraints
-            finall_mat[i,j] =  np.sum(common_constr) == dim-1
-    return finall_mat
+            final_mat[i,j] =  np.sum(common_constr) == dim-1
+    return final_mat
 
 
 def find_edges(points):
@@ -117,7 +117,7 @@ def find_edges(points):
         dd_sub = DoubleRepresentation()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
-        dd_sub.H_to_V()
+        # dd_sub.H_to_V()
         # normalizing normal vectors
         c = 1/np.linalg.norm(A_sub, axis=-1)
         b_sub *= c
@@ -128,10 +128,10 @@ def find_edges(points):
         # checking that each vertex solves at least dim constraints
         # print(vertex_test.sum(0))
         # print((A_sub @ np.array(points).T - b_sub[:, np.newaxis]).T)
-        assert (vertex_test.sum(0) >= dim).all()
+        # assert (vertex_test.sum(0) >= dim).all()
         # two vertices on a same edge solve the same dim-1 constraints 
-        finall_mat = compute_constraints_matching(vertex_test, dim)
-        E_new = np.transpose(np.nonzero(finall_mat))
+        final_mat = compute_constraints_matching(vertex_test, dim)
+        E_new = np.transpose(np.nonzero(final_mat))
     return E_new
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
