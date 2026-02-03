@@ -121,7 +121,18 @@ def optimal_t(max_diam, d, cost, t, convex_tol):
     if t is None:
         return 0
     return t 
-    
+
+
+def new_direction_convex_slow(P_minus, x_plus):
+    # Normalized normal vectors of P_minus
+    A,b =  P_minus.H
+    # Finding best direction 
+    testing_dir = A @ x_plus - b
+    index = np.argmax(testing_dir)
+    g = A[index]
+    # checking that the point is outside P_minus
+    assert g @ x_plus - b[index]>0
+    return g / np.linalg.norm(g)
 
 def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3):
 
@@ -144,11 +155,12 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
     c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
     
-    centro = P_minus.get_centroid()
-    g = x_plus - centro
-    g /= np.linalg.norm(g)
     
     for iter in range(iter_max):
+        
+        # choose direction
+        logger.info('Chosing best direction')
+        g = new_direction_convex_slow(P_minus, x_plus)
         logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         logger.info(f'new half plane: {g}, {g_hat}')
@@ -158,7 +170,6 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
         logger.info(f'Updated box with , P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
         logger.info('Updating c_minus (candidate optimal value)')
         Tcost = vector_cost(g_star, cost, R, d, t)
-        # c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
 
         # The optimal values after each iteration is updated
         logger.info('Updating c_plus and c_minus')
@@ -170,12 +181,6 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
             x_minus = g_star
         if c_plus - c_minus < cost_tol:
             break
-        
-        # update direction
-        logger.info('Updating direction for next iteration')
-        centro = P_minus.get_centroid() # not needed after a couple of iterations
-        g = x_plus - centro
-        g /= np.linalg.norm(g)
 
     # Computing the optimal coupling:
     cost_matrix = function_to_cost(x_minus, e_base)
