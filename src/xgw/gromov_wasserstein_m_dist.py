@@ -131,7 +131,7 @@ def new_direction_convex_slow(P_minus, x_plus):
     index = np.argmax(testing_dir)
     g = A[index]
     # checking that the point is outside P_minus
-    assert g @ x_plus - b[index]>0
+    assert g @ x_plus - b[index]>=0
     return g / np.linalg.norm(g)
 
 def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3):

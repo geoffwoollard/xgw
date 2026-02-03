@@ -6,6 +6,16 @@ from xgw.gromov_wasserstein_m_dist import gw_m_convex, gw_m_non_convex, gw_m_non
 from test_frank_wolfe import marginals_3d, random_invariance_matrix
 from test_hyperplane_approx import make_marginals, make_simple_marginals, marginals
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def testing_2d_convex():
@@ -14,49 +24,44 @@ def testing_2d_convex():
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         
-        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
+        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=50)
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (IGW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)
 
         
-        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=100)
+        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=50)
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (CGW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)
 
-#     mu, nu, space_x, space_y = make_marginals(0)
+    mu, nu, space_x, space_y = make_marginals(0)
+    cost_tolerance = 1e-6
+    T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=500)
+    assert -cost_tolerance <c<cost_tolerance and -1e-15<T<1e-15
 
-#     T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='IGW', cost_tol=1e-15, iter_max=100)
-#     plan_error = np.isclose(plan, np.eye(len(mu))/len(mu)).mean()
-#     assert plan_error > 0.97
-
-#     T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=100, t= 0.67)
-#     plan_error = np.isclose(plan, np.eye(len(mu))/len(mu)).mean()
-#     assert plan_error > 0.97
+    T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=500)
+    assert -cost_tolerance <c<cost_tolerance and -1e-15<T<1e-15
     
-#     cost_tolerance = 0.5
-
-#     T, _, c = gw_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=200) # need EMD kwarg tuning I guess
-#     print(f'Test {test_id} IGW convex T: {T}, c: {c}')
-#     assert c < cost_tolerance
-#     assert T > 0
+    cost_tolerance = 1e-4
+    T, _, c = gw_m_convex(mu, space_x, nu, space_y, {}, cost='IGW', cost_tol=1e-15, iter_max=50) 
+    logger.info(f'Test 1 IGW convex T: {T}, c: {c}')
+    assert -cost_tolerance <c<cost_tolerance and 1e-2<T
     
-#     T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
-#     print(f'Test {test_id} IGW convex T: {T}, c: {c}')
-#     assert c < cost_tolerance
-#     assert T > 0
+    cost_tolerance = 5e-3
+    T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
+    logger.info(f'Test 2 IGW convex T: {T}, c: {c}')
+    assert -cost_tolerance <c<cost_tolerance and 1<T
     
-
-#     T, _, c = gw_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=200, t= 0.67) # need EMD kwarg tuning I guess
-#     print(f'Test {test_id} CGW convex T: {T}, c: {c}')
-#     assert c < cost_tolerance
-#     assert T > 0
+    cost_tolerance = 1e-4
+    T, _, c = gw_m_convex(mu, space_x, nu, space_y, {}, cost='CGW', cost_tol=1e-15, iter_max=50) # need EMD kwarg tuning I guess
+    logger.info(f'Test {test_id} IGW convex T: {T}, c: {c} 3')
+    assert -cost_tolerance <c<cost_tolerance and 1e-2<T
     
-#     T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=200, t= 0.67) 
-#     print(f'Test {test_id} CGW convex T: {T}, c: {c}')
-#     assert c < cost_tolerance
-#     assert T > 0
+    cost_tolerance = 5e-3
+    T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=200) 
+    logger.info(f'Test {test_id} IGW convex T: {T}, c: {c} 4')
+    assert -cost_tolerance <c<cost_tolerance and 1<T
 
 # def testing_2d_non_convex(marginals):
 #     mu, nu, space_x, space_y = marginals
