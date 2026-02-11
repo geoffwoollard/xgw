@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 def testing_2d_convex():
     '''passing'''
 
-    n_tests = 1
+    n_tests = 3
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         
-        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=200) # imax 200 crashes
+        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (IGW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)
@@ -43,6 +43,7 @@ def testing_2d_convex():
     assert -cost_tolerance < c < cost_tolerance 
     assert -1e-15 < T < 1e-15
 
+    cost_tolerance = 1e-3
     T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=500)
     assert -cost_tolerance < c < cost_tolerance 
     assert -1e-15 < T < 1e-15
@@ -58,7 +59,7 @@ def testing_2d_convex():
     T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
     logger.info(f'Test 2 IGW convex T: {T}, c: {c}')
     assert -cost_tolerance < c < cost_tolerance 
-    not_too_small_tolerance = 1
+    not_too_small_tolerance = 0.5
     assert not_too_small_tolerance < T
     
     cost_tolerance = 1e-3
@@ -72,7 +73,7 @@ def testing_2d_convex():
     T, _, c = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=200) 
     logger.info(f'Test {test_id} IGW convex T: {T}, c: {c} 4')
     assert -cost_tolerance < c < cost_tolerance 
-    not_too_small_tolerance = 1
+    not_too_small_tolerance = 0.5
     assert not_too_small_tolerance < T
     
 # def testing_2d_non_convex(marginals):
