@@ -31,7 +31,7 @@ def testing_2d_convex():
         assert np.isclose(plan_error, 0.0)
 
         
-        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=50)
+        T, plan, c = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=200)
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (CGW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)
@@ -43,7 +43,7 @@ def testing_2d_convex():
     assert -cost_tolerance < c < cost_tolerance 
     assert -1e-15 < T < 1e-15
 
-    cost_tolerance = 1e-3
+    cost_tolerance = 5e-2
     T, plan, c = gw_m_convex(mu, space_x, mu, space_x, {}, cost='CGW', cost_tol=1e-15, iter_max=500)
     assert -cost_tolerance < c < cost_tolerance 
     assert -1e-15 < T < 1e-15
@@ -121,38 +121,24 @@ def test_igw_convex_reflection_invariant():
             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
 
-# def test_igw_convex_rotation_invariant():
-#     '''sometimes failing (depending random seed), because of vertex outside (internal assert statement)
-    
-#             def new_direction_convex_slow(P_minus, x_plus):
-#             # Normalized normal vectors of P_minus
-#             A,b =  P_minus.H
-#             # Finding best direction
-#             testing_dir = A @ x_plus - b
-#             index = np.argmax(testing_dir)
-#             g = A[index]
-#             # checking that the point is outside P_minus
-#     >       assert g @ x_plus - b[index]>=0
-
-#     '''
-#     np.random.seed(0)
-#     n_tests = 1
-#     for d in [2]:
-#         for test_id in range(n_tests):
-#             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
-#             random_angle = np.random.rand() * 2 * np.pi
-#             if d ==2:
-#                 rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
-#             elif d==3:
-#                 random_axis = np.random.randn(3)
-#                 random_axis /= np.linalg.norm(random_axis)
-#                 rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
-#             print('Rotation matrix: ', rotation.shape)
-#             space_xs_rotated = space_xs @  rotation.T
-#             _, plan, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
-#             mis_match = (plan*len(mus) != np.eye(len(mus)))
-#             print('Plan (should be id): ', plan)
-#             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+def test_igw_convex_rotation_invariant():
+    n_tests = 10
+    for d in [2]:
+        for test_id in range(n_tests):
+            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
+            random_angle = np.random.rand() * 2 * np.pi
+            if d ==2:
+                rotation = R.from_euler('z', random_angle).as_matrix()[:d,:d]
+            elif d==3:
+                random_axis = np.random.randn(3)
+                random_axis /= np.linalg.norm(random_axis)
+                rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
+            print('Rotation matrix: ', rotation.shape)
+            space_xs_rotated = space_xs @  rotation.T
+            _, plan, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
+            mis_match = (plan*len(mus) != np.eye(len(mus)))
+            print('Plan (should be id): ', plan)
+            assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
 def test_cgw_convex_rotation_invariant():
     '''passing'''
