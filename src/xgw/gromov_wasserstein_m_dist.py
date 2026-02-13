@@ -8,7 +8,7 @@ from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
 
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s.%(msecs)03d - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     force=False,

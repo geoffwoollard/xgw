@@ -67,12 +67,16 @@ def test_initial_box(marginals):
 
 def make_simple_marginals(seed, d, min_points=10, max_points=20):
     np.random.seed(seed)
-    n_points = np.random.randint(min_points, max_points)
+    n_points = np.random.randint(min_points, max_points+1)
     print(f'Number of points in simple marginals test: {n_points}')
     mu = nu = np.ones(n_points) / n_points
 
     space_x = np.random.randn(n_points,d)
     space_y = np.random.randn(n_points,d)
+    radius_x = np.linalg.norm(space_x, axis=1).max()
+    radius_y = np.linalg.norm(space_y, axis=1).max()
+    space_x /= radius_x
+    space_y /= radius_y
 
     return mu, nu, space_x, space_y
 
