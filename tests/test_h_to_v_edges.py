@@ -1,5 +1,8 @@
 import numpy as np
 import pytest
+import logging
+
+logger = logging.getLogger(__name__)
 
 from xgw.hyperplane_approx import DoubleDescription
 from xgw.h_to_v_edges import update_edges_with_new_halfplane, find_edges
@@ -450,16 +453,16 @@ def half_cube_rescale(V, E, axis, cut_val):
     
     # Mask for bottom vs top half
     mask_bottom = V[:, axis] >= cut_val
-    print("mask_bottom:", mask_bottom)
+    logger.info(f"mask_bottom: {mask_bottom}")
     mask_top = ~mask_bottom
-    print("mask_top:", mask_top)
+    logger.info(f"mask_top: {mask_top}")
     
     # Rescale top half to the cut value
-    print("Before rescale V:", V)
-    print("cut_val:", cut_val)
-    print(V[mask_top, axis])
+    logger.info(f"Before rescale V: {V}")
+    logger.info(f"cut_val: {cut_val}")
+    logger.info(f"V[mask_top, axis]: {V[mask_top, axis]}")
     V[mask_top, axis] = cut_val
-    print("After rescale V:", V)
+    logger.info(f"After rescale V: {V}")
     
     # Keep all original edges (no new edges needed)
     return V, E
@@ -558,7 +561,7 @@ def test_cube_d_random_plane_cut():
     for d in [3, 4, 5, 6, 7, 8, 9]:
         V, E, A, b = make_cube_any_d(d)
         for _trial in range(n_trials):
-            print(f'trial {_trial}', end=' ')
+            logger.info(f'trial {_trial}')
             a_new, b_new = random_cut(V, rng=np.random.default_rng(_trial)) 
             # print("New halfplane:", a_new, b_new)
             left, right, on = split_by_cut(V, a_new, b_new)

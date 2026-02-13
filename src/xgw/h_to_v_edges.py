@@ -136,7 +136,7 @@ def find_edges(points):
         try:
             assert (vertex_test.sum(0) >= dim).all()
         except AssertionError:
-            print("Warning: some vertices do not satisfy enough constraints. Numerical issues may be present.")
+            # print("Warning: some vertices do not satisfy enough constraints. Numerical issues may be present.")
             pass
         # two vertices on a same edge solve the same dim-1 constraints 
         final_mat = compute_constraints_matching(vertex_test, dim)

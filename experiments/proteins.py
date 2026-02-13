@@ -3,18 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ot
 import logging
+import os
+import time
+from dataclasses import dataclass
+
+logging.disable(logging.CRITICAL)
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
-
-# suppress noisy loggers; adjust level to WARNING or ERROR as needed
-logging.getLogger().setLevel(logging.WARNING)
-logging.getLogger("xgw").setLevel(logging.WARNING)
-logging.getLogger("ot").setLevel(logging.WARNING)
-logging.getLogger("gemmi").setLevel(logging.WARNING)
-
-# module logger for informational messages in this script
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)  # Set to INFO or DEBUG for more verbose output
 
 
 def extract_coords_and_atoms(fname):
@@ -62,22 +57,24 @@ def gw_matrix(coords_ca_1, coords_ca_2, symmetric, n_skip):
                 gw_losses[idx_2, idx_1] = gw_loss
     return gw_losses
 
-from dataclasses import dataclass
+def safe_plot(arr):
+    return arr[np.isfinite(arr)]
+
 @dataclass
 class Config:
     fname_1: str = '/Users/gw/repos/xgw/experiments/2M3T.cif'
     fname_2: str = '/Users/gw/repos/xgw/experiments/2M3U.cif'
     gw_plot_fname: str = '/Users/gw/repos/xgw/experiments/gw_loss_plot.png'
     selection: str = 'CA'
-    n_models: int | None = None
+    n_models: int | None = 20
     n_skip_every: int = 1
-    compute_gw: bool = False
+    compute_gw: bool = True
     compute_xgw: bool = True
     xgw_plot_fname: str = '/Users/gw/repos/xgw/experiments/xgw_loss_plot.png'
+    max_iter: int = 100
 
 
 def main():
-    import os
     config = Config()
     model_coords_1, model_atoms_1 = extract_coords_and_atoms(config.fname_1)
     label_1 = os.path.basename(config.fname_1).replace('.cif', '')
@@ -118,56 +115,82 @@ def main():
         r2_y = np.linalg.norm(coords_ca_2, axis=(-1)).max()
         r2_max = max(r2_x, r2_y)
         t = 24*r2_max / (2 + 24*r2_max)
-        logger.info(f"Using t={t:.4f} based on r2_max={r2_max:.4f}")
+        print(f"Using t={t:.4f} based on r2_max={r2_max:.4f}")
 
         def gw_m_convex_wrapper(coords_ca_1, coords_ca_2, t, symmetric, iter_max):
-            losses_lower_bound = np.zeros((len(coords_ca_1), len(coords_ca_2)), dtype=float)
-            losses_upper_bound = np.zeros_like(losses_lower_bound)
+            losses_upper_bound = np.zeros((len(coords_ca_1), len(coords_ca_2)), dtype=float)
+            losses_lower_bound = np.zeros_like(losses_upper_bound)
+            losses_gap = np.zeros_like(losses_upper_bound)
+            losses_constant = np.zeros_like(losses_upper_bound)
             for i in range(coords_ca_1.shape[0]):
                 space_xs = coords_ca_1[i]
                 mus = ot.unif(space_xs.shape[0])
-                logger.info(f"Conformer {i}: coords shape={space_xs.shape}")
+                print(f"Conformer {i}: coords shape={space_xs.shape}")
                 for j in range(coords_ca_2.shape[0]):
                     if i < j:
                         if symmetric: continue
                     space_ys = coords_ca_2[j]
                     nus = ot.unif(space_ys.shape[0])
                     try:
-                        loss_lower, plan, c, loss_upper = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=iter_max, t=t)
+                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=iter_max, t=t)
                     except Exception as e:
-                        logger.error(f"Error comparing conformer {i} vs {j}: {e}")
-                        loss_lower, c, loss_upper = np.nan, np.nan, np.nan
+                        print(f"Error comparing conformer {i} vs {j}: {e}")
+                        loss_lower, gap, loss_upper = np.nan, np.nan, np.nan
                     losses_lower_bound[i, j] = loss_lower
                     losses_upper_bound[i, j] = loss_upper
+                    losses_gap[i, j] = gap
+                    losses_constant[i, j] = loss_constant
                     if symmetric:
                         losses_lower_bound[j, i] = loss_lower
                         losses_upper_bound[j, i] = loss_upper
+                        losses_gap[j, i] = gap
+                        losses_constant[j, i] = loss_constant
 
 
-                    logger.info(f"Conformers {i} vs {j}: loss_lower={loss_lower:.4f}, loss_upper={loss_upper:.4f}, c={c:.4f}")
-            return losses_lower_bound, losses_upper_bound
+                    print(f"Conformers {i} vs {j}: loss_lower={loss_lower:.8f}, loss_upper={loss_upper:.8f}, gap={gap:.8f}, constant={loss_constant:.8f}")
+            return losses_lower_bound, losses_upper_bound, losses_gap, losses_constant
 
-        iter_max = 2
-        n_proteins = 2
-        lower_bounds_cross, upper_bounds_cross = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=False, iter_max=iter_max)
-        lower_bounds_1, upper_bounds_1 = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_1[:n_proteins], t, symmetric=True, iter_max=iter_max)
-        lower_bounds_2, upper_bounds_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max)
-
-        np.savez(config.fname_1.replace('.cif', f'_xgw_bounds_iter{iter_max}.npz'), 
+        iter_max = config.max_iter
+        n_proteins = config.n_models
+        print("Cross CGW:")
+        lower_bounds_cross, upper_bounds_cross, losses_gap_cross, losses_constant_cross = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=False, iter_max=iter_max)
+        print("Self CGW 1:")
+        lower_bounds_1, upper_bounds_1, losses_gap_1, losses_constant_1 = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_1[:n_proteins], t, symmetric=True, iter_max=iter_max)
+        print("Self CGW 2:")
+        lower_bounds_2, upper_bounds_2, losses_gap_2, losses_constant_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max)
+        # timestr
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        np.savez(f'xgw_bounds_{timestr}.npz', 
                  config=config,
                  lower_bounds_cross=lower_bounds_cross, 
                  upper_bounds_cross=upper_bounds_cross, 
                  lower_bounds_1=lower_bounds_1, 
                  upper_bounds_1=upper_bounds_1, 
                  lower_bounds_2=lower_bounds_2, 
-                 upper_bounds_2=upper_bounds_2)
+                 upper_bounds_2=upper_bounds_2,
+                 losses_gap_cross=losses_gap_cross,
+                 losses_constant_cross=losses_constant_cross,
+                 losses_gap_1=losses_gap_1,
+                 losses_constant_1=losses_constant_1,
+                 losses_gap_2=losses_gap_2,
+                 losses_constant_2=losses_constant_2)
 
         fig = plt.figure(figsize=(12, 12))  
-        plt.boxplot([lower_bounds_cross.flatten(), lower_bounds_1.flatten(), lower_bounds_2.flatten()])
+        plt.boxplot([safe_plot(upper_bounds_cross.flatten()), safe_plot(upper_bounds_1.flatten()), safe_plot(upper_bounds_2.flatten())])
         # label
         plt.xticks([1, 2, 3], ['cross', f'self_{label_1}', f'self_{label_2}'])
         # plt.yscale('log')
         plt.ylabel('CGW loss')
+        plt.title(f'max_iter={iter_max} \n t={t:.4f}')
+        plt.savefig(config.xgw_plot_fname)
+        plt.close(fig)
+
+        fig = plt.figure(figsize=(12, 12))  
+        plt.boxplot([safe_plot(losses_constant_cross.flatten()), safe_plot(losses_constant_1.flatten()), safe_plot(losses_constant_2.flatten())])
+        # label
+        plt.xticks([1, 2, 3], ['cross', f'self_{label_1}', f'self_{label_2}'])
+        # plt.yscale('log')
+        plt.ylabel('Constant CGW loss')
         plt.title(f'max_iter={iter_max} \n t={t:.4f}')
         plt.savefig(config.xgw_plot_fname)
         plt.close(fig)

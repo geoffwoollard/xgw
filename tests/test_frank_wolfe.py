@@ -1,6 +1,9 @@
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation as R
+import logging
+
+logger = logging.getLogger(__name__)
 
 from xgw.frank_wolfe import frank_wolfe_gw, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, dgw_2d_polynomial, det_23d, dgw_3d_polynomial, matrix_cofactor_low_dim
 from test_hyperplane_approx import marginals,  simple_marginals_2D
@@ -46,12 +49,12 @@ def test_comatrix():
     A = np.array([[1,0,0],[4,5,3], [2,6,1]])
     invA = 1/det_23d(A)*np.transpose(matrix_cofactor_low_dim(A))
     real_inv = np.linalg.inv(A)
-    print(invA, real_inv)
+    logger.info(f"invA: {invA}, real_inv: {real_inv}")
     assert np.allclose(invA, real_inv)
     A = np.array([[5,2,4],[0,5,8], [0,0,1]])
     invA = 1/det_23d(A)*np.transpose(matrix_cofactor_low_dim(A))
     real_inv = np.linalg.inv(A)
-    print(invA, real_inv)
+    logger.info(f"invA: {invA}, real_inv: {real_inv}")
     assert np.allclose(invA, real_inv)
     
     
@@ -123,7 +126,7 @@ def random_invariance_matrix(cost, d):
         rotation = random_rotation_matrix(d)
         sheer_fact = 1+10*np.random.rand(d)
         sheer_fact /= np.power(np.prod(sheer_fact), 1/d)
-        print (sheer_fact)
+        logger.info(f"Sheer factors: {sheer_fact}")
         return np.diag(sheer_fact) @ rotation
     else:
         raise ValueError(f"cost not implemented")

@@ -5,7 +5,7 @@ import ot
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 try:
     from pypoman import compute_polytope_halfspaces, compute_polytope_vertices
@@ -23,13 +23,13 @@ def _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solution
 
 def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
-    print('box initialized')
+    logger.info('box initialized')
     
     objective_list = []
     x_0_list, v_0_list = [], []
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
-        print(iter)
+        logger.info(f'Iteration {iter}')
         p_plus, p_minus, objective, _, x_0, v_0 = _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         x_0_list.append(x_0)
@@ -50,12 +50,12 @@ def iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions
 
 def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
-    print('box initialized')
+    logger.info('box initialized')
     
     objective_list = []
     for iter in range(niter):
         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
-        print(iter)
+        logger.info(f'Iteration {iter}')
         p_plus, p_minus, objective, previous_solutions_to_reuse  = iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
         objective_list.append(objective)
         logger.info(f'Iteration {iter}, hausdorff distance: {objective}')
@@ -129,13 +129,13 @@ class DoubleDescription():
         # A x <= b
         c = np.zeros(A.shape[1])
         res = linprog(c, A_ub=A, b_ub=b)
-        print(res.success)
-        print(res)
+        logger.info(f'Feasibility check result: {res.success}')
+        logger.info(f'Linprog result: {res}')
 
     def H_to_V(self):
         A, b = self.H
-        print(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
-        print(f'Half-planes: {A}, {b}')
+        logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
+        logger.info(f'Half-planes: {A}, {b}')
         assert not self.check_feasibility_V(A, b)
         
         def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
@@ -305,7 +305,7 @@ def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
 
 
 def projection(pi, e_base):
-    print(f'e_base {e_base.shape}, pi {pi.shape}')
+    logger.info(f'e_base {e_base.shape}, pi {pi.shape}')
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
@@ -345,7 +345,7 @@ def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
         if objective > cost:
             x0, v_0 = x, vertex
             cost = objective
-    print(f'Hausdorff distance :{objective}')
+    logger.info(f'Hausdorff distance :{objective}')
     return x0, v_0, objective, previous_solutions_to_reuse
 
 

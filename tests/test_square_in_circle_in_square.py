@@ -8,7 +8,7 @@ from scipy.spatial import ConvexHull
 from xgw.hyperplane_approx import DoubleDescription, hausdorff, new_direction, update_box, p_plus_outside_p_minus
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 @pytest.fixture

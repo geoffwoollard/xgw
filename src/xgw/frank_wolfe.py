@@ -253,7 +253,7 @@ def _frank_wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_
         M_pi_val = -log['cost']
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
-        print(f"FW it {it}: tau={tau}, {cost}^2 T cost={T}", end=' ')
+        # print(f"FW it {it}: tau={tau}, {cost}^2 T cost={T}", end=' ')
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
@@ -279,7 +279,7 @@ def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
-        print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
+        # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n

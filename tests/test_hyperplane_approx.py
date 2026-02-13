@@ -13,7 +13,7 @@ from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outsi
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def make_marginals(seed):
