@@ -3,7 +3,9 @@ from numpy.linalg import qr
 from numba import njit
 import ot
 import logging
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 try:
     from pypoman import compute_polytope_halfspaces, compute_polytope_vertices

@@ -8,10 +8,10 @@ from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s.%(msecs)03d - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    force=True,
+    force=False,
 )
 
 logger = logging.getLogger(__name__)
@@ -189,9 +189,14 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     
     # Local optimization to finish the optimization  (may not be needed)
     c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
-    
-    return cst_cost-2*c_op, pi_opt, c_plus - c_op
 
+    total_loss = cst_cost-2*c_op
+    gap = c_plus - c_minus
+    lower_bound_on_loss = cst_cost-2*c_plus
+    logger.info(f'Final results: total loss {total_loss}, gap {gap}, bound on loss {lower_bound_on_loss}')
+
+    
+    return total_loss, pi_opt, gap, lower_bound_on_loss
         
 def gw_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
