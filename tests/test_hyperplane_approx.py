@@ -65,7 +65,7 @@ def test_initial_box(marginals):
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
 
-def make_simple_marginals(seed, d, min_points=10, max_points=20):
+def make_simple_marginals(seed, d, min_points=30, max_points=30):
     np.random.seed(seed)
     n_points = np.random.randint(min_points, max_points+1)
     print(f'Number of points in simple marginals test: {n_points}')

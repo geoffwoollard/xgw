@@ -5,7 +5,7 @@ import ot
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 logging.disable(logging.CRITICAL)
 
@@ -66,12 +66,15 @@ class Config:
     fname_2: str = '/Users/gw/repos/xgw/experiments/2M3U.cif'
     gw_plot_fname: str = '/Users/gw/repos/xgw/experiments/gw_loss_plot.png'
     selection: str = 'CA'
-    n_models: int | None = 20
+    n_models: int | None = 5
     n_skip_every: int = 1
-    compute_gw: bool = True
+    compute_gw: bool = False
     compute_xgw: bool = True
     xgw_plot_fname: str = '/Users/gw/repos/xgw/experiments/xgw_loss_plot.png'
-    max_iter: int = 100
+    max_iter: int = 20
+    unique_label: str = time.strftime("%Y%m%d-%H%M%S")
+    dimension: int = 3
+    odir: str = '/Users/gw/repos/xgw/experiments/'
 
 
 def main():
@@ -85,7 +88,7 @@ def main():
     np.savez(config.fname_2.replace('.cif', '_models.npz'), model_coords=model_coords_2, model_atoms=model_atoms_2)
 
     n_models = config.n_models
-    dimension = 2
+    dimension = config.dimension
     coords_ca_1 = selection_atoms(config.selection, model_coords_1[:n_models], model_atoms_1[:n_models])[:,:,:dimension]
     coords_ca_2 = selection_atoms(config.selection, model_coords_2[:n_models], model_atoms_2[:n_models])[:,:,:dimension]
 
@@ -107,8 +110,13 @@ def main():
         plt.xticks([1, 2, 3], ['cross', f'self_{label_1}', f'self_{label_2}'])
         # plt.yscale('log')
         plt.ylabel('GW loss')
-        plt.savefig(config.gw_plot_fname)
+        plt.savefig(config.gw_plot_fname.replace('.png', f'_{config.unique_label}.png'))
         plt.close(fig)
+        np.savez(config.gw_plot_fname.replace('.png', f'_data_{config.unique_label}.npz'), 
+                 config=asdict(config),
+                 cross_gw_losses=cross_gw_losses,
+                 self_gw_losses_1=self_gw_losses_1,
+                 self_gw_losses_2=self_gw_losses_2)
 
     if config.compute_xgw:
         r2_x = np.linalg.norm(coords_ca_1, axis=(-1)).max()
@@ -158,10 +166,8 @@ def main():
         lower_bounds_1, upper_bounds_1, losses_gap_1, losses_constant_1 = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_1[:n_proteins], t, symmetric=True, iter_max=iter_max)
         print("Self CGW 2:")
         lower_bounds_2, upper_bounds_2, losses_gap_2, losses_constant_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max)
-        # timestr
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        np.savez(f'xgw_bounds_{timestr}.npz', 
-                 config=config,
+        np.savez(config.xgw_plot_fname.replace('.png', f'_data_{config.unique_label}.npz'), 
+                 config=asdict(config),
                  lower_bounds_cross=lower_bounds_cross, 
                  upper_bounds_cross=upper_bounds_cross, 
                  lower_bounds_1=lower_bounds_1, 
@@ -182,7 +188,7 @@ def main():
         # plt.yscale('log')
         plt.ylabel('CGW loss')
         plt.title(f'max_iter={iter_max} \n t={t:.4f}')
-        plt.savefig(config.xgw_plot_fname)
+        plt.savefig(config.xgw_plot_fname.replace('.png', f'_{config.unique_label}.png'))
         plt.close(fig)
 
         fig = plt.figure(figsize=(12, 12))  
@@ -192,7 +198,7 @@ def main():
         # plt.yscale('log')
         plt.ylabel('Constant CGW loss')
         plt.title(f'max_iter={iter_max} \n t={t:.4f}')
-        plt.savefig(config.xgw_plot_fname)
+        plt.savefig(config.xgw_plot_fname.replace('.png', f'_constant_{config.unique_label}.png'))
         plt.close(fig)
 
 if __name__ == "__main__":
