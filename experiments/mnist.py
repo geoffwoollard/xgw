@@ -35,9 +35,10 @@ class Config:
     unique_label: str = time.strftime("%Y%m%d-%H%M%S")
     t_eps: float = 1e-2
     iter_max: int = 100
-    n_digits: int = 3
+    n_digits: int = 30
     space_scale: float = 1.0
     cost_tol: float = 1e-4
+    random_seed: int = 0
 
 
 def main():
@@ -74,6 +75,7 @@ def main():
     d_list = []
     iter_max = config.iter_max
     
+    np.random.seed(config.random_seed)
     idxs = np.random.choice(n_total, n_digits, replace=False)
     for idx_1 in tqdm(idxs, desc="Computing CGW distances", total=n_digits):
         mu_1, space_xs_1 = sparse_mnist(mnist, idx_1)
@@ -98,7 +100,7 @@ def main():
                                                                                        cost='CGW', 
                                                                                        cost_tol=config.cost_tol, 
                                                                                        iter_max=config.iter_max, 
-                                                                                       t=config.t
+                                                                                       t=t
                                                                                        )
                         
                         d_list.append({'idx_1': idx_1, 
@@ -111,14 +113,16 @@ def main():
                                     'loss_lower': loss_lower,
                                     'loss_constant': loss_constant,
                                     't': t,
-                                    'iter_max': iter_max})
+                                    'iter_max': iter_max,
+                                    'space_scale': config.space_scale,
+                                    'random_seed': config.random_seed,
+                                    })
                         print(f"Computed CGW distance between idx {idx_1} (digit {digit_1}) and idx {idx_2} (digit {digit_2}), flip={flip}: loss_upper={loss_upper:.6f}, gap={gap_11:.6f}, loss_lower={loss_lower:.6f}, loss_constant={loss_constant:.6f}")
-                    except:
-                        print(f"Failed for idx {idx_1} and idx {idx_2}, flip={flip}")
+                    except Exception as e:
+                        print(f"Failed for idx {idx_1} and idx {idx_2}, flip={flip}: {e}")
     df = pd.DataFrame(d_list)
     df.to_csv(config.output_csv.replace('.csv', f'_{config.unique_label}.csv'), index=False)
     np.savez(config.output_csv.replace('.csv', f'_{config.unique_label}.npz'), config=asdict(config), data=df.to_dict(orient='list'))
-
 
 if __name__ == "__main__":
     main()
