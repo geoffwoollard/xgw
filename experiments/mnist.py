@@ -4,8 +4,10 @@ import pandas as pd
 from tqdm import tqdm
 import time
 from dataclasses import dataclass, asdict
+import ot
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
+from xgw.utils import gw_matrix
 
 logging.disable(logging.CRITICAL)
 
@@ -35,10 +37,12 @@ class Config:
     unique_label: str = time.strftime("%Y%m%d-%H%M%S")
     t_eps: float = 1e-2
     iter_max: int = 100
-    n_digits: int = 30
-    space_scale: float = 1.0
+    n_digits: int = 100
+    space_scale: float = 0.5
     cost_tol: float = 1e-4
     random_seed: int = 0
+    compute_gw: bool = True
+    compute_xgw: bool = False
 
 
 def main():
@@ -70,6 +74,7 @@ def main():
     #          loss_upper_22=loss_upper_22, plan_22=plan_22, gap_22=gap_22, loss_lower_22=loss_lower_22, loss_constant_22=loss_constant_22,
     #          loss_upper_12=loss_upper_12, plan_12=plan_12, gap_12=gap_12, loss_lower_12=loss_lower_12, loss_constant_12=loss_constant_12)
 
+        
     n_digits = config.n_digits
     n_total = len(mnist['images'])
     d_list = []
@@ -91,35 +96,50 @@ def main():
                         space_xs_2[:, 0] = -space_xs_2[:, 0]
                         print(f"Flipped digit {digit_2} (idx {idx_2}) horizontally")
                 
-                    try:
-                        loss_upper, _, gap_11, loss_lower, loss_constant = gw_m_convex(mu_1, 
-                                                                                       config.space_scale*space_xs_1, 
-                                                                                       mu_2, 
-                                                                                       config.space_scale*space_xs_2, 
-                                                                                       {}, 
-                                                                                       cost='CGW', 
-                                                                                       cost_tol=config.cost_tol, 
-                                                                                       iter_max=config.iter_max, 
-                                                                                       t=t
-                                                                                       )
-                        
-                        d_list.append({'idx_1': idx_1, 
+                    dict_ij = {'idx_1': idx_1, 
                                     'idx_2': idx_2, 
                                     'flip': flip,
                                     'digit_1': digit_1,
                                     'digit_2': digit_2,
-                                    'loss_upper': loss_upper,
-                                    'gap': gap_11,
-                                    'loss_lower': loss_lower,
-                                    'loss_constant': loss_constant,
-                                    't': t,
-                                    'iter_max': iter_max,
-                                    'space_scale': config.space_scale,
                                     'random_seed': config.random_seed,
-                                    })
-                        print(f"Computed CGW distance between idx {idx_1} (digit {digit_1}) and idx {idx_2} (digit {digit_2}), flip={flip}: loss_upper={loss_upper:.6f}, gap={gap_11:.6f}, loss_lower={loss_lower:.6f}, loss_constant={loss_constant:.6f}")
-                    except Exception as e:
-                        print(f"Failed for idx {idx_1} and idx {idx_2}, flip={flip}: {e}")
+                    }
+
+                    if config.compute_gw:
+                        C1 = ot.dist(space_xs_1, space_xs_1)
+                        C2 = ot.dist(space_xs_2, space_xs_2)
+                        gw_loss = ot.gromov_wasserstein2(C1, C2, mu_1, mu_2) 
+                        dict_ij['gw_loss'] = gw_loss
+                    if config.compute_xgw:
+                        try:
+                            loss_upper, _, gap_11, loss_lower, loss_constant = gw_m_convex(mu_1, 
+                                                                                        config.space_scale*space_xs_1, 
+                                                                                        mu_2, 
+                                                                                        config.space_scale*space_xs_2, 
+                                                                                        {}, 
+                                                                                        cost='CGW', 
+                                                                                        cost_tol=config.cost_tol, 
+                                                                                        iter_max=config.iter_max, 
+                                                                                        t=t
+                                                                                        )
+                            
+                            dict_ij.update({'idx_1': idx_1, 
+                                        'idx_2': idx_2, 
+                                        'flip': flip,
+                                        'digit_1': digit_1,
+                                        'digit_2': digit_2,
+                                        'loss_upper': loss_upper,
+                                        'gap': gap_11,
+                                        'loss_lower': loss_lower,
+                                        'loss_constant': loss_constant,
+                                        't': t,
+                                        'iter_max': iter_max,
+                                        'space_scale': config.space_scale,
+                                        })
+                            print(f"Computed CGW distance between idx {idx_1} (digit {digit_1}) and idx {idx_2} (digit {digit_2}), flip={flip}: loss_upper={loss_upper:.6f}, gap={gap_11:.6f}, loss_lower={loss_lower:.6f}, loss_constant={loss_constant:.6f}")
+                        except Exception as e:
+                            print(f"Failed for idx {idx_1} and idx {idx_2}, flip={flip}: {e}")
+                    d_list.append(dict_ij)
+ 
     df = pd.DataFrame(d_list)
     df.to_csv(config.output_csv.replace('.csv', f'_{config.unique_label}.csv'), index=False)
     np.savez(config.output_csv.replace('.csv', f'_{config.unique_label}.npz'), config=asdict(config), data=df.to_dict(orient='list'))
