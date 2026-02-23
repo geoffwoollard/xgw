@@ -16,7 +16,7 @@ def n_iter():
     return 50
 
 
-def test_hausdorff():
+def test_hausdorff_cdd():
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
@@ -26,7 +26,7 @@ def test_hausdorff():
     ]]
 
     previous_solutions_to_reuse = {}
-    p_plus = DoubleDescription()
+    p_plus = DoubleDescription(implementation='cdd')
     p_plus.add_V(outer_square_vertices)  
     p_minus = DoubleDescription()
     p_minus.add_V(inner_square_vertices)
@@ -36,6 +36,29 @@ def test_hausdorff():
     assert np.allclose(objective, np.linalg.norm(x_0 - v_0)**2)
     assert np.allclose(2*x_0, v_0) # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
+def test_hausdorff_h_to_v_edges():
+    inner_square_vertices = [np.array(v) for v in [
+        (0,1), (0,-1), (1,0), (-1,0)
+    ]]
+
+    outer_square_vertices = [np.array(v) for v in [
+        (1,1), (1,-1), (-1,1), (-1,-1)
+    ]]
+
+    previous_solutions_to_reuse = {}
+    
+    p_plus = DoubleDescription(implementation='h_to_v_edges', E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]))
+    p_plus.V = outer_square_vertices
+    A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
+    b = np.array([1,1,1,1])
+    p_plus.H = [A, b]
+    p_minus = DoubleDescription()
+    p_minus.add_V(inner_square_vertices)
+
+    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
+    
+    assert np.allclose(objective, np.linalg.norm(x_0 - v_0)**2)
+    assert np.allclose(2*x_0, v_0) # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
 def test_minimal_2d(n_iter):
     inner_square_vertices = [np.array(v) for v in [
@@ -107,10 +130,4 @@ def test_minimal_2d(n_iter):
     plt.clf()
         
 
-def iteration_loop(p_plus, p_minus, previous_solutions_to_reuse):
-    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
-    g = new_direction(x_0, v_0, p_minus)
-    g_hat, g_star = 1, g/np.linalg.norm(g)
-    p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
-    return p_plus, p_minus, objective, previous_solutions_to_reuse
 

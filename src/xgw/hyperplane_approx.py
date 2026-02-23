@@ -12,6 +12,8 @@ try:
 except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
+from .h_to_v_edges import update_edges_with_new_halfplane
+
 
 def _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
     x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
@@ -91,11 +93,17 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd'):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
         self.implementation = implementation
+        if self.implementation == 'cdd':
+            pass
+        elif self.implementation == 'h_to_v_edges':
+            self.E = E_initialization
+        else:
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
 
     def remove_duplicates_V(self):
@@ -134,8 +142,12 @@ class DoubleDescription():
         logger.info(f'Linprog result: {res}')
 
     def H_to_V(self):
+        
         if self.implementation == 'h_to_v_edges':
             raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            # V = self.V
+            # A, b = self.H
+            # V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
@@ -254,23 +266,39 @@ class DoubleDescription():
     
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
-        # vertex is a d^2 by 1 vector
-        self.V.extend(vertex_list)
-        self.remove_duplicates_V()
-        self.V_to_H()
+        if self.implementation == 'h_to_v_edges':
+            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        elif self.implementation == 'cdd':
+            # vertex is a d^2 by 1 vector
+            self.V.extend(vertex_list)
+            self.remove_duplicates_V()
+            self.V_to_H()
     
     # could be optimized for a family of vectors and scalars
     def add_H(self, constraint_list):
-        vector_list = [np.transpose(elem[0]) for elem in constraint_list]
-        scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
-        # vector is a d^2 by 1 vector
-        if self.H != ():
-            vector_list.append(self.H[0])
-            scalar_list.append(self.H[1])
-        A = np.vstack(vector_list)
-        b = np.hstack(scalar_list)
-        self.H = [A, b]
-        self.H_to_V()
+        if self.implementation == 'h_to_v_edges':
+            assert len(constraint_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            V = self.V
+            A, b = self.H
+            E = self.E
+            V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
+            self.V = V_final
+            self.E = E_final
+            self.H = [A_final, b_final]
+            self.remove_duplicates_V()
+        elif self.implementation == 'cdd':
+            vector_list = [np.transpose(elem[0]) for elem in constraint_list]
+            scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
+            # vector is a d^2 by 1 vector
+            if self.H != ():
+                vector_list.append(self.H[0])
+                scalar_list.append(self.H[1])
+            A = np.vstack(vector_list)
+            b = np.hstack(scalar_list)
+            self.H = [A, b]
+            self.H_to_V()
     
     def get_centroid(self):
         return np.mean(np.array(self.V), axis=0)

@@ -1,8 +1,6 @@
 import numpy as np
 from numba import njit
 
-from xgw.hyperplane_approx import DoubleDescription
-
 
 def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
     """
@@ -118,6 +116,7 @@ def find_edges(points):
     if dim==1:
         E_new = np.array([0, 1])
     else:
+        from xgw.hyperplane_approx import DoubleDescription
         dd_sub = DoubleDescription()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
