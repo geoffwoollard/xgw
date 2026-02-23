@@ -91,10 +91,11 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd'):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
+        self.implementation = implementation
         # self.n_decimals_for_v_round = 30
 
     def remove_duplicates_V(self):
@@ -133,61 +134,64 @@ class DoubleDescription():
         logger.info(f'Linprog result: {res}')
 
     def H_to_V(self):
-        A, b = self.H
-        logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
-        logger.info(f'Half-planes: {A}, {b}')
-        assert not self.check_feasibility_V(A, b)
-        
-        def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
-            '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
+        if self.implementation == 'h_to_v_edges':
+            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        elif self.implementation == 'cdd':
+            A, b = self.H
+            logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
+            logger.info(f'Half-planes: {A}, {b}')
+            assert not self.check_feasibility_V(A, b)
             
-            This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
-            This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
-            In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
-            Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
-            Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
-            The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
-            
-            '''
-            try:
-                V = compute_polytope_vertices(A, b)
-            except:
-                H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
-                for decimals in range(decimals_start, decimals_end, -1):
-                    V=[]
-                    try:
-                        # 1. Round vertices to reduce numerical noise
-                        H_rounded = [np.round(h, decimals=decimals) for h in H]
-
-                        # 2. Keep only unique vertices
-                        H_rounded_unique = np.unique(H_rounded, axis=0)
-                        A_rounded_unique = H_rounded_unique[:,:-1]
-                        b_rounded_unique = H_rounded_unique[:,-1]
-
-                        # 3. Try compute_polytope_halfspaces
+            def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
+                '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
+                
+                This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
+                This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
+                In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
+                Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
+                Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
+                The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
+                
+                '''
+                try:
+                    V = compute_polytope_vertices(A, b)
+                except:
+                    H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
+                    for decimals in range(decimals_start, decimals_end, -1):
+                        V=[]
                         try:
-                            V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
-                        except RuntimeError as e:
-                            # 4. If it fails due to numerical issues, add tiny jitter
-                            scale = 0.5 * 10**(-decimals)
-                            jitter = scale * np.random.randn(*H_rounded_unique.shape)
-                            H_perturbed = H_rounded_unique + jitter
-                            A_perturbed = H_perturbed[:,:-1]
-                            b_perturbed = H_perturbed[:,-1]
-                            V = compute_polytope_vertices(A_perturbed, b_perturbed)
+                            # 1. Round vertices to reduce numerical noise
+                            H_rounded = [np.round(h, decimals=decimals) for h in H]
 
-                    except Exception as e:
-                        # print(f'Failed with rounding to {decimals} decimals: {e}')
-                        continue  # try next lower precision
+                            # 2. Keep only unique vertices
+                            H_rounded_unique = np.unique(H_rounded, axis=0)
+                            A_rounded_unique = H_rounded_unique[:,:-1]
+                            b_rounded_unique = H_rounded_unique[:,-1]
 
-                    else:
-                        if len(V)>1:
-                            # print(f"Success with {decimals} decimals!")
-                            break
-            return V
-        logger.info(f'A,b: {A, b}')
-        self.V = stabilize_compute_polytope_vertices(A, b)
-        self.remove_duplicates_V()
+                            # 3. Try compute_polytope_halfspaces
+                            try:
+                                V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
+                            except RuntimeError as e:
+                                # 4. If it fails due to numerical issues, add tiny jitter
+                                scale = 0.5 * 10**(-decimals)
+                                jitter = scale * np.random.randn(*H_rounded_unique.shape)
+                                H_perturbed = H_rounded_unique + jitter
+                                A_perturbed = H_perturbed[:,:-1]
+                                b_perturbed = H_perturbed[:,-1]
+                                V = compute_polytope_vertices(A_perturbed, b_perturbed)
+
+                        except Exception as e:
+                            # print(f'Failed with rounding to {decimals} decimals: {e}')
+                            continue  # try next lower precision
+
+                        else:
+                            if len(V)>1:
+                                # print(f"Success with {decimals} decimals!")
+                                break
+                return V
+            logger.info(f'A,b: {A, b}')
+            self.V = stabilize_compute_polytope_vertices(A, b)
+            self.remove_duplicates_V()
 
     def V_to_H(self):
         # loop over high to low decimals to ensure numerical stability. take largest that works
