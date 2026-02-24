@@ -201,7 +201,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         # print(p, "→", coords)
 
     # find edges between the new points
-    E_new = find_edges(new_points)
+    E_new = find_edges(new_points) # TODO: optimize
     # re-index V and E accordingly
     delta_v_idx = len(V) - len(v_excluded_idx)
     E_new = E_new + delta_v_idx

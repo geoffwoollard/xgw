@@ -26,23 +26,19 @@ def testing_3d_convex():
         mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=300, max_points=300)
         r2 = 1
         t = 24*r2 / (2*r2 + 24)
-        print(f'Using t={t} for test {test_id}')
-        
-        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', gap_tol=1e-15, iter_max=10, t=t) 
-        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-        print('Plan error for identical marginals (IGW, convex): ', plan_error)
-        print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-        assert np.isclose(plan_error, 0.0)
-        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (IGW, convex) in test {test_id}"
+        logger.info(f'Using t={t} for test {test_id}')
 
-        
-        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', gap_tol=1e-15, iter_max=10, t=t*1.01)
-        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-        print('Plan error for identical marginals (CGW, convex): ', plan_error)
-        print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-        assert np.isclose(plan_error, 0.0)
-        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (CGW, convex) in test {test_id}"
+        for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
+            for p_plus_implementation in ['cdd', 'h_to_v_edges']:    
+                logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
+                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=10, t=t_use, p_plus_implementation=p_plus_implementation) 
+                plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+                logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
+                logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+                assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+                assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
+    
 
 def testing_2d_convex():
     '''passing'''
