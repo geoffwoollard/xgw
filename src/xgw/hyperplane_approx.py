@@ -15,7 +15,7 @@ except ImportError as e:
 from .h_to_v_edges import update_edges_with_new_halfplane
 
 
-def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
+def stabilize_compute_polytope_vertices(A, b, decimals_start=18, decimals_end=3):
     '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
     
     This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
@@ -63,7 +63,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                     break
     return V
 
-def stabilize_compute_polytope_halfspaces(V, decimals_start=15, decimals_end=3):
+def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
     '''Try to compute halfspaces from vertices with decreasing rounding precision to enhance numerical stability.
     
     This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.

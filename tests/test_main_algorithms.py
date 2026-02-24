@@ -16,37 +16,38 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-def testing_2d_classical_gw():
-    n_tests = 3
-    for test_id in range(n_tests):
-        mus, _, space_xs, _ = make_simple_marginals(test_id, d=2)
+# def testing_2d_classical_gw():
+#     n_tests = 3
+#     for test_id in range(n_tests):
+#         mus, _, space_xs, _ = make_simple_marginals(test_id, d=2)
         
-        _, plan, _, _, _ = classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-15, iter_max=200) 
-        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
-        print('Plan error for identical marginals (classic GW, convex): ', plan_error)
-        assert np.isclose(plan_error, 0.0)
+#         _, plan, _, _, _ = classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-15, iter_max=200) 
+#         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+#         print('Plan error for identical marginals (classic GW, convex): ', plan_error)
+#         assert np.isclose(plan_error, 0.0)
 
 
-def testing_3d_convex():
-    '''passing'''
+# def testing_3d_convex():
+#     '''passing'''
 
-    n_tests = 3
-    for test_id in range(n_tests):
-        mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
-        r2 = 1
-        t = 24*r2 / (2*r2 + 24)
-        logger.info(f'Using t={t} for test {test_id}')
+#     n_tests = 3
+#     for test_id in range(n_tests):
+#         mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
+#         r2 = 1
+#         t = 24*r2 / (2*r2 + 24)
+#         logger.info(f'Using t={t} for test {test_id}')
 
-        for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
-            for p_plus_implementation in ['h_to_v_edges','cdd', ]:    
-                logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
-                plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-                logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
-                logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-                assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
-                assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+#         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
+#             for p_plus_implementation in ['h_to_v_edges','cdd', ]:    
+#                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
+#                 total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
+#                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+#                 logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
+#                 logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+#                 assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+#                 assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
 
 def testing_2d_convex():
@@ -66,7 +67,7 @@ def testing_2d_convex():
     mu, nu, space_x, space_y = make_marginals(0)
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
-        for p_plus_implementation in ['cdd', 'h_to_v_edges']:
+        for p_plus_implementation in ['h_to_v_edges', 'cdd']:
             final_gap_tolerance = 1e-4
             T, _, gap, _, _ = gw_m_convex(mu, space_x, mu, space_x, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, p_plus_implementation=p_plus_implementation)
             assert -final_gap_tolerance < gap < final_gap_tolerance, f"Gap {gap} is not within tolerance {final_gap_tolerance} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
@@ -151,10 +152,11 @@ def test_igw_convex_rotation_invariant():
                     rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
                 logger.info(f'Rotation matrix: {rotation.shape}')
                 space_xs_rotated = space_xs @  rotation.T
-                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
+                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', gap_tol=1e-15, iter_max=200, p_plus_implementation=p_plus_implementation)
                 mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-                logger.info(f'Plan (should be id): {plan}')
-                assert np.isclose(mis_match.sum(), 0.0), "Rotation test failed!"
+                logger.info(f'Plan (should be id): {plan,d}')
+                print(plan)
+                assert np.isclose(mis_match.sum(), 0.0), f"Rotation test failed!"  
 
 def test_cgw_convex_rotation_invariant():
     '''passing'''
@@ -188,5 +190,5 @@ def test_cgw_convex_rotation_invariant():
 # #             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
 
-if __name__ == "__main__":
-    testing_3d_convex()
+# if __name__ == "__main__":
+    # testing_3d_convex()

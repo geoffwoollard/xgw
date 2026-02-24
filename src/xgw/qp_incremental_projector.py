@@ -75,7 +75,14 @@ class OptimalProjectedCoupling:
 
     Uses CVXPY + OSQP. (maybe use other solver)
     """
-    def __init__(self, dim, proj_dim, e_base, A=None, b=None, C=None, d=None, eps_abs=1e-5, eps_rel=1e-5, max_iter=10000, verbose=False):
+    def __init__(self, proj_dim, e_base, mu=None, nu=None, eps_abs=1e-5, eps_rel=1e-5, max_iter=10000, verbose=False):
+        l_mu = len(mu)
+        l_nu = len(nu)
+        dim = l_mu*l_nu
+        b = np.zeros(dim)
+        C_mu =np.ones(l_mu)
+        C_nu = np.ones(l_nu)
+        
         self.dim = dim
         self.x = cp.Variable(dim)
         self.eps_abs = eps_abs
@@ -83,13 +90,15 @@ class OptimalProjectedCoupling:
         self.max_iter = max_iter
         self.solver_opts = {'eps_abs': self.eps_abs, 'eps_rel': self.eps_rel, 'max_iter': self.max_iter}
         self.verbose = verbose
+        
 
         # initially possibly empty constraint list
         self.constraints = []
-        if A is not None and b is not None:
-            self.constraints.append(A @ self.x <= b)
-        if C is not None and d is not None:
-            self.constraints.append(C @ self.x -d == 0)
+        
+        self.constraints.append( self.x >= b)
+        x_reshape = cp.reshape(self.x, shape=(l_mu,l_nu), order='C')
+        self.constraints.append(C_mu @ x_reshape -mu == 0)
+        self.constraints.append( x_reshape @ C_nu -nu == 0)
 
         # v is a parameter so we don't have to rebuild the problem
         self.v = cp.Parameter(proj_dim)

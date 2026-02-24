@@ -99,24 +99,11 @@ def vector_cost(vect, cost, R, d, t):
 
 
 def vect_to_coupling(x_minus, mu, nu, e_base):
-    l_mu = len(mu)
-    l_nu = len(nu)
-    dim = l_mu*l_nu
     proj_dim = len(x_minus) 
-    A = -np.eye(dim)
-    b = np.zeros(dim)
-    # Need to check matrix C (marginal constraints), not exactly sure of the implementation
-    C = np.zeros((l_mu, l_nu, l_mu + l_nu))
-    for i in range(l_mu):
-        C[i, :, i] = 1
-    for j in range(l_nu):
-        C[:, j, l_mu+j] = 1
-    C = np.transpose(C.reshape((dim, l_mu + l_nu)))
-    d = np.hstack((np.ravel(mu), np.ravel(nu)))
-    conv_solver = OptimalProjectedCoupling(dim, proj_dim, e_base, A=A, b=b, C=C, d=d)
+    conv_solver = OptimalProjectedCoupling(proj_dim, e_base, mu=mu, nu=nu)
     pi_opt, objective = conv_solver.solve(x_minus)
     # can do check on objective being close to 0 (to code later)
-    pi_opt = pi_opt.reshape((l_mu,l_nu))
+    pi_opt = pi_opt.reshape((len(mu),len(nu)))
     return pi_opt
     
     
@@ -201,7 +188,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
 
     total_loss = cst_cost-2*c_op
-    gap = c_plus - c_minus
+    gap = c_plus - c_op
     lower_bound_on_total_loss = cst_cost-2*c_plus
     logger.info(f'Final results: total loss {total_loss}, gap {gap}, bound on loss {lower_bound_on_total_loss}')
 
@@ -258,7 +245,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     c_op, pi_opt, _ = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_opt, g_func, iter_max=FW_iter)
 
     total_loss = cst_cost-4*c_op
-    gap = c_plus - c_minus
+    gap = c_plus - c_op
     lower_bound_on_total_loss = cst_cost-4*c_plus
     logger.info(f'Final results: total loss {total_loss}, gap {gap}, bound on loss {lower_bound_on_total_loss}')
 
