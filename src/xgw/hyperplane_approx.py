@@ -155,7 +155,7 @@ class DoubleDescription():
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
-            logger.info(f'Half-planes: {A}, {b}')
+            # logger.info(f'Half-planes: {A}, {b}')
             assert not self.check_feasibility_V(A, b)
             
             def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):

@@ -112,8 +112,8 @@ def random_rotation_matrix(d):
     return rotation
 
 
-def random_invariance_matrix(cost, d):
-    np.random.seed(2)
+def random_invariance_matrix(cost, d, random_state=2):
+    np.random.seed(random_state)
     if cost == 'IGW':
         rotation = random_rotation_matrix(d)
         s = np.random.randint(2, size = d)

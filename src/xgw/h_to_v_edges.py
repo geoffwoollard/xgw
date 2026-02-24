@@ -2,9 +2,11 @@ import numpy as np
 from numba import njit
 
 
-def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
+def segment_plane_intersection(v0, v1, a, b, tol=1e-16):
     """
     Intersection between segment [v0, v1] and hyperplane a^T x = b.
+
+    Note: have run into numerical issues with in_plane return when tol=1e-12, so reduced to 1e-16. May need to adjust if numerical issues arise.
     
     Returns:
         - intersection point (np.ndarray) if it exists within the segment
@@ -171,6 +173,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
             if (idx_of_v_excluded in v_excluded_idx and idx_other in v_excluded_idx):
                 pass
             else:
+                # TODO: handle case where in plane
                 v_new = segment_plane_intersection(V[idx_of_v_excluded], V[idx_other], a_new, b_new)
                 # check v inside all old halfplanes
                 tol = 1e-12
