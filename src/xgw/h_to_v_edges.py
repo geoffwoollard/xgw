@@ -149,7 +149,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
     a_new /= a_norm
     b_new /= a_norm
     # find excluded vertices
-    v_excluded_bool = a_new.dot(V.T) < b_new
+    v_excluded_bool = a_new.dot(V.T) > b_new
     v_excluded_idx = np.arange(V.shape[0])[v_excluded_bool]
     # print("excluded vertices:", v_excluded_idx)
 

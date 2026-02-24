@@ -145,9 +145,6 @@ class DoubleDescription():
         
         if self.implementation == 'h_to_v_edges':
             raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
-            # V = self.V
-            # A, b = self.H
-            # V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
@@ -280,11 +277,11 @@ class DoubleDescription():
             assert len(constraint_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
-            V = self.V
+            V = np.array(self.V)
             A, b = self.H
             E = self.E
             V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
-            self.V = V_final
+            self.V = V_final.tolist()
             self.E = E_final
             self.H = [A_final, b_final]
             self.remove_duplicates_V()
@@ -346,15 +343,25 @@ def function_to_cost(g, e_base):
 
 
 def update_box(p_plus, p_minus, half_planes_list, vertex_list):
-    logger.info('Adding new half-planes and vertices to the bounding boxes')
-    p_plus.add_H(half_planes_list)
-    logger.info('Added half-planes to p_plus')
-    p_minus.add_V(vertex_list)
-    logger.info('Added vertices to p_minus')
-    p_minus.V_to_H()
-    logger.info('Updated half-planes of p_minus from vertices')
-    p_plus.H_to_V()
-    logger.info('Updated vertices of p_plus from half-planes')
+    if p_plus.implementation == 'cdd':
+        logger.info('Adding new half-planes and vertices to the bounding boxes')
+        p_plus.add_H(half_planes_list)
+        logger.info('Added half-planes to p_plus')
+        # p_plus.H_to_V()
+        # logger.info('Updated vertices of p_plus from half-planes')
+    elif p_plus.implementation == 'h_to_v_edges':
+        assert len(half_planes_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
+        
+    if p_minus.implementation == 'cdd':
+        p_minus.add_V(vertex_list)
+        logger.info('Added vertices to p_minus')
+        p_minus.V_to_H()
+        logger.info('Updated half-planes of p_minus from vertices')
+    elif p_minus.implementation == 'h_to_v_edges':
+        raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+
     return p_plus, p_minus
 
 
@@ -379,7 +386,6 @@ def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
             cost = objective
     logger.info(f'Hausdorff distance :{objective}')
     return x0, v_0, objective, previous_solutions_to_reuse
-
 
             
 def p_plus_outside_p_minus(p_plus, p_minus):
