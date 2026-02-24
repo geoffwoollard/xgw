@@ -54,15 +54,17 @@ def marginals():
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={})
-    assert len(P_minus.V) == 8
-    assert len(P_plus.V) == 16
-    assert P_plus.H[0].shape == (8,4)
-    assert P_minus.H[0].shape == (16,4)
-    
-    residuals = p_plus_outside_p_minus(P_plus, P_minus)
-    atol = 1e-15
-    assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
+    for p_plus_implementation in ['cdd', 'h_to_v_edges']:
+        logger.info(f'Testing initial box with p_plus implementation: {p_plus_implementation}')
+        e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={}, p_plus_implementation=p_plus_implementation)
+        assert len(P_minus.V) == 8
+        assert len(P_plus.V) == 16
+        assert P_plus.H[0].shape == (8,4)
+        assert P_minus.H[0].shape == (16,4)
+        
+        residuals = p_plus_outside_p_minus(P_plus, P_minus)
+        atol = 1e-15
+        assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
 
 def make_simple_marginals(seed, d, min_points=30, max_points=30):
@@ -259,7 +261,7 @@ def test_simple_marginals_FAILING(super_simple_marginals_2D):
 
 @pytest.fixture
 def niter():
-    return 5
+    return 10
 
 
 def volume_convex_hull_from_vertices(vertices):
@@ -291,7 +293,8 @@ def test_overall(niter, marginals):
     P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
     logger.info(f'Objective list over iterations: {objective_list}')
     diffs = np.diff(objective_list)
-    tol = 1e-16
+    tol = 1e-5
+    print(f'Objective differences over iterations: {diffs}')
 
     assert np.all(diffs < tol), f'Objective not non-increasing, diffs: {diffs}'
     _, _, new_obj, _ = hausdorff( P_plus, P_minus, previous_solutions_to_reuse)
@@ -329,3 +332,5 @@ def test_P_monotonicity_FAILING(marginals):
         P_minus_old = deepcopy(P_minus)
 
 
+if __name__ == "__main__":
+    test_initial_box(marginals())

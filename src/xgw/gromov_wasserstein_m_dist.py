@@ -134,7 +134,7 @@ def new_direction_convex_slow(P_minus, x_plus, tol=1e-10):
     assert g @ x_plus - b[index]>= -tol 
     return g / np.linalg.norm(g)
 
-def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3):
+def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3, p_plus_implementation='cdd'):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -147,7 +147,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', cost_tol=1e-5,
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     
     # Bounding box initialization
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
     # print('Initial box with ', len(P_minus.V), ' vertices and ', P_minus.H[0].shape[0], ' half-planes.')
     # print('Vertices: ', P_minus.V)
     

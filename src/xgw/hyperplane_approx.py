@@ -301,7 +301,7 @@ class DoubleDescription():
         return np.mean(np.array(self.V), axis=0)
 
 
-def initial_box(space_x, space_y, mu, nu, emd_kwargs):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
     '''
     Docstring for initial_box
     
@@ -311,10 +311,11 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     creates an initial rectangle bounding 
     '''
     e_base, R = construct_basis_eij(space_x, space_y)
-    p_plus, p_minus = DoubleDescription(), DoubleDescription()
+    p_plus_initial = DoubleDescription(implementation='cdd')
+    p_minus = DoubleDescription(implementation='cdd')
     vertex_list = []
     half_plans_list = []
-    a,b,c = e_base.shape
+    a,b,c = e_base.shape # TODO: .shape[2]
     for i in range(c):
         for sigma in [-1,1]:
             e_i = np.zeros(c)
@@ -322,7 +323,15 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs):
             g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
-    update_box(p_plus, p_minus, half_plans_list, vertex_list)
+    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    if p_plus_implementation == 'h_to_v_edges':
+        from xgw.h_to_v_edges import find_edges
+        E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
+        p_plus = DoubleDescription(implementation=p_plus_implementation, E_initialization=E_initialization)
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
+    elif p_plus_implementation == 'cdd':
+        p_plus = p_plus_initial
             
     return e_base, R, p_plus, p_minus
 
