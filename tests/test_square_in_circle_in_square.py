@@ -91,7 +91,7 @@ def test_minimal_2d(n_iter):
 
         np.random.seed(42)
         for iter in range(n_iter):
-            # print('iteration', iter)
+            print('iteration', iter)
             p_plus, p_minus, _, previous_solutions_to_reuse = iteration_loop_circle(p_plus=p_plus, p_minus=p_minus, previous_solutions_to_reuse=previous_solutions_to_reuse)
             # print('number of vertices p_plus', len(p_plus.V))
             # print('number of half-planes p_plus', len(p_plus.H[0]))
@@ -130,3 +130,5 @@ def test_minimal_2d(n_iter):
 
         plt.clf()
             
+if __name__ == "__main__":
+    test_minimal_2d(n_iter=50)

@@ -145,6 +145,7 @@ def find_edges(points):
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
     '''Given a new half-plane a_new^T x <= b_new, update the vertices and edges of the polytope defined by (V, E) to reflect the intersection with this new half-plane.'''
+    assert isinstance(E, np.ndarray)
     # check if  a_new is normalized (can remove later)
     a_norm = np.linalg.norm(a_new)
     a_new /= a_norm

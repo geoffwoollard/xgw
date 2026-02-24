@@ -128,8 +128,15 @@ class DoubleDescription():
         unique_indices.sort()
 
         logger.info(f"Original number of vertices: {len(self.V)}")
+
         self.V = [V_array[i] for i in unique_indices]
         logger.info(f"Removed duplicates, new number of vertices: {len(self.V)}")
+
+        if self.implementation == 'h_to_v_edges':
+            # decrement edges for removed vertices
+            index_map = {old_idx: new_idx for new_idx, old_idx in enumerate(unique_indices)}
+            self.E = np.array([(index_map[edge[0]], index_map[edge[1]]) for edge in self.E if edge[0] in index_map and edge[1] in index_map])
+            logger.info(f"Re-indexed edges, new number of edges: {len(self.E)}")
 
     def check_feasibility_V(self, A, b):
         import numpy as np
@@ -284,7 +291,8 @@ class DoubleDescription():
             self.V = V_final.tolist()
             self.E = E_final
             self.H = [A_final, b_final]
-            self.remove_duplicates_V()
+            self.remove_duplicates_V() 
+
         elif self.implementation == 'cdd':
             vector_list = [np.transpose(elem[0]) for elem in constraint_list]
             scalar_list = [np.transpose(elem[1]) for elem in constraint_list]

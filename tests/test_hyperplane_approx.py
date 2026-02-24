@@ -331,6 +331,21 @@ def test_P_monotonicity_FAILING(marginals):
         P_plus_old = deepcopy(P_plus)
         P_minus_old = deepcopy(P_minus)
 
+def test_remove_duplicates_V():
+    V = np.array([[0,0],[1,0],[0,1],[1,1],[0,0],[1,0]])
+    E = np.array([[0,1],[1,2],[2,3],[3,0],[4,5]])
+    A = np.array([[1,0],[-1,0],[0,1],[0,-1]])
+    b = np.array([1,1,1,1])
+    for implementation in ['h_to_v_edges', 'cdd']:
+        logger.info(f'Testing remove_duplicates_V with implementation: {implementation}')
+        p = DoubleDescription(implementation=implementation)
+        p.V = V.tolist()
+        p.E = E
+        p.H = [A,b]
+        p.remove_duplicates_V()
+        assert len(p.V) == 4
+        assert np.array_equal(p.V, np.array([[0,0],[1,0],[0,1],[1,1]]))
+        if implementation == 'h_to_v_edges':
+            assert len(p.E) == 4
+            assert np.array_equal(p.E, np.array([[0,1],[1,2],[2,3],[3,0]]))
 
-if __name__ == "__main__":
-    test_initial_box(marginals())
