@@ -94,7 +94,7 @@ def main():
                     mu_2, space_xs_2 = sparse_mnist(mnist, idx_2)
                     if flip:
                         space_xs_2[:, 0] = -space_xs_2[:, 0]
-                        print(f"Flipped digit {digit_2} (idx {idx_2}) horizontally")
+                        # print(f"Flipped digit {digit_2} (idx {idx_2}) horizontally")
                 
                     dict_ij = {'idx_1': idx_1, 
                                     'idx_2': idx_2, 
