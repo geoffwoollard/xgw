@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from xgw.frank_wolfe import frank_wolfe_gw, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, dgw_2d_polynomial, det_23d, dgw_3d_polynomial, matrix_cofactor_low_dim
+from xgw.frank_wolfe import frank_wolfe_gw, center_marginal, optimize_deg_2_polynomial, optimize_deg_3_polynomial, dgw_2d_polynomial, det_23d, dgw_3d_polynomial, matrix_cofactor_low_dim, classical_gw_frank_wolfe
 from test_hyperplane_approx import marginals,  simple_marginals_2D
 
 
@@ -167,6 +167,30 @@ def test_FW_diff_costs(marginals, marginals_3d, simple_marginals_2D):
     compute_test (marginals_3d, 'CGW', p)
     compute_test (simple_marginals_2D, 'CGW', p)
 
+
+def compute_test_classical_gw(marg, p):
+    # marginals
+    mu, nu, space_x, space_y = marg
+    # Initial coupling
+    pi_n = p*np.outer(mu, mu) + (1-p)*np.diag(mu) 
+    # dimension
+    d = space_x.shape[-1]
+    # Non zero cost for two different marginals
+    c, _, _ = classical_gw_frank_wolfe(mu, space_x, nu, space_y)
+    assert c>1e-3
+    # Zero cost for the same marginals
+    c, _, _ = classical_gw_frank_wolfe(mu, space_x, mu, space_x, pi_n=pi_n)
+    assert c<1e-15
+    # invariance by Lie group action
+    M = random_invariance_matrix('IGW', d)
+    c, _, _ = classical_gw_frank_wolfe(mu, space_x, mu, lie_group_action(space_x, M), pi_n=pi_n)
+    assert c<1e-15
+    
+def test_classical_gw(marginals, marginals_3d, simple_marginals_2D):
+    p = 0.9
+    compute_test_classical_gw (marginals, p)
+    compute_test_classical_gw (marginals_3d, p)
+    compute_test_classical_gw (simple_marginals_2D, p)
 
 def test_optimal_t_cste():
     # we have an upper bound for the highest eigenvalue of the determinant hessian (on the sphere):4. This is probabaly not tight, let's estimate the optimal upper bound
