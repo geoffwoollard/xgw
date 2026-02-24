@@ -63,6 +63,9 @@ def polynomial_cost(sigma, cost, t):
 def const_cost(sigma_x, sigma_y,  cost, t):
     return polynomial_cost(sigma_x, cost, t) + polynomial_cost(sigma_y, cost, t)
 
+def classical_gw_const_cost(sigma_x, sigma_y,  cost, t):
+    return polynomial_cost(sigma_x, cost, t) + polynomial_cost(sigma_y, cost, t)
+
 @njit
 def linearized_cost_matrix(sigma, cost, t):
     if cost == 'IGW':
@@ -301,6 +304,32 @@ def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max 
         pi_n = pi_n_1
     return T, pi_n
     
+    
+def classical_gw_frank_wolfe(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
+    if pi_n is None:
+        pi_n = np.outer(mu, nu)
+    
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+    sigma_x = covariance(space_x, mu)
+    sigma_y = covariance(space_y, nu)
+    initial_cost = classical_gw_const_cost(sigma_x, sigma_y, cost, t)
+    # print(f' \n initial_cost', initial_cost)
+    initial_coupling_cost = polynomial_cost(np.array(cross_covariance(space_x, space_y, pi_n)), cost, t)
+    # print(f' initial coupling_cost', initial_cost-2*initial_coupling_cost)
+    for it in range(iter_max):
+        sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
+        M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
+        lin_cost = linearized_cost_function(space_x, space_y, M_pi_n)
+        pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
+        sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
+        T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
+        # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
+        if tau == 0:
+            break
+        pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
+        pi_n = pi_n_1
+    return initial_cost-2*T, pi_n, initial_cost-2*initial_coupling_cost
+
 
 
    

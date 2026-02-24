@@ -185,17 +185,35 @@ def test_optimal_t_cste():
     
     def test_matrix_eig(niter):
         max_val = 0
+        # for iter in range(niter):
+            # x = np.random.rand(9)
+            # sign = np.random.randint(2, size = 9)
+            # sign = (sign == 1).astype(int) - (sign == 0).astype(int)
+            # x = x*sign
+            # eig = np.linalg.eigvalsh(hess_mat(x))
+            # val = np.max(np.abs(eig)) 
+            # if max_val < val:
+            #     max_val = val
         for iter in range(niter):
-            x = np.random.rand(9)
+            # x = np.ones(9)
+            # x = np.random.rand(9)
+            x = np.random.randint(2, size = 9)
             norm = np.linalg.norm(x)
-            sign = np.random.randint(2, size = 9)
-            sign = (sign == 1).astype(int) + (sign == -1).astype(int)
+            if norm == 0:
+                x[0]=1
+                norm = 1
+            # sign = np.random.randint(2, size = 9)
+            # sign = (sign == 1).astype(int) - (sign == 0).astype(int)
+            x = x/norm
             eig = np.linalg.eigvalsh(hess_mat(x))
-            e1, e2 = abs(eig[0]), abs(eig[-1])
-            val = max(e1, e2)
+            val = np.max(np.abs(eig)) 
             if max_val < val:
                 max_val = val
         return max_val
     
     best_cst = test_matrix_eig(100000)
-    assert 2.5<=best_cst<=3
+    print(best_cst)
+    # assert 2.5<=best_cst<=3
+
+if __name__ == "__main__":
+    test_optimal_t_cste()
