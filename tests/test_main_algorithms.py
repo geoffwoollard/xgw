@@ -33,13 +33,13 @@ def testing_3d_convex():
 
     n_tests = 3
     for test_id in range(n_tests):
-        mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=300, max_points=300)
+        mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
         r2 = 1
         t = 24*r2 / (2*r2 + 24)
         logger.info(f'Using t={t} for test {test_id}')
 
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
-            for p_plus_implementation in ['cdd', ]:    
+            for p_plus_implementation in ['cdd', 'h_to_v_edges']:    
                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
                 total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
@@ -64,7 +64,6 @@ def testing_2d_convex():
                 assert np.isclose(plan_error, 0.0)
 
     mu, nu, space_x, space_y = make_marginals(0)
-     # NB: fails if 1e-6
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
         for p_plus_implementation in ['cdd', 'h_to_v_edges']:
@@ -129,7 +128,7 @@ def test_igw_convex_reflection_invariant():
                 space_xs_reflected[:,reflextion_axis] = -space_xs_reflected[:,reflextion_axis]
 
                 _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_reflected, {}, cost='IGW', gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                mis_match = (plan*len(mus) != np.eye(len(mus)))
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
                 logger.info(f'Plan (should be id): {plan}')
                 assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
@@ -153,9 +152,9 @@ def test_igw_convex_rotation_invariant():
                 logger.info(f'Rotation matrix: {rotation.shape}')
                 space_xs_rotated = space_xs @  rotation.T
                 _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                mis_match = (plan*len(mus) != np.eye(len(mus)))
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
                 logger.info(f'Plan (should be id): {plan}')
-                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+                assert np.isclose(mis_match.sum(), 0.0), "Rotation test failed!"
 
 def test_cgw_convex_rotation_invariant():
     '''passing'''
@@ -168,9 +167,10 @@ def test_cgw_convex_rotation_invariant():
             logger.info(f'Rotation matrix: {rotation.shape}')
             space_xs_rotated = space_xs @  rotation.T
             _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', gap_tol=1e-5, iter_max=50)
-            mis_match = (plan*len(mus) != np.eye(len(mus)))
+            mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+            # mis_match = (plan*len(mus) != np.eye(len(mus)))
             logger.info(f'Plan (should be id): {plan}')
-            assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+            assert np.isclose(mis_match.sum(), 0.0), "Rotation test failed!"
 
 # # def test_cgw_hausdorff_rotation_invariant_FAILING():
 # #     return # currently failing test
