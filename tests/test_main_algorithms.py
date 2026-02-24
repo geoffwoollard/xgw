@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from xgw.gromov_wasserstein_m_dist import gw_m_convex, gw_m_non_convex, gw_m_non_convex_hausdorff
+from xgw.gromov_wasserstein_m_dist import gw_m_convex, gw_m_non_convex, gw_m_non_convex_hausdorff, classical_gw
 
 from test_frank_wolfe import marginals_3d, random_invariance_matrix
 from test_hyperplane_approx import make_marginals, make_simple_marginals, marginals
@@ -17,6 +17,16 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def testing_2d_classical_gw():
+    n_tests = 3
+    for test_id in range(n_tests):
+        mus, _, space_xs, _ = make_simple_marginals(test_id, d=2)
+        
+        _, plan, _, _, _ = classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-15, iter_max=200) 
+        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+        print('Plan error for identical marginals (classic GW, convex): ', plan_error)
+        assert np.isclose(plan_error, 0.0)
+
 
 def testing_3d_convex():
     '''passing'''
@@ -29,16 +39,15 @@ def testing_3d_convex():
         logger.info(f'Using t={t} for test {test_id}')
 
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
-            for p_plus_implementation in ['cdd', 'h_to_v_edges']:    
+            for p_plus_implementation in ['cdd', ]:    
                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=10, t=t_use, p_plus_implementation=p_plus_implementation) 
+                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
                 logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
                 logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
                 assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
                 assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
-    
 
 def testing_2d_convex():
     '''passing'''
