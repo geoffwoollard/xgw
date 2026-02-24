@@ -63,6 +63,20 @@ def polynomial_cost(sigma, cost, t):
 def const_cost(sigma_x, sigma_y,  cost, t):
     return polynomial_cost(sigma_x, cost, t) + polynomial_cost(sigma_y, cost, t)
 
+def classical_gw_const_cost(mu, space_x, nu, space_y):
+    diffs_mu = space_x[:, np.newaxis, :] - space_x[np.newaxis, :, :]
+    distance_matrix_mu = np.linalg.norm(diffs_mu, axis=-1)**4
+    
+    diffs_nu = space_y[:, np.newaxis, :] - space_y[np.newaxis, :, :]
+    distance_matrix_nu = np.linalg.norm(diffs_nu, axis=-1)**4
+    
+    cost = np.inner(mu, distance_matrix_mu@mu) + np.inner(nu, distance_matrix_nu@nu) -4*np.inner(mu,np.linalg.norm(space_x, axis=-1)**2)*np.inner(nu,np.linalg.norm(space_y, axis=-1)**2)
+    
+    return np.outer(np.linalg.norm(space_x, axis=-1)**2, np.linalg.norm(space_y, axis=-1)**2), cost
+
+def classical_gw_cost( space_x, space_y, pi_n, g):
+    return 2*np.linalg.norm(cross_covariance(space_x, space_y, pi_n))**2 + np.einsum('ij,ij', g, pi_n)
+    
 @njit
 def linearized_cost_matrix(sigma, cost, t):
     if cost == 'IGW':
@@ -253,7 +267,7 @@ def _frank_wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost='IGW', iter_
         M_pi_val = -log['cost']
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
-        print(f"FW it {it}: tau={tau}, {cost}^2 T cost={T}", end=' ')
+        # print(f"FW it {it}: tau={tau}, {cost}^2 T cost={T}", end=' ')
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
@@ -279,7 +293,7 @@ def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
-        print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
+        # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
         if tau == 0:
             break
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
@@ -301,6 +315,30 @@ def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max 
         pi_n = pi_n_1
     return T, pi_n
     
+    
+def classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n=None, iter_max = 50, emd_kwargs = {}):
+    if pi_n is None:
+        pi_n = np.outer(mu, nu)
+    
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+    g_func, initial_cost = classical_gw_const_cost(mu, space_x, nu, space_y)
+    
+    T, pi_n, initial_coupling_cost = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func)
+    
+    return initial_cost-4*T, pi_n, initial_cost-4*initial_coupling_cost
 
+def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, iter_max = 50, emd_kwargs = {}):
+    initial_coupling_cost = classical_gw_cost(space_x, space_y, pi_n, g_func)
+    T = initial_coupling_cost
+    for it in range(iter_max):
+        M_pi_n = cross_covariance(space_x, space_y, pi_n)
+        lin_cost = 2*linearized_cost_function(space_x, space_y, M_pi_n) + g_func
+        pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
+        new_cost = classical_gw_cost(space_x, space_y, pi_n_1_hat, g_func)
+        if new_cost <= T:
+            break
+        T =  new_cost
+        pi_n = pi_n_1_hat
+    return T, pi_n, initial_coupling_cost
 
    

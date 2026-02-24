@@ -1,12 +1,12 @@
 import numpy as np
 from numba import njit
 
-from xgw.hyperplane_approx import DoubleDescription
 
-
-def segment_plane_intersection(v0, v1, a, b, tol=1e-12):
+def segment_plane_intersection(v0, v1, a, b, tol=1e-16):
     """
     Intersection between segment [v0, v1] and hyperplane a^T x = b.
+
+    Note: have run into numerical issues with in_plane return when tol=1e-12, so reduced to 1e-16. May need to adjust if numerical issues arise.
     
     Returns:
         - intersection point (np.ndarray) if it exists within the segment
@@ -118,6 +118,7 @@ def find_edges(points):
     if dim==1:
         E_new = np.array([0, 1])
     else:
+        from xgw.hyperplane_approx import DoubleDescription
         dd_sub = DoubleDescription()
         dd_sub.add_V(points)
         A_sub, b_sub = dd_sub.H
@@ -136,7 +137,7 @@ def find_edges(points):
         try:
             assert (vertex_test.sum(0) >= dim).all()
         except AssertionError:
-            print("Warning: some vertices do not satisfy enough constraints. Numerical issues may be present.")
+            # print("Warning: some vertices do not satisfy enough constraints. Numerical issues may be present.")
             pass
         # two vertices on a same edge solve the same dim-1 constraints 
         final_mat = compute_constraints_matching(vertex_test, dim)
@@ -145,12 +146,14 @@ def find_edges(points):
 
 
 def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
+    '''Given a new half-plane a_new^T x <= b_new, update the vertices and edges of the polytope defined by (V, E) to reflect the intersection with this new half-plane.'''
+    assert isinstance(E, np.ndarray)
     # check if  a_new is normalized (can remove later)
     a_norm = np.linalg.norm(a_new)
     a_new /= a_norm
     b_new /= a_norm
     # find excluded vertices
-    v_excluded_bool = a_new.dot(V.T) < b_new
+    v_excluded_bool = a_new.dot(V.T) > b_new
     v_excluded_idx = np.arange(V.shape[0])[v_excluded_bool]
     # print("excluded vertices:", v_excluded_idx)
 
@@ -170,6 +173,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
             if (idx_of_v_excluded in v_excluded_idx and idx_other in v_excluded_idx):
                 pass
             else:
+                # TODO: handle case where in plane
                 v_new = segment_plane_intersection(V[idx_of_v_excluded], V[idx_other], a_new, b_new)
                 # check v inside all old halfplanes
                 tol = 1e-12
@@ -197,7 +201,7 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         # print(p, "→", coords)
 
     # find edges between the new points
-    E_new = find_edges(new_points)
+    E_new = find_edges(new_points) # TODO: optimize
     # re-index V and E accordingly
     delta_v_idx = len(V) - len(v_excluded_idx)
     E_new = E_new + delta_v_idx
