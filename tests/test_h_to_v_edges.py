@@ -91,9 +91,9 @@ def cube_2d():
 def test_cube_3d_keep_one_corner(cube_3d):
     '''Test plane close to origin cutting off all except one.'''
     V, E, A, b = cube_3d
-    a_new = np.array([-1.0, -1.0, -1.0])
+    a_new = np.array([1.0, 1.0, 1.0])
     delta = 0.1
-    b_new = np.array(-delta)
+    b_new = np.array(delta)
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
 
@@ -117,14 +117,12 @@ def test_cube_3d_drop_one_corner(cube_3d):
     '''Test plane close to corner, cutting off one corner.'''
     V, E, A, b = cube_3d
 
-    a_new = np.array([-1.0, -1.0, -1.0])
+    a_new = np.array([1.0, 1.0, 1.0])
     max_L1_distance_to_diag_corner = 3
     delta = 0.1
-    b_new = np.array(-max_L1_distance_to_diag_corner + delta)
+    b_new = np.array(max_L1_distance_to_diag_corner - delta)
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
-    # print("V_final:", V_final)
-    # print("E_final:", E_final)
 
     V_final, E_final = canonicalize(V_final, E_final)
     V_true = np.array([
@@ -135,9 +133,9 @@ def test_cube_3d_drop_one_corner(cube_3d):
         [0. , 0. , 1. ],
         [1. , 0. , 1. ],
         [0. , 1. , 1. ],
-        [1. , 1. , 0.9],
-        [1. , 0.9, 1. ],
-        [0.9, 1. , 1. ]
+        [1. , 1. , 1-delta],
+        [1. , 1-delta, 1. ],
+        [1-delta, 1. , 1. ]
     ])
 
     E_true = np.array([
@@ -172,10 +170,10 @@ def test_cube_3d_horizontal_cut(cube_3d):
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
     V_true = np.array([
-        [0. , 0. , 1. ],
-        [1. , 0. , 1. ],
-        [0. , 1. , 1. ],
-        [1. , 1. , 1. ],
+        [0. , 0. , 0. ],
+        [1. , 0. , 0. ],
+        [0. , 1. , 0. ],
+        [1. , 1. , 0. ],
         [0. , 0. , 0.5],
         [1. , 0. , 0.5],
         [0. , 1. , 0.5],
@@ -205,10 +203,10 @@ def test_cube_4d_drop_one_corner(cube_4d):
     '''Test plane close to corner, cutting off one corner.'''
     V, E, A, b = cube_4d
 
-    a_new = np.array([-1.0, -1.0, -1.0, -1.0])
+    a_new = np.array([1.0, 1.0, 1.0, 1.0])
     max_L1_distance_to_diag_corner = 4
     delta = 0.1
-    b_new = np.array(-max_L1_distance_to_diag_corner + delta)
+    b_new = np.array(max_L1_distance_to_diag_corner - delta)
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
     # print("V_final:", V_final)
@@ -232,10 +230,10 @@ def test_cube_4d_drop_one_corner(cube_4d):
         [0.0, 0.0, 1.0, 1.0],
         [1.0, 0.0, 1.0, 1.0],
         [0.0, 1.0, 1.0, 1.0],
-        [0.9, 1.0, 1.0, 1.0],
-        [1.0, 0.9, 1.0, 1.0],
-        [1.0, 1.0, 0.9, 1.0],
-        [1.0, 1.0, 1.0, 0.9],
+        [1-delta, 1.0, 1.0, 1.0],
+        [1.0, 1-delta, 1.0, 1.0],
+        [1.0, 1.0, 1-delta, 1.0],
+        [1.0, 1.0, 1.0, 1-delta],
     ])
     
     E_true = np.array([
@@ -289,8 +287,8 @@ def test_cube_4d_horizontal_cut(cube_4d):
     '''Test plane close to corner, cutting off one corner.'''
     V, E, A, b = cube_4d
 
-    a_new = np.array([-1.0, 0, 0, 0])
-    b_new = np.array(-0.5)
+    a_new = np.array([1.0, 0, 0, 0])
+    b_new = np.array(0.5)
 
     V_final, E_final, A_final, b_final = update_edges_with_new_halfplane(V, E, A, b, a_new, b_new)
     # print("V_final:", V_final)
@@ -372,7 +370,7 @@ def half_cube_rescale(V, E, axis, cut_val):
     E = np.array(E)
     
     # Mask for bottom vs top half
-    mask_bottom = V[:, axis] >= cut_val
+    mask_bottom = V[:, axis] <= cut_val
     logger.info(f"mask_bottom: {mask_bottom}")
     mask_top = ~mask_bottom
     logger.info(f"mask_top: {mask_top}")
