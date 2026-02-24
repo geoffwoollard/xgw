@@ -170,7 +170,6 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     
     
     for iter in range(iter_max):
-        
         # choose direction
         logger.info('Chosing best direction')
         g = new_direction_convex_slow(P_minus, x_plus)

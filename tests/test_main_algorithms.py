@@ -39,7 +39,7 @@ def testing_3d_convex():
         logger.info(f'Using t={t} for test {test_id}')
 
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
-            for p_plus_implementation in ['cdd', 'h_to_v_edges']:    
+            for p_plus_implementation in ['h_to_v_edges','cdd', ]:    
                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
                 total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))

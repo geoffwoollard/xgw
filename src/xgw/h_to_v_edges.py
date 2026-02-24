@@ -1,5 +1,9 @@
 import numpy as np
 from numba import njit
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def segment_plane_intersection(v0, v1, a, b, tol=1e-16):
@@ -201,7 +205,9 @@ def update_edges_with_new_halfplane(V, E, A, b, a_new, b_new):
         # print(p, "→", coords)
 
     # find edges between the new points
+    logger.info("Finding edges between new vertices...")
     E_new = find_edges(new_points) # TODO: optimize
+    logger.info(f"Found {len(E_new)} edges between new vertices: len(V_new)={len(V_new)}, len(new_points)={len(new_points)}, len(E_new)={len(E_new)}")
     # re-index V and E accordingly
     delta_v_idx = len(V) - len(v_excluded_idx)
     E_new = E_new + delta_v_idx
