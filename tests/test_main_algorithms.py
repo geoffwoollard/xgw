@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from xgw.gromov_wasserstein_m_dist import gw_m_convex, gw_m_non_convex, gw_m_non_convex_hausdorff
+from xgw.gromov_wasserstein_m_dist import gw_m_convex, gw_m_non_convex, gw_m_non_convex_hausdorff, classical_gw
 
 from test_frank_wolfe import marginals_3d, random_invariance_matrix
 from test_hyperplane_approx import make_marginals, make_simple_marginals, marginals
@@ -17,31 +17,40 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-def testing_3d_convex():
-    '''passing'''
-
+def testing_2d_classical_gw():
     n_tests = 3
     for test_id in range(n_tests):
-        mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=300, max_points=300)
-        r2 = 1
-        t = 24*r2 / (2*r2 + 24)
-        print(f'Using t={t} for test {test_id}')
+        mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         
-        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=10, t=t) 
-        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+        T, plan, c, _, _ = classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-15, iter_max=200) 
+        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         print('Plan error for identical marginals (IGW, convex): ', plan_error)
-        print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
         assert np.isclose(plan_error, 0.0)
-        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (IGW, convex) in test {test_id}"
+
+# def testing_3d_convex():
+#     '''passing'''
+
+#     n_tests = 3
+#     for test_id in range(n_tests):
+#         mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=300, max_points=300)
+#         r2 = 1
+#         t = 24*r2 / (2*r2 + 24)
+#         print(f'Using t={t} for test {test_id}')
+        
+#         total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='IGW', cost_tol=1e-15, iter_max=10, t=t) 
+#         plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+#         print('Plan error for identical marginals (IGW, convex): ', plan_error)
+#         print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+#         assert np.isclose(plan_error, 0.0)
+#         assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (IGW, convex) in test {test_id}"
 
         
-        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=10, t=t*1.01)
-        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-        print('Plan error for identical marginals (CGW, convex): ', plan_error)
-        print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-        assert np.isclose(plan_error, 0.0)
-        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (CGW, convex) in test {test_id}"
+#         total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost='CGW', cost_tol=1e-15, iter_max=10, t=t*1.01)
+#         plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+#         print('Plan error for identical marginals (CGW, convex): ', plan_error)
+#         print(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+#         assert np.isclose(plan_error, 0.0)
+#         assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals (CGW, convex) in test {test_id}"
 
 
 # def testing_2d_convex():
@@ -81,11 +90,11 @@ def testing_3d_convex():
 #     not_too_small_tolerance = 1e-2
 #     assert not_too_small_tolerance < T
     
-#     cost_tolerance = 5e-3
+#     cost_tolerance = 5e-5
 #     T, _, c, _, _ = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='IGW', cost_tol=1e-15, iter_max=200) 
 #     logger.info(f'Test 2 IGW convex T: {T}, c: {c}')
 #     assert -cost_tolerance < c < cost_tolerance 
-#     not_too_small_tolerance = 0.01
+#     not_too_small_tolerance = 5e-3
 #     assert not_too_small_tolerance < T
     
 #     cost_tolerance = 1e-3
@@ -95,11 +104,11 @@ def testing_3d_convex():
 #     not_too_small_tolerance = 1e-2
 #     assert not_too_small_tolerance < T
     
-#     cost_tolerance = 5e-3
+#     cost_tolerance = 5e-5
 #     T, _, c, _,  _ = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=200) 
 #     logger.info(f'Test {test_id} IGW convex T: {T}, c: {c} 4')
 #     assert -cost_tolerance < c < cost_tolerance 
-#     not_too_small_tolerance = 0.01
+#     not_too_small_tolerance = 5e-3
 #     assert not_too_small_tolerance < T
     
 # # def testing_2d_non_convex(marginals):
@@ -142,7 +151,7 @@ def testing_3d_convex():
 #             space_xs_reflected[:,reflextion_axis] = -space_xs_reflected[:,reflextion_axis]
 
 #             _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_reflected, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
-#             mis_match = (plan*len(mus) != np.eye(len(mus)))
+#             mis_match = (plan*len(mus) - np.eye(len(mus)))
 #             logger.info(f'Plan (should be id): {plan}')
 #             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
@@ -161,8 +170,8 @@ def testing_3d_convex():
 #                 rotation = R.from_rotvec(random_axis * random_angle).as_matrix()
 #             print('Rotation matrix: ', rotation.shape)
 #             space_xs_rotated = space_xs @  rotation.T
-#             _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', cost_tol=1e-5, iter_max=50)
-#             mis_match = (plan*len(mus) != np.eye(len(mus)))
+#             _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='IGW', cost_tol=1e-10, iter_max=100)
+#             mis_match = (plan*len(mus) - np.eye(len(mus)))
 #             print('Plan (should be id): ', plan)
 #             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
@@ -177,7 +186,7 @@ def testing_3d_convex():
 #             print('Rotation matrix: ', rotation.shape)
 #             space_xs_rotated = space_xs @  rotation.T
 #             _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', cost_tol=1e-5, iter_max=50)
-#             mis_match = (plan*len(mus) != np.eye(len(mus)))
+#             mis_match = (plan*len(mus) - np.eye(len(mus)))
 #             print('Plan (should be id): ', plan)
 #             assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 

@@ -78,6 +78,19 @@ def construct_basis_eij(space_x, space_y):
     e_base = np.reshape(Q,(N, M, dx*dy)) # reshape to  physical dimensions, now we have a N by M by dx*dy tensor
     return e_base, R
 
+def classical_gw_construct_basis_eij(space_x, space_y, g_func):
+    # finding orthonormal basis : Q = [e_1,...,e_dx*dy] orthonormal base (ei flatten), f_base = [f1,...,f_dx*dy] = e_base@R, R triangular superior matrix of size dx*dy^2, e_base (N, M) by dx*dy tensor, f_base (N, M) by dx*dy tensor
+    N, dx = space_x.shape
+    M, dy = space_y.shape
+    stacked_base = np.zeros((N*M, dx*dy+1))
+    for i in range(dx):
+        for j in range(dy):
+            stacked_base[:, i+j*dx] = np.ravel(np.outer(space_x[:,i], space_y[:,j])) # flattening vectors to use QR decomposition
+    stacked_base[:, -1] = np.ravel(g_func)
+    Q, R = qr(stacked_base, mode='reduced') 
+    assert np.all(np.diag(R)!=0), f"at least one marginal is supported on a d-1 vector space" 
+    e_base = np.reshape(Q,(N, M, dx*dy+1)) # reshape to  physical dimensions, now we have a N by M by dx*dy+1 tensor
+    return e_base, R
 
 @njit
 def e_to_f(vect, R, d):
@@ -282,6 +295,31 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs):
     creates an initial rectangle bounding 
     '''
     e_base, R = construct_basis_eij(space_x, space_y)
+    p_plus, p_minus = DoubleDescription(), DoubleDescription()
+    vertex_list = []
+    half_plans_list = []
+    a,b,c = e_base.shape
+    for i in range(c):
+        for sigma in [-1,1]:
+            e_i = np.zeros(c)
+            e_i[i] = 1
+            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
+            vertex_list.append(g_star)
+            half_plans_list.append([sigma*e_i, g_hat])
+    update_box(p_plus, p_minus, half_plans_list, vertex_list)
+            
+    return e_base, R, p_plus, p_minus
+
+def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs):
+    '''
+    Docstring for initial_box
+    
+    :param e: orthonormal basis for V
+    :param mu: marginal 1
+    :param nu: marginal 2
+    creates an initial rectangle bounding 
+    '''
+    e_base, R = classical_gw_construct_basis_eij(space_x, space_y, g_func)
     p_plus, p_minus = DoubleDescription(), DoubleDescription()
     vertex_list = []
     half_plans_list = []
