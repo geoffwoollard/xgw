@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
     
 def optimal_cost_cvx(P, cost, R, d, t):
     # optimize a convex polynomial cost over a polytope
@@ -25,11 +25,12 @@ def optimal_cost_cvx(P, cost, R, d, t):
 @njit
 def classical_gw_optimal_cost(vect_list, R):
     x_op = vect_list[0]
-    vect = x_op@R
-    c_op = 2*np.linalg.norm(vect[:-1])*2+vect[-1]
-    for vect in vect_list[1:]:
-        vect = vect@R
-        c = 2*np.linalg.norm(vect[:-1])*2+vect[-1]
+    vect_r = x_op@R
+    c_op = 2*np.sum(vect_r[:-1]**2)+vect_r[-1]
+    for i in range(len(vect_list)):
+        vect = vect_list[i]
+        vect_r = vect@R
+        c = 2*np.sum(vect_r[:-1]**2)+vect_r[-1]
         if c > c_op:
             c_op = c
             x_op = vect
@@ -84,7 +85,8 @@ def non_convex_polynomial_cost(cost, x, R, t):
 def _optimal_cost_cvx(vect_list, cost, R, d, t):
     x_op = vect_list[0]
     c_op = vector_cost(x_op, cost, R, d, t)
-    for vect in vect_list[1:]:
+    for i in range(len(vect_list)):
+        vect = vect_list[i]
         c = vector_cost(vect, cost, R, d, t)
         if c > c_op:
             c_op = c
@@ -196,7 +198,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
 
 
-def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100,  convex_tol = 1e-3):
+def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -224,8 +226,8 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
         logger.info(f'Updated box with , P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
         logger.info('Updating c_minus (candidate optimal value)')
-        vect = g_star@R
-        Tcost = 2*np.linalg.norm(vect[:-1])*2+vect[-1]
+        vect_r = g_star@R
+        Tcost = 2*np.sum(vect_r[:-1]**2)+vect_r[-1]
 
         # The optimal values after each iteration is updated
         logger.info('Updating c_plus and c_minus')
