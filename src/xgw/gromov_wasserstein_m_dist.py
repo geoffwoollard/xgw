@@ -3,7 +3,7 @@ from numba import njit
 import ot
 from ncpol2sdpa import generate_variables, SdpRelaxation
 from .frank_wolfe import _frank_wolfe_iter, covariance, const_cost, polynomial_cost, frank_wolfe_polynomial, center_marginal, _classical_gw_frank_wolfe, classical_gw_const_cost
-from .hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, function_to_cost, classical_gw_initial_box
+from .hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, classical_gw_initial_box
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
 
@@ -198,7 +198,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
 
 
-def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100):
+def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd'):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -206,7 +206,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     # Computing constant cost
     g_func, cst_cost = classical_gw_const_cost(mu, space_x, nu, space_y)
     # Bounding box initialization
-    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs)
+    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
 
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
@@ -242,8 +242,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
 
     # Computing the optimal coupling:
     pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) 
-    
-    # Local optimization to finish the optimization  (may not be needed)
+    # Local optimization to finish the optimization 
     c_op, pi_opt, _ = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_opt, g_func, iter_max=FW_iter)
 
     total_loss = cst_cost-4*c_op
@@ -255,53 +254,53 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
 
         
-def gw_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
-    space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
-    # Computing constant cost
-    sigma_x = covariance(space_x, mu)
-    sigma_y = covariance(space_y, nu)
-    cst_cost = const_cost(sigma_x, sigma_y, cost, t)
+# def gw_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
+#     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
+#     # Computing constant cost
+#     sigma_x = covariance(space_x, mu)
+#     sigma_y = covariance(space_y, nu)
+#     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     
-    # Bounding box initialization
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
-    R_inv = np.linalg.inv(R)
-    # Initialization of the cost bounds by optimizing non convex function over bounding boxes
-    c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t) #need implementation
-    c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
-    centro = P_minus.get_centroid()
-    init_direc = x_plus - centro
-    init_direc/= np.linalg.norm(init_direc)
-    for iter in range(iter_max):
-        # constraints that will be added to the bounding bow
-        vertex_list = []
-        half_plans_list = []
-        for coup_star, g, g_hat in _frank_wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost=cost, t=t):
-            # during the iteration, the OT problem (10) is solved with direction g and cost g_hat
-            g_star = projection(coup_star, e_base)
-            # g is in the f basis not in the e basis, and with a wrong format
-            g = f_to_e(g, R_inv)
-            vertex_list.append(g_star)
-            half_plans_list.append([g, g_hat])
-        # The bounding boxes are updated 
-        P_plus, P_minus = update_box(P_plus, P_minus, half_plans_list, vertex_list)
-        # The optimal values after each FW loops are updated
-        c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t) 
-        c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t)
-        if c_plus - c_minus < cost_tol:
-            break
-        # Choosing next direction 
-        centro = P_minus.get_centroid()
-        init_direc = x_plus - centro
-        init_direc /= np.linalg.norm(init_direc)
-    # Once the algorithm converges, the optimal point is x_minus, we find the appropriate transport plan
-    pi = vect_to_coupling(x_minus, mu, nu, e_base) 
-    # Local optimization 
-    c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
+#     # Bounding box initialization
+#     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+#     R_inv = np.linalg.inv(R)
+#     # Initialization of the cost bounds by optimizing non convex function over bounding boxes
+#     c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t) #need implementation
+#     c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t)
+#     centro = P_minus.get_centroid()
+#     init_direc = x_plus - centro
+#     init_direc/= np.linalg.norm(init_direc)
+#     for iter in range(iter_max):
+#         # constraints that will be added to the bounding bow
+#         vertex_list = []
+#         half_plans_list = []
+#         for coup_star, g, g_hat in _frank_wolfe_iter(mu, space_x, nu, space_y, init_direc, R, cost=cost, t=t):
+#             # during the iteration, the OT problem (10) is solved with direction g and cost g_hat
+#             g_star = projection(coup_star, e_base)
+#             # g is in the f basis not in the e basis, and with a wrong format
+#             g = f_to_e(g, R_inv)
+#             vertex_list.append(g_star)
+#             half_plans_list.append([g, g_hat])
+#         # The bounding boxes are updated 
+#         P_plus, P_minus = update_box(P_plus, P_minus, half_plans_list, vertex_list)
+#         # The optimal values after each FW loops are updated
+#         c_minus, x_minus = optimal_polynomial_cost(P_minus, cost, relax_level, R, t) 
+#         c_plus, x_plus = optimal_polynomial_cost(P_plus, cost, relax_level, R, t)
+#         if c_plus - c_minus < cost_tol:
+#             break
+#         # Choosing next direction 
+#         centro = P_minus.get_centroid()
+#         init_direc = x_plus - centro
+#         init_direc /= np.linalg.norm(init_direc)
+#     # Once the algorithm converges, the optimal point is x_minus, we find the appropriate transport plan
+#     pi = vect_to_coupling(x_minus, mu, nu, e_base) 
+#     # Local optimization 
+#     c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi, cost=cost, iter_max = FW_iter, t=t)
     
-    return cst_cost-2*c_op, pi_opt, c_plus - c_minus
+#     return cst_cost-2*c_op, pi_opt, c_plus - c_minus
 
 
-def gw_m_non_convex_hausdorff(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
+def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', Hausdorff_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)

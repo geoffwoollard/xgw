@@ -5,7 +5,7 @@ import pytest
 import logging
 from scipy.spatial import ConvexHull
 
-from xgw.hyperplane_approx import DoubleDescription, hausdorff, new_direction, update_box, p_plus_outside_p_minus
+from xgw.hyperplane_approx import DoubleDescription, new_direction, update_box, p_plus_outside_p_minus
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -16,33 +16,33 @@ def n_iter():
     return 50
 
 
-def test_hausdorff():
-    inner_square_vertices = [np.array(v) for v in [
-        (0,1), (0,-1), (1,0), (-1,0)
-    ]]
+# def test_hausdorff():
+#     inner_square_vertices = [np.array(v) for v in [
+#         (0,1), (0,-1), (1,0), (-1,0)
+#     ]]
 
-    outer_square_vertices = [np.array(v) for v in [
-        (1,1), (1,-1), (-1,1), (-1,-1)
-    ]]
+#     outer_square_vertices = [np.array(v) for v in [
+#         (1,1), (1,-1), (-1,1), (-1,-1)
+#     ]]
 
-    for implementation in ['cdd', 'h_to_v_edges']:
-        previous_solutions_to_reuse = {}
-        if implementation == 'cdd':
-            p_plus = DoubleDescription(implementation=implementation)
-            p_plus.add_V(outer_square_vertices)  
-        elif implementation == 'h_to_v_edges':
-            p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]))
-            p_plus.V = outer_square_vertices
-            A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
-            b = np.array([1,1,1,1])
-            p_plus.H = [A, b]
-        p_minus = DoubleDescription()
-        p_minus.add_V(inner_square_vertices)
+#     for implementation in ['cdd', 'h_to_v_edges']:
+#         previous_solutions_to_reuse = {}
+#         if implementation == 'cdd':
+#             p_plus = DoubleDescription(implementation=implementation)
+#             p_plus.add_V(outer_square_vertices)  
+#         elif implementation == 'h_to_v_edges':
+#             p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]))
+#             p_plus.V = outer_square_vertices
+#             A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
+#             b = np.array([1,1,1,1])
+#             p_plus.H = [A, b]
+#         p_minus = DoubleDescription()
+#         p_minus.add_V(inner_square_vertices)
 
-        x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
+#         x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
         
-        assert np.allclose(objective, np.linalg.norm(x_0 - v_0)**2), f'fail for implementation {implementation}'
-        assert np.allclose(2*x_0, v_0), f'fail for implementation {implementation}' # since the closest point in the inner square to a vertex of the outer square is at half the distance
+#         assert np.allclose(objective, np.linalg.norm(x_0 - v_0)**2), f'fail for implementation {implementation}'
+#         assert np.allclose(2*x_0, v_0), f'fail for implementation {implementation}' # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
 
 def test_minimal_2d(n_iter):
@@ -79,20 +79,17 @@ def test_minimal_2d(n_iter):
             b = np.dot(A, point_on_circle)
             return b, A
 
-        def iteration_loop_circle(p_plus, p_minus, previous_solutions_to_reuse):
-            x_0, _, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse={})
-            g = np.random.randn(2)
-            g = g / np.linalg.norm(g)
+        def iteration_loop_circle(p_plus, p_minus):
+            g, _ = new_direction(p_plus, p_minus, tol=1e-10)
             g_hat, g_star = compute_hyperplane_on_circle_from_direction(g)
-            print('g', g)
             p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
-            return p_plus, p_minus, objective, previous_solutions_to_reuse
+            return p_plus, p_minus
         
 
         np.random.seed(42)
         for iter in range(n_iter):
             print('iteration', iter)
-            p_plus, p_minus, _, previous_solutions_to_reuse = iteration_loop_circle(p_plus=p_plus, p_minus=p_minus, previous_solutions_to_reuse=previous_solutions_to_reuse)
+            p_plus, p_minus = iteration_loop_circle(p_plus, p_minus)
             # print('number of vertices p_plus', len(p_plus.V))
             # print('number of half-planes p_plus', len(p_plus.H[0]))
             # print('vertices:', p_plus.V)
