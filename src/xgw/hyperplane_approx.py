@@ -108,24 +108,6 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
     return A, b
 
 
-# def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-#     e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
-#     logger.info('box initialized')
-    
-#     objective_list = []
-#     x_0_list, v_0_list = [], []
-#     for iter in range(niter):
-#         previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
-#         logger.info(f'Iteration {iter}')
-#         p_plus, p_minus, objective, x_0= _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
-#         objective_list.append(objective)
-#         x_0_list.append(x_0)
-#         v_0_list.append(v_0)
-#         logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
-#         if objective < epsilon:
-#             break
-#     return p_plus, p_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
-
 
 def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
@@ -175,7 +157,7 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
         logger.info(f'Iteration {iter}, hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return p_minus, objective, R, e_base
+    return p_minus, p_plus, objective, R, e_base
 
 
 def construct_basis_eij(space_x, space_y):
@@ -476,7 +458,7 @@ def new_direction(P_plus, P_minus, tol=1e-10, ret_arg=False):
         return g / np.linalg.norm(g), val, x_plus
     return g / np.linalg.norm(g), val
 
-# #we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
+
 # def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
 #     #deprecated
 #     cost = -np.inf
@@ -498,32 +480,32 @@ def p_plus_outside_p_minus(p_plus, p_minus):
     return residuals        
         
         
-def build_new_constraint(A_all, b_all, A_old, b_old):
-    # Stack A and b together for comparison
-    all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
-    old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
+# def build_new_constraint(A_all, b_all, A_old, b_old):
+#     # Stack A and b together for comparison
+#     all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
+#     old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
 
-    # Find index where row is in all_rows but not in old_rows
-    for i, row in enumerate(all_rows):
-        if not any(np.all(row == r) for r in old_rows):
-            new_index = i
-            break
-    a_new = A_all[new_index]
-    b_new = b_all[new_index]
-    return a_new, b_new
+#     # Find index where row is in all_rows but not in old_rows
+#     for i, row in enumerate(all_rows):
+#         if not any(np.all(row == r) for r in old_rows):
+#             new_index = i
+#             break
+#     a_new = A_all[new_index]
+#     b_new = b_all[new_index]
+#     return a_new, b_new
 
-def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
-    from .qp_incremental_projector import IncrementalQPProjector
-    if vertex.tobytes() not in previous_solutions_to_reuse:
-        A_all, b_all = p_minus.H
-        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
-        x, objective = qp_solver.solve(vertex)
-    else:
-        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
-        A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
-        A_all, b_all = p_minus.H
-        a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
-        x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
-    previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
-    return x, objective, previous_solutions_to_reuse
+# def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
+#     from .qp_incremental_projector import IncrementalQPProjector
+#     if vertex.tobytes() not in previous_solutions_to_reuse:
+#         A_all, b_all = p_minus.H
+#         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
+#         x, objective = qp_solver.solve(vertex)
+#     else:
+#         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
+#         A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
+#         A_all, b_all = p_minus.H
+#         a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
+#         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
+#     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
+#     return x, objective, previous_solutions_to_reuse
 
