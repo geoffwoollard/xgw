@@ -110,13 +110,16 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     return pi_opt
     
     
-def optimal_t(max_diam, d, cost, t, convex_tol):
+def optimal_t(max_diam, d, cost, t, convex_tol, exp_upper_bound=True):
     if cost == 'CGW' and t is None:
         if d <= 2 :
             t =  1/2 + convex_tol
         elif d == 3:
             assert max_diam is not None, f'Need to define a max_diameter or a t in 3D to check CGW convexity'
-            val = (24*max_diam**2)/(2+24*max_diam**2)
+            if exp_upper_bound:
+                val = (8*max_diam**2)/(2+8*max_diam**2)
+            else:
+                val = (24*max_diam**2)/(2+24*max_diam**2)
             if 1-val> 2*convex_tol:
                 t = val + convex_tol
             else:
