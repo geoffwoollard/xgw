@@ -127,6 +127,16 @@ def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
             break
     return p_plus, p_minus, objective, objective_list, x_0_list, v_0_list
 
+def _run_approx_yield(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    logger.info('box initialized')
+    
+    for iter in range(niter):
+        p_plus, p_minus, objective, _, _ = iteration_loop_geometric(mu, nu, p_plus, p_minus, e_base, emd_kwargs, ret_arg=True)
+        yield(p_plus, p_minus, objective)
+        if objective < epsilon:
+            break
+
 # def iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
 #     #deprecated
 #     x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
@@ -341,13 +351,18 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
     vertex_list = []
     half_plans_list = []
     c = e_base.shape[2]
+    direction_list = []
     for i in range(c):
-        for sigma in [-1,1]:
-            e_i = np.zeros(c)
-            e_i[i] = 1
-            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
-            vertex_list.append(g_star)
-            half_plans_list.append([sigma*e_i, g_hat])
+        dir = np.zeros(c)
+        dir[i] = 1
+        direction_list.append(dir)
+    direction_list.append(-np.ones(c))
+    for dir in direction_list:
+        g_hat, g_star = compute_hyperplane(mu, nu, dir, e_base, emd_kwargs)
+        vertex_list.append(g_star)
+        half_plans_list.append([dir, g_hat])
+            
+            
     update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
@@ -508,4 +523,5 @@ def p_plus_outside_p_minus(p_plus, p_minus):
 #         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
 #     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
 #     return x, objective, previous_solutions_to_reuse
+
 

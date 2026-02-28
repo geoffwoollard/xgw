@@ -6,3 +6,4 @@ __pycache__
 img
 tests/results
 !/**/.gitkeep
+experiments/figures

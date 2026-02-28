@@ -323,3 +323,47 @@ def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, relax
     
     return cst_cost-2*c_op, pi_opt, objective
     
+    
+
+
+def _run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = 100, cost='IGW', gap_tol=1e-15, t=None, max_diam=None, convex_tol = 1e-3, p_plus_implementation='cdd'):
+
+    # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
+    d = space_x.shape[-1]
+    # selecting the optimale t in the CGW case, if not pre-selected
+    t = optimal_t(max_diam, d, cost, t, convex_tol)
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+    # Computing constant cost
+    sigma_x = covariance(space_x, mu)
+    sigma_y = covariance(space_y, nu)
+    cst_cost = const_cost(sigma_x, sigma_y, cost, t)
+    
+    # Bounding box initialization
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    # print('Initial box with ', len(P_minus.V), ' vertices and ', P_minus.H[0].shape[0], ' half-planes.')
+    # print('Vertices: ', P_minus.V)
+    
+    # Selection of the best direction (lagest score in the bounding box)
+    c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
+    
+    
+    for iter in range(niter):
+        
+        if c_plus - c_minus < gap_tol:
+            break
+        # choose direction
+        g = new_direction_convex_slow(P_minus, x_plus)
+        g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+        P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+        Tcost = vector_cost(g_star, cost, R, d, t)
+
+        # The optimal values after each iteration is updated
+        c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+        logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, verices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}')
+        
+        if Tcost > c_minus:
+            c_minus = Tcost
+            x_minus = g_star
+         
+        yield P_plus, P_minus, c_plus - c_minus

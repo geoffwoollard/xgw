@@ -38,7 +38,7 @@ def testing_2d_classical_gw():
 
 
 def testing_3d_convex():
-    '''passing'''
+    '''passing but slow as f*'''
 
     n_tests = 3
     for test_id in range(n_tests):
@@ -50,7 +50,7 @@ def testing_3d_convex():
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
             for p_plus_implementation in ['h_to_v_edges','cdd', ]:    
                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=7, t=t_use, p_plus_implementation=p_plus_implementation) 
+                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=10, t=t_use, p_plus_implementation=p_plus_implementation) 
                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
                 logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
                 logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
@@ -190,3 +190,4 @@ def test_cgw_convex_rotation_invariant():
 
 if __name__ == "__main__":
     testing_3d_convex()
+    # test_igw_convex_rotation_invariant()
