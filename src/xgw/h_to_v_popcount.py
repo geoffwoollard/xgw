@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ExtremePointPolytope3D:
+class ExtremePointPolytope:
     """
     Minimal faithful implementation of Section A.3
     """

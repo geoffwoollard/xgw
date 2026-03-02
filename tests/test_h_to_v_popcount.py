@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from xgw.h_to_v_popcount import ExtremePointPolytope3D
+from xgw.h_to_v_popcount import ExtremePointPolytope
 
 
 def d_cube_polytope(dim):
@@ -29,7 +29,7 @@ def d_cube_polytope(dim):
     for i in range(dim):
         B[dim + i] = (E[:, i] == 1)
 
-    return ExtremePointPolytope3D(E, B, dim=dim)
+    return ExtremePointPolytope(E, B, dim=dim)
 
 def cube_polytope(dim):
     """
@@ -59,7 +59,7 @@ def cube_polytope(dim):
             [0,0,0,1,0,1,1,1],
         ], dtype=np.uint8)
 
-        return ExtremePointPolytope3D(E, B, dim=dim)
+        return ExtremePointPolytope(E, B, dim=dim)
     elif dim == 2:
         E = np.array([
             [0,0],
@@ -77,7 +77,7 @@ def cube_polytope(dim):
             [0,1,0,1],
         ], dtype=np.uint8)
 
-        return ExtremePointPolytope3D(E, B, dim=dim)
+        return ExtremePointPolytope(E, B, dim=dim)
     
     elif dim >= 4 and isinstance(dim, int):
         return d_cube_polytope(dim)

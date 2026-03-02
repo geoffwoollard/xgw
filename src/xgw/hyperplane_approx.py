@@ -13,6 +13,7 @@ except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
 from .h_to_v_edges import update_edges_with_new_halfplane
+from .h_to_v_popcount import ExtremePointPolytope
 
 
 def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
@@ -198,7 +199,7 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
@@ -207,6 +208,8 @@ class DoubleDescription():
             pass
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly = ExtremePointPolytope(V_initialization, B_initialization, [], [])
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -243,6 +246,13 @@ class DoubleDescription():
             self.E = np.array([(index_map[edge[0]], index_map[edge[1]]) for edge in self.E if edge[0] in index_map and edge[1] in index_map])
             logger.info(f"Re-indexed edges, new number of edges: {len(self.E)}")
 
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.B = self.poly.B[:, unique_indices]
+            self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
+
     def check_feasibility_V(self, A, b):
         import numpy as np
         from scipy.optimize import linprog
@@ -257,6 +267,8 @@ class DoubleDescription():
         
         if self.implementation == 'h_to_v_edges':
             raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError('h_to_v_popcount implementation is not implemented yet')
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
@@ -287,6 +299,8 @@ class DoubleDescription():
     def add_V(self, vertex_list):
         if self.implementation == 'h_to_v_edges':
             raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError('h_to_v_popcount implementation is not implemented yet')
         elif self.implementation == 'cdd':
             # vertex is a d^2 by 1 vector
             self.V.extend(vertex_list)
@@ -295,8 +309,13 @@ class DoubleDescription():
     
     # could be optimized for a family of vectors and scalars
     def add_H(self, constraint_list):
-        if self.implementation == 'h_to_v_edges':
-            assert len(constraint_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
+        if self.implementation == 'h_to_v_popcount':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_halfplane(a_new, b_new)
+            self.V = self.poly.E.tolist()
+        elif self.implementation == 'h_to_v_edges':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
             V = np.array(self.V)
