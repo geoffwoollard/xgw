@@ -3,10 +3,6 @@ import pytest
 from xgw.h_to_v_popcount import ExtremePointPolytope3D
 
 
-# ------------------------------------------------------------
-# helpers
-# ------------------------------------------------------------
-
 def d_cube_polytope(dim):
     """
     Construct the unit hypercube [0,1]^dim
@@ -109,21 +105,14 @@ def one_cut_corner_polys(dimensions):
 def cube_polys(dimensions):
     return [cube_polytope(dim=dimension) for dimension in dimensions]
 
-# ------------------------------------------------------------
-# TEST 1 — cube invariants
-# ------------------------------------------------------------
 def test_cube_vertex_rank(cube_polys):
+    '''Every vertex of the cube must lie on exactly r facets.'''
     for poly in cube_polys:
         counts = np.sum(poly.B, axis=0)
         assert np.all(counts == poly.r)
-    # every vertex must lie on exactly r=3 facets
 
-
-
-# ------------------------------------------------------------
-# TEST 2 — adjacency rule (B^T B)
-# ------------------------------------------------------------
 def test_adjacency_rule(one_cut_corner_polys, cube_polys):
+    '''Adjacency rule: two vertices are adjacent iff they share exactly r-1 active constraints.'''
     for poly in one_cut_corner_polys + cube_polys:
 
         BTB = poly.B.T @ poly.B
@@ -136,11 +125,10 @@ def test_adjacency_rule(one_cut_corner_polys, cube_polys):
                 expected = (BTB[i, j] == poly.r - 1)
                 assert poly.D[i, j] == expected
 
-
-# ------------------------------------------------------------
-# TEST 3 — cutting removes (1,1,1)
-# ------------------------------------------------------------
 def test_cut_removes_corner(cube_polys):
+    '''Cutting the cube with should remove the corner vertex.
+    e.g. in dim=3, cutting with x+y+z <= 2.9 should remove the (1,1,1) vertex.
+    '''
     for poly in cube_polys:
         delta = 0.1
         d = poly.r
@@ -148,11 +136,8 @@ def test_cut_removes_corner(cube_polys):
 
         assert not np.any(np.all(np.isclose(poly.E, np.ones(d).tolist()), axis=1))
 
-
-# ------------------------------------------------------------
-# TEST 4 — new vertices created correctly
-# ------------------------------------------------------------
 def test_new_vertices_exist():
+    '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).'''
     poly = d_cube_polytope(dim=3)
     delta = 0.1
     d = poly.r
@@ -167,20 +152,14 @@ def test_new_vertices_exist():
     for v in expected:
         assert np.any(np.all(np.isclose(poly.E, v, atol=1e-8), axis=1))
 
-
-# ------------------------------------------------------------
-# TEST 5 — rank invariant AFTER CUT
-# ------------------------------------------------------------
 def test_rank_invariant_after_cut(one_cut_corner_polys):
+    '''After cutting in one corner every vertex of the resulting polytope should still lie on exactly r facets.'''
     for poly in one_cut_corner_polys:
         counts = np.sum(poly.B, axis=0)
         assert np.all(counts == poly.r)
 
-
-# ------------------------------------------------------------
-# TEST 6 — adjacency still consistent
-# ------------------------------------------------------------
 def test_adjacency_after_cut(one_cut_corner_polys):
+    '''After cutting in one corner, the adjacency rule should still hold: two vertices are adjacent iff they share exactly r-1 active constraints.'''
     for poly in one_cut_corner_polys:
 
         BTB = poly.B.T @ poly.B
@@ -191,11 +170,8 @@ def test_adjacency_after_cut(one_cut_corner_polys):
                 expected = (BTB[i,j] == poly.r - 1)
                 assert poly.D[i,j] == expected
 
-
-# ------------------------------------------------------------
-# TEST 7 — new constraint active on new vertices
-# ------------------------------------------------------------
 def test_new_constraint_active(one_cut_corner_polys):
+    '''After cutting in one corner, the new constraint should be active on all new vertices.'''
 
     for poly_one_cut_corner in one_cut_corner_polys:
 
