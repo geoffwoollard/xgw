@@ -6,12 +6,12 @@ class ExtremePointPolytope3D:
     Minimal faithful implementation of Section A.3
     """
 
-    def __init__(self, E, B):
+    def __init__(self, E, B, dim=3):
         """
         E : (n,3) vertices
         B : (m,n) binary active-constraint matrix
         """
-        self.r = 3
+        self.r = dim
         self.E = np.asarray(E, float)
         self.B = np.asarray(B, np.uint8)
 
