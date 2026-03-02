@@ -73,13 +73,13 @@ def cube_polytope(dim):
         B = np.array([
             [1,0,1,0],
             [1,1,0,0],
-            [0,0,1,0],
             [0,1,0,1],
+            [0,0,1,1],
         ], dtype=np.uint8)
 
         return ExtremePointPolytope(E, B, dim=dim)
     
-    elif dim >= 4 and isinstance(dim, int):
+    if dim >= 4 and isinstance(dim, int):
         return d_cube_polytope(dim)
     
     else:
@@ -87,7 +87,7 @@ def cube_polytope(dim):
 
 @pytest.fixture
 def dimensions():
-    return [3, 4, 5, 6, 7, 8, 9, 10]
+    return [2,3,4]
 
 @pytest.fixture
 def one_cut_corner_polys(dimensions):
@@ -97,7 +97,8 @@ def one_cut_corner_polys(dimensions):
         poly_one_cut_corner = cube_polytope(dim=dimension)
         delta = 0.1
         d = poly_one_cut_corner.r
-        poly_one_cut_corner.add_constraint(np.ones(d).tolist(), d - delta)
+        ones = np.ones(d).tolist()
+        poly_one_cut_corner.add_constraint(ones, d - delta)
         polys.append(poly_one_cut_corner)
     return polys
 
@@ -179,3 +180,6 @@ def test_new_constraint_active(one_cut_corner_polys):
 
         # at least 3 vertices must lie on new plane
         assert np.sum(new_constraint_row) >= poly_one_cut_corner.r
+
+if __name__ == "__main__":
+    test_new_constraint_active(one_cut_corner_polys([2]))

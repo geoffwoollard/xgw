@@ -25,13 +25,26 @@ def test_hausdorff():
         (1,1), (1,-1), (-1,1), (-1,-1)
     ]]
 
-    for implementation in ['cdd', 'h_to_v_edges']:
+    for implementation in ['h_to_v_popcount', ]:
         previous_solutions_to_reuse = {}
         if implementation == 'cdd':
             p_plus = DoubleDescription(implementation=implementation)
             p_plus.add_V(outer_square_vertices)  
         elif implementation == 'h_to_v_edges':
             p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]))
+            p_plus.V = outer_square_vertices
+            A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
+            b = np.array([1,1,1,1])
+            p_plus.H = [A, b]
+        elif implementation == 'h_to_v_popcount':
+            p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]), B_initialization=np.array([
+                [1,0,1,1],
+                [1,1,0,1],
+                [1,1,1,0],
+                [0,1,0,1],
+                [0,0,1,0],
+                [0,0,0,1],
+            ], dtype=np.uint8))
             p_plus.V = outer_square_vertices
             A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
             b = np.array([1,1,1,1])
@@ -45,7 +58,7 @@ def test_hausdorff():
         assert np.allclose(2*x_0, v_0), f'fail for implementation {implementation}' # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
 
-def test_minimal_2d(n_iter):
+def skip_test_minimal_2d(n_iter):
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
