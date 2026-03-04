@@ -89,7 +89,7 @@ def cube_polytope(dim):
 def dimensions():
     return [2,3,4]
 
-@pytest.fixture
+# @pytest.fixture
 def one_cut_corner_polys(dimensions):
 
     polys = []

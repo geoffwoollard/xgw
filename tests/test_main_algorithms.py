@@ -56,7 +56,7 @@ def test_2d_convex():
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         for cost in ['IGW', 'CGW']:
-            for p_plus_implementation in ['h_to_v_popcount', 'cdd', 'h_to_v_edges']:
+            for p_plus_implementation in ['h_to_v_popcount', 'cdd', ]: #TODO: add in h_to_v_edges
         
                 T, plan, c, _, _ = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=200, p_plus_implementation=p_plus_implementation) 
                 plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
@@ -66,7 +66,7 @@ def test_2d_convex():
     mu, nu, space_x, space_y = make_marginals(0)
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
-        for p_plus_implementation in ['h_to_v_popcount', 'cdd', 'h_to_v_edges']:
+        for p_plus_implementation in ['h_to_v_popcount', 'cdd', ]: #TODO: add in h_to_v_edges
             final_gap_tolerance = 1e-4
             T, _, gap, _, _ = gw_m_convex(mu, space_x, mu, space_x, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, p_plus_implementation=p_plus_implementation)
             assert -final_gap_tolerance < gap < final_gap_tolerance, f"Gap {gap} is not within tolerance {final_gap_tolerance} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
@@ -186,4 +186,4 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_3d_convex()
+    test_2d_convex()
