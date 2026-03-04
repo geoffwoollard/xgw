@@ -16,7 +16,7 @@ def n_iter():
     return 50
 
 
-def skip_test_hausdorff():
+def test_hausdorff():
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
@@ -25,7 +25,7 @@ def skip_test_hausdorff():
         (1,1), (1,-1), (-1,1), (-1,-1)
     ]]
 
-    for implementation in ['h_to_v_popcount']:
+    for implementation in ['cdd', 'h_to_v_edges', 'h_to_v_popcount']:
         previous_solutions_to_reuse = {}
         if implementation == 'cdd':
             p_plus = DoubleDescription(implementation=implementation)
@@ -67,7 +67,7 @@ def test_minimal_2d(n_iter):
         (1,1), (1,-1), (-1,1), (-1,-1) # 01, 02, 13, 23
     ]]
 
-    for implementation in ['h_to_v_popcount']:
+    for implementation in ['cdd', 'h_to_v_edges', 'h_to_v_popcount']:
         previous_solutions_to_reuse = {}
         if implementation == 'cdd':
             p_plus = DoubleDescription(implementation=implementation)
