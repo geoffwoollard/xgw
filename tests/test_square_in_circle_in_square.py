@@ -25,7 +25,7 @@ def test_hausdorff():
         (1,1), (1,-1), (-1,1), (-1,-1)
     ]]
 
-    for implementation in ['h_to_v_popcount', ]:
+    for implementation in ['cdd', 'h_to_v_edges', 'h_to_v_popcount']:
         previous_solutions_to_reuse = {}
         if implementation == 'cdd':
             p_plus = DoubleDescription(implementation=implementation)
@@ -37,14 +37,14 @@ def test_hausdorff():
             b = np.array([1,1,1,1])
             p_plus.H = [A, b]
         elif implementation == 'h_to_v_popcount':
-            p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[1,2],[2,3],[3,0]]), B_initialization=np.array([
+            B_initialization = np.array([
+                [1,1,0,0],
                 [1,0,1,1],
-                [1,1,0,1],
-                [1,1,1,0],
-                [0,1,0,1],
-                [0,0,1,0],
+                [0,0,1,1],
                 [0,0,0,1],
-            ], dtype=np.uint8))
+            ], dtype=np.uint8)
+
+            p_plus = DoubleDescription(implementation=implementation, V_initialization=np.array(outer_square_vertices), B_initialization=B_initialization)
             p_plus.V = outer_square_vertices
             A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
             b = np.array([1,1,1,1])
@@ -58,7 +58,7 @@ def test_hausdorff():
         assert np.allclose(2*x_0, v_0), f'fail for implementation {implementation}' # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
 
-def skip_test_minimal_2d(n_iter):
+def test_minimal_2d(n_iter):
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
@@ -69,12 +69,22 @@ def skip_test_minimal_2d(n_iter):
 
     previous_solutions_to_reuse = {}
 
-    for implementation in ['cdd', 'h_to_v_edges']:
+    for implementation in ['cdd', 'h_to_v_edges', 'h_to_v_popcount']:
         if implementation == 'cdd':
             p_plus = DoubleDescription(implementation=implementation)
             p_plus.add_V(outer_square_vertices)  
         elif implementation == 'h_to_v_edges':
             p_plus = DoubleDescription(implementation=implementation, E_initialization=np.array([[0,1],[0,2],[1,3],[2,3]]))
+            p_plus.V = outer_square_vertices
+        elif implementation == 'h_to_v_popcount':
+            B_initialization = np.array([
+                [1,1,0,0],
+                [1,0,1,1],
+                [0,0,1,1],
+                [0,0,0,1],
+            ], dtype=np.uint8)
+
+            p_plus = DoubleDescription(implementation=implementation, V_initialization=np.array(outer_square_vertices), B_initialization=B_initialization)
             p_plus.V = outer_square_vertices
         A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
         b = np.array([1,1,1,1])
@@ -143,5 +153,3 @@ def skip_test_minimal_2d(n_iter):
 
         plt.clf()
             
-if __name__ == "__main__":
-    test_minimal_2d(n_iter=50)

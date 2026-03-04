@@ -209,7 +209,7 @@ class DoubleDescription():
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
         elif self.implementation == 'h_to_v_popcount':
-            self.poly = ExtremePointPolytope(V_initialization, B_initialization, [], [])
+            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -312,8 +312,8 @@ class DoubleDescription():
         if self.implementation == 'h_to_v_popcount':
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
-            self.poly.add_halfplane(a_new, b_new)
-            self.V = self.poly.E.tolist()
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
         elif self.implementation == 'h_to_v_edges':
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
@@ -429,6 +429,10 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         assert len(half_planes_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount':
+        assert len(half_planes_list) == 1, 'h_to_v_popcount implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
         
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
@@ -436,7 +440,9 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         p_minus.V_to_H()
         logger.info('Updated half-planes of p_minus from vertices')
     elif p_minus.implementation == 'h_to_v_edges':
-        raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
 
     return p_plus, p_minus
 
