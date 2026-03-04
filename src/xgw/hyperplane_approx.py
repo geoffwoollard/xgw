@@ -493,7 +493,10 @@ def build_new_constraint(A_all, b_all, A_old, b_old):
     return a_new, b_new
 
 def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
+    '''Solve the optimization problem of finding the point in p_minus that is farthest from vertex.'''
     from .qp_incremental_projector import IncrementalQPProjector
+    # print(f'solve_dist for vertex {vertex}')
+    # print(f'len p_minus half-planes: {len(p_minus.H[0])}')
     if vertex.tobytes() not in previous_solutions_to_reuse:
         A_all, b_all = p_minus.H
         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
@@ -502,8 +505,15 @@ def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
         A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
         A_all, b_all = p_minus.H
-        a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
-        x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
+        if len(A_all) > len(A_old):
+            a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old) 
+            # print('reusing: len A_old', len(A_old), 'len A_all', len(A_all))
+            x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new) 
+        else:
+            raise ValueError('No new constraints to add, but previous solution exists. This should not happen, check the logic of when to reuse previous solutions.')
+            # A_all, b_all = p_minus.H
+            # qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
+            # x, objective = qp_solver.solve(vertex)
     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
 
