@@ -314,6 +314,10 @@ class DoubleDescription():
             a_new, b_new = constraint_list[0]
             self.poly.add_constraint(a_new, b_new)
             self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
         elif self.implementation == 'h_to_v_edges':
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
