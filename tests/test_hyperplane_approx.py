@@ -54,7 +54,7 @@ def marginals():
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    for p_plus_implementation in ['cdd', 'h_to_v_edges']:
+    for p_plus_implementation in ['cdd', 'h_to_v_edges', 'h_to_v_popcount']:
         logger.info(f'Testing initial box with p_plus implementation: {p_plus_implementation}')
         e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={}, p_plus_implementation=p_plus_implementation)
         assert len(P_minus.V) == 8

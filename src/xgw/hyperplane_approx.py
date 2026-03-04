@@ -374,6 +374,20 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
+    elif p_plus_implementation == 'h_to_v_popcount':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+        B_initialization = B_bool.astype(int)
+        p_plus = DoubleDescription(implementation=p_plus_implementation, 
+                                   V_initialization=V_initialization, 
+                                   B_initialization=B_initialization
+                                   )
+        
+        # raise NotImplementedError(f'{p_plus_implementation} implementation is not implemented yet')
+        p_plus.V = [np.array(v) for v in p_plus.poly.E]
+        p_plus.H = [A, b]
             
     return e_base, R, p_plus, p_minus
 
