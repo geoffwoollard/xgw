@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from itertools import product
+
 from xgw.h_to_v_popcount import ExtremePointPolytopeSparse
 
 
@@ -8,34 +10,72 @@ def cube_polytope(dim):
     Create unit cube with correct B matrix.
     """
 
+    # def cube_mask(v, dim):
+    #     m = 0
+    #     if dim == 3:
+    #         if v[0]==1: m|=1<<0
+    #         if v[1]==1: m|=1<<1
+    #         if v[2]==1: m|=1<<2
+    #         if v[0]==0: m|=1<<3
+    #         if v[1]==0: m|=1<<4
+    #         if v[2]==0: m|=1<<5
+
+    #     elif dim == 2:
+    #         if v[0] == 1: m |= 1 << 0  # bit 0: x == 1
+    #         if v[1] == 1: m |= 1 << 1  # bit 1: y == 1
+    #         if v[0] == 0: m |= 1 << 2  # bit 2: x == 0
+    #         if v[1] == 0: m |= 1 << 3  # bit 3: y == 0
+            
+    #     return m
+
     def cube_mask(v):
+        # bits 0..d-1: coordinate == 1 ; bits d..2d-1: coordinate == 0
+        d = len(v)
         m = 0
-        if v[0]==1: m|=1<<0
-        if v[1]==1: m|=1<<1
-        if v[2]==1: m|=1<<2
-        if v[0]==0: m|=1<<3
-        if v[1]==0: m|=1<<4
-        if v[2]==0: m|=1<<5
+        for i in range(d):
+            if v[i] == 1:
+                m |= 1 << i
+            if v[i] == 0:
+                m |= 1 << (d + i)
         return m
 
+    # if dim == 3:
+    #     E = np.array([
+    #         [0,0,0],[1,0,0],[0,1,0],[0,0,1],
+    #         [1,1,0],[1,0,1],[0,1,1],[1,1,1]
+    #     ], float)
+    #     A = np.array([
+    #         [1,0,0],[0,1,0],[0,0,1],
+    #         [-1,0,0],[0,-1,0],[0,0,-1]
+    #     ], float)
+    #     b = np.array([1,1,1,0,0,0], float)
+    # elif dim == 2:
+    #     E = np.array([[0,0],[1,0],[0,1],[1,1]], float)
+    #     A = np.array([[1,0],[0,1],[-1,0],[0,-1]], float)
+    #     b = np.array([1,1,0,0], float)
+    # else:
+    #     raise ValueError(f"Unsupported dimension {dim}")
 
-    E = np.array([
-        [0,0,0],[1,0,0],[0,1,0],[0,0,1],
-        [1,1,0],[1,0,1],[0,1,1],[1,1,1]
-    ], float)
+
+    def unit_cube(dim):
+        # Vertices
+        E = np.array(list(product([0,1], repeat=dim)), dtype=float)
+
+        # Halfspace form
+        A = np.vstack([np.eye(dim), -np.eye(dim)])
+        b = np.concatenate([np.ones(dim), np.zeros(dim)])
+
+        return E, A, b
+
+    E, A, b = unit_cube(dim)
+
     masks = [cube_mask(v) for v in E]
-    A = np.array([
-        [1,0,0],[0,1,0],[0,0,1],
-        [-1,0,0],[0,-1,0],[0,0,-1]
-    ], float)
-    b = np.array([1,1,1,0,0,0], float)
-
     poly = ExtremePointPolytopeSparse(E, masks, A, b)
     return poly
 
 @pytest.fixture
 def dimensions():
-    return [3]
+    return [2,3,4,5,6,7,8,9,10]
 
 @pytest.fixture
 def one_cut_corner_polys(dimensions):
@@ -69,11 +109,11 @@ def test_assert_symmetric_D(cube_polys):
 
 
 def test_vertex_count(one_cut_corner_polys):
+    delta = 0.1
     for poly in one_cut_corner_polys:
-        if poly.r == 3:
-            poly.add_constraint([1,1,1], 2.9)
-
-            assert len(poly.E) == 10
+        ones = np.ones(poly.r).tolist()
+        poly.add_constraint(ones, poly.r - delta)
+        assert len(poly.E) == 2**poly.r - 1 + poly.r, f"Expected {2**poly.r - 1 + poly.r} vertices after cutting one corner of the cube, but got {len(poly.E)} for E={poly.E}"
 
 # TODO: .B -> .masks
 # def test_adjacency_rule(one_cut_corner_polys, cube_polys):
@@ -91,40 +131,81 @@ def test_vertex_count(one_cut_corner_polys):
 #                 assert poly.D[i, j] == expected
 
 def test_active_constraints(cube_polys):
+    delta = 0.1
     for poly in cube_polys:
-        if poly.r == 3:
-            poly.add_constraint([1,1,1], 2.9)
+        ones = np.ones(poly.r).tolist()
+        poly.add_constraint(ones, poly.r - delta)
 
-            for m in poly.masks:
-                assert m.bit_count() == poly.r, f"Mask {m} does not have exactly r active constraints"
+        for m in poly.masks:
+            assert m.bit_count() == poly.r, f"Mask {m} does not have exactly r active constraints"
 
-# def test_cut_removes_corner(cube_polys):
-#     '''Cutting the cube with should remove the corner vertex.
-#     e.g. in dim=3, cutting with x+y+z <= 2.9 should remove the (1,1,1) vertex.
-#     '''
+def test_cut_removes_corner(cube_polys):
+    '''Cutting the cube with should remove the corner vertex.
+    e.g. in dim=3, cutting with x+y+z <= 2.9 should remove the (1,1,1) vertex.
+    '''
+    for poly in cube_polys:
+        delta = 0.1
+        d = poly.r
+        poly.add_constraint(np.ones(d).tolist(), d - delta)
+        assert not np.any(np.all(np.isclose(poly.E, np.ones(d).tolist()), axis=1))
+
+def test_new_vertices_on_plane(cube_polys):
+    '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).'''
+    for poly in cube_polys:
+        delta = 0.1
+        ones = np.ones(poly.r).tolist()
+        poly.add_constraint(ones, poly.r - delta)
+        vals = poly.E @ np.array(ones)
+        on_plane = np.isclose(vals, poly.r - delta, atol=1e-8)
+        assert np.sum(on_plane) == poly.r, f"Expected {poly.r} new vertices to lie on the new plane, but got {np.sum(on_plane)}"
+
+# def test_new_vertices_exist(cube_polys):
+#     '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).'''
 #     for poly in cube_polys:
+#         if poly.r != 3:
+#             return 
 #         delta = 0.1
 #         d = poly.r
 #         poly.add_constraint(np.ones(d).tolist(), d - delta)
 
-#         assert not np.any(np.all(np.isclose(poly.E, np.ones(d).tolist()), axis=1))
+#         expected = [
+#             [1,1,1-delta],
+#             [1,1-delta,1],
+#             [1-delta,1,1],
+#         ]
 
-# def test_new_vertices_exist():
-#     '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).'''
-#     poly = d_cube_polytope(dim=3)
-#     delta = 0.1
-#     d = poly.r
-#     poly.add_constraint(np.ones(d).tolist(), d - delta)
+#         for v in expected:
+#             assert np.any(np.all(np.isclose(poly.E, v, atol=1e-8), axis=1))
 
-#     expected = [
-#         [1,1,1-delta],
-#         [1,1-delta,1],
-#         [1-delta,1,1],
-#     ]
+def test_new_vertices_exist(cube_polys):
+    """
+    Cutting the d-cube with sum(x_i) <= d - delta
+    should create d new vertices at
 
-#     for v in expected:
-#         assert np.any(np.all(np.isclose(poly.E, v, atol=1e-8), axis=1))
+        1 - delta in exactly one coordinate,
+        1 elsewhere.
+    """
+    for poly in cube_polys:
+        d = poly.r
+        delta = 0.1
 
+        # Add truncating constraint
+        poly.add_constraint(np.ones(d).tolist(), d - delta)
+
+        # Expected new vertices: 1 - delta in one coordinate
+        expected = []
+        for i in range(d):
+            v = np.ones(d)
+            v[i] = 1 - delta
+            expected.append(v)
+
+        # Check each expected vertex exists
+        for v in expected:
+            assert np.any(
+                np.all(np.isclose(poly.E, v, atol=1e-8), axis=1)
+            )
+
+# TODO: don't have access to B
 # def test_rank_invariant_after_cut(one_cut_corner_polys):
 #     '''After cutting in one corner every vertex of the resulting polytope should still lie on exactly r facets.'''
 #     for poly in one_cut_corner_polys:
@@ -153,5 +234,22 @@ def test_active_constraints(cube_polys):
 #         # at least 3 vertices must lie on new plane
 #         assert np.sum(new_constraint_row) >= poly_one_cut_corner.r
 
+def test_new_vertices_triangle(cube_polys):
+    for poly in cube_polys:
+        # if poly.r != 3:
+        #     return 
+        delta = 0.1
+        d = poly.r
+        poly.add_constraint(np.ones(d).tolist(), d - delta)
+
+        vals = poly.E @ np.ones(d)
+        new_idx = np.where(np.isclose(vals, d - delta))[0]
+
+        subgraph = poly.D[np.ix_(new_idx, new_idx)]
+
+        # triangle adjacency
+        expected = np.ones((d,d), dtype=int) - np.eye(d, dtype=int)
+        assert np.all(subgraph == expected)
+
 if __name__ == "__main__":
-    one_cut_corner_polys([3])
+    one_cut_corner_polys([2])

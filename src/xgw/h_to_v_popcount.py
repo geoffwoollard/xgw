@@ -128,7 +128,7 @@ class ExtremePointPolytopeSparse:
         self.A = [] if A is None else list(A)
         self.b = [] if b is None else list(b)
 
-        self.r = 3  # dimension
+        self.r = E.shape[1]
         self.D = self._build_adjacency()
 
     # --------------------------------------------------
