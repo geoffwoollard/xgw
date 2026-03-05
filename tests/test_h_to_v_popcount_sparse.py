@@ -257,7 +257,7 @@ def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys
             d = poly.r
 
             vals = poly.E @ np.ones(d)
-            new_idx = np.where(np.isclose(vals, delta))[0]
+            new_idx = np.where(np.isclose(vals, _delta))[0]
 
             subgraph = poly.D[np.ix_(new_idx, new_idx)]
 
