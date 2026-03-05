@@ -57,6 +57,18 @@ def one_cut_corner_polys(dimensions, delta):
     return polys
 
 @pytest.fixture
+def double_one_cut_corner_polys(dimensions, delta):
+    polys = []
+    for dimension in dimensions:
+        poly_one_cut_corner = cube_polytope(dim=dimension)
+        d = poly_one_cut_corner.r
+        ones = np.ones(d).tolist()
+        poly_one_cut_corner.add_constraint(ones, d - delta)
+        poly_one_cut_corner.add_constraint(ones, d - 2*delta)
+        polys.append(poly_one_cut_corner)
+    return polys
+
+@pytest.fixture
 def all_corners_except_one_polys(dimensions, delta):
     polys = []
     for dimension in dimensions:
@@ -68,14 +80,14 @@ def all_corners_except_one_polys(dimensions, delta):
     return polys
 
 @pytest.fixture
-def double_one_cut_corner_polys(dimensions, delta):
+def double_all_corners_except_one_polys(dimensions, delta):
     polys = []
     for dimension in dimensions:
         poly_one_cut_corner = cube_polytope(dim=dimension)
         d = poly_one_cut_corner.r
         ones = np.ones(d).tolist()
-        poly_one_cut_corner.add_constraint(ones, d - delta)
-        poly_one_cut_corner.add_constraint(ones, d - 2*delta)
+        poly_one_cut_corner.add_constraint(ones, delta)
+        poly_one_cut_corner.add_constraint(ones, delta/2)
         polys.append(poly_one_cut_corner)
     return polys
 
@@ -92,26 +104,26 @@ def test_cube_vertex_rank(cube_polys):
         counts = np.array([m.bit_count() for m in poly.masks], dtype=int)
         assert np.all(counts == poly.r)
 
-def test_assert_symmetric_D(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys):
-    for poly in cube_polys + one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys:
+def test_assert_symmetric_D(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
+    for poly in cube_polys + one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
         M = poly.D
         assert np.all(M == M.T), "Adjacency matrix not symmetric"
 
-def test_vertex_count(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys):
+def test_vertex_count(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     for poly in cube_polys:
         assert len(poly.E) == 2**poly.r, f"Expected {2**poly.r} vertices for the cube, but got {len(poly.E)} for E={poly.E}"
 
     for poly in one_cut_corner_polys + double_one_cut_corner_polys:
         assert len(poly.E) == 2**poly.r - 1 + poly.r, f"Expected {2**poly.r - 1 + poly.r} vertices after cutting one corner of the cube, but got {len(poly.E)} for E={poly.E}"
 
-    for poly in all_corners_except_one_polys:
+    for poly in all_corners_except_one_polys + double_all_corners_except_one_polys:
         assert len(poly.E) == 1 + poly.r, f"Expected {1 + poly.r} vertices after cutting off all but one corner of the cube, but got {len(poly.E)} for E={poly.E}"
 
-def test_adjacency_rule(one_cut_corner_polys, double_one_cut_corner_polys, cube_polys):
+def test_adjacency_rule(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     """Adjacency rule using bitmask representation:
     two vertices are adjacent iff they share exactly r-1 active constraints.
     """
-    for poly in one_cut_corner_polys + double_one_cut_corner_polys + cube_polys:
+    for poly in one_cut_corner_polys + double_one_cut_corner_polys + cube_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
         n = len(poly.masks)
         for i in range(n):
             for j in range(i + 1, n):
@@ -123,23 +135,22 @@ def test_adjacency_rule(one_cut_corner_polys, double_one_cut_corner_polys, cube_
                     f"shared={shared}, expected={expected}"
                 )
 
-def test_active_constraints(cube_polys, delta):
-    for poly in cube_polys:
-        ones = np.ones(poly.r).tolist()
-        poly.add_constraint(ones, poly.r - delta)
-
+def test_active_constraints(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
+    for poly in one_cut_corner_polys + double_one_cut_corner_polys + cube_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
         for m in poly.masks:
             assert m.bit_count() == poly.r, f"Mask {m} does not have exactly r active constraints"
 
-def test_cut_removes_corner(one_cut_corner_polys, double_one_cut_corner_polys):
+def test_cut_removes_corner(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     '''Cutting the cube with should remove the corner vertex.
-    e.g. in dim=3, cutting with x+y+z <= 2.9 should remove the (1,1,1) vertex.
+    e.g. in dim=3, cutting with x+y+z <= 2.9 should remove the all ones vertex: (1, 1, ..., 1).
     '''
-    for poly in one_cut_corner_polys + double_one_cut_corner_polys:
+    for poly in one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
         assert not np.any(np.all(np.isclose(poly.E, np.ones(poly.r).tolist()), axis=1))
 
-def test_new_vertices_on_plane(one_cut_corner_polys, double_one_cut_corner_polys, delta):
-    '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).'''
+def test_new_vertices_on_plane(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys, delta):
+    '''Cutting the cube with x+y+z <= 3-delta should create new vertices at (1,1,1-delta), (1,1-delta,1), and (1-delta,1,1).
+    Cutting the cube with x+y+z <= delta should create new vertices at (delta,0,0), (0,delta,0), and (0,0,delta).
+    '''
     
     for poly_list, _delta in zip([one_cut_corner_polys, double_one_cut_corner_polys], [delta, 2*delta]):
         for poly in poly_list:
@@ -147,7 +158,13 @@ def test_new_vertices_on_plane(one_cut_corner_polys, double_one_cut_corner_polys
             on_plane = np.isclose(vals, poly.r - _delta, atol=1e-8)
             assert np.sum(on_plane) == poly.r, f"Expected {poly.r} new vertices to lie on the new plane, but got {np.sum(on_plane)}"
 
-def test_new_vertices_exist(one_cut_corner_polys, double_one_cut_corner_polys, delta):
+    for poly_list, _delta in zip([all_corners_except_one_polys, double_all_corners_except_one_polys], [delta, delta/2]):
+        for poly in poly_list:
+            vals = poly.E @ np.ones(poly.r)
+            on_plane = np.isclose(vals, _delta, atol=1e-8)
+            assert np.sum(on_plane) == poly.r, f"Expected {poly.r} new vertices to lie on the new plane, but got {np.sum(on_plane)}"
+
+def test_new_vertices_exist(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys, delta):
     """
     Cutting the d-cube with sum(x_i) <= d - delta
     should create d new vertices at
@@ -172,17 +189,34 @@ def test_new_vertices_exist(one_cut_corner_polys, double_one_cut_corner_polys, d
                     np.all(np.isclose(poly.E, v, atol=1e-8), axis=1)
                 ), f"Expected new vertex {v} not found in E:\n{poly.E}"
 
-def test_rank_invariant_after_cut(one_cut_corner_polys, double_one_cut_corner_polys):
+    for poly_list, _delta in zip([all_corners_except_one_polys, double_all_corners_except_one_polys], [delta, delta/2]):
+        for poly in poly_list:
+            d = poly.r
+
+            # Expected new vertices: 1 - delta in one coordinate
+            expected = []
+            for i in range(d):
+                v = np.zeros(d)
+                v[i] = _delta
+                expected.append(v)
+
+            # Check each expected vertex exists
+            for v in expected:
+                assert np.any(
+                    np.all(np.isclose(poly.E, v, atol=1e-8), axis=1)
+                ), f"Expected new vertex {v} not found in E:\n{poly.E}"
+
+def test_rank_invariant_after_cut(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     """After cutting in one corner every vertex of the resulting polytope
     should still lie on exactly r facets (check via popcount of masks)."""
-    for poly in one_cut_corner_polys + double_one_cut_corner_polys:
+    for poly in one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys:
         counts = np.array([m.bit_count() for m in poly.masks], dtype=int)
         assert np.all(counts == poly.r), f"Some vertices do not lie on {poly.r} facets"
 
-def test_adjacency_after_cut(one_cut_corner_polys, double_one_cut_corner_polys):
+def test_adjacency_after_cut(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     """After cutting in one corner, adjacency rule should still hold:
     two vertices are adjacent iff they share exactly r-1 active constraints."""
-    for poly in one_cut_corner_polys + double_one_cut_corner_polys:
+    for poly in one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys:
         n = len(poly.masks)
         for i in range(n):
             for j in range(i + 1, n):
@@ -193,24 +227,37 @@ def test_adjacency_after_cut(one_cut_corner_polys, double_one_cut_corner_polys):
                     f"shared={shared}, expected={expected}"
                 )
 
-def test_new_constraint_active(one_cut_corner_polys, double_one_cut_corner_polys):
+def test_new_constraint_active(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys, delta):
     '''After cutting in one corner, the new constraint should be active on all new vertices.'''
 
-    for poly_one_cut_corner in one_cut_corner_polys + double_one_cut_corner_polys:
+    for poly_one_cut_corner in one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
 
         sum_new_constraint_row = poly_one_cut_corner.masks[-1].bit_count()
 
         # at least r vertices must lie on new plane
         assert sum_new_constraint_row >= poly_one_cut_corner.r
 
-def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys, delta):
-    '''Cutting the cube with x+y+z <= 3-delta should create new vertices that are mutually adjacent (form a triangle in dim=3, tetrahedron in dim=4, etc).'''
+def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys, delta):
+    '''Cutting the cube with x+y+z <= 3-delta or x+y+z <= delta should create new vertices that are mutually adjacent (form a triangle in dim=3, tetrahedron in dim=4, etc).'''
     for poly_list, _delta in zip([one_cut_corner_polys, double_one_cut_corner_polys], [delta, 2*delta]):
         for poly in poly_list:
             d = poly.r
 
             vals = poly.E @ np.ones(d)
             new_idx = np.where(np.isclose(vals, d - _delta))[0]
+
+            subgraph = poly.D[np.ix_(new_idx, new_idx)]
+
+            # triangle adjacency
+            expected = np.ones((d,d), dtype=int) - np.eye(d, dtype=int)
+            assert np.all(subgraph == expected)
+
+    for poly_list, _delta in zip([all_corners_except_one_polys, double_all_corners_except_one_polys], [delta, delta/2]):
+        for poly in poly_list:
+            d = poly.r
+
+            vals = poly.E @ np.ones(d)
+            new_idx = np.where(np.isclose(vals, delta))[0]
 
             subgraph = poly.D[np.ix_(new_idx, new_idx)]
 
