@@ -47,7 +47,6 @@ def delta():
 
 @pytest.fixture
 def one_cut_corner_polys(dimensions, delta):
-
     polys = []
     for dimension in dimensions:
         poly_one_cut_corner = cube_polytope(dim=dimension)
@@ -58,8 +57,18 @@ def one_cut_corner_polys(dimensions, delta):
     return polys
 
 @pytest.fixture
-def double_one_cut_corner_polys(dimensions, delta):
+def all_corners_except_one_polys(dimensions, delta):
+    polys = []
+    for dimension in dimensions:
+        poly_one_cut_corner = cube_polytope(dim=dimension)
+        d = poly_one_cut_corner.r
+        ones = np.ones(d).tolist()
+        poly_one_cut_corner.add_constraint(ones, delta)
+        polys.append(poly_one_cut_corner)
+    return polys
 
+@pytest.fixture
+def double_one_cut_corner_polys(dimensions, delta):
     polys = []
     for dimension in dimensions:
         poly_one_cut_corner = cube_polytope(dim=dimension)
@@ -83,16 +92,20 @@ def test_cube_vertex_rank(cube_polys):
         counts = np.array([m.bit_count() for m in poly.masks], dtype=int)
         assert np.all(counts == poly.r)
 
-def test_assert_symmetric_D(cube_polys):
-    for poly in cube_polys:
+def test_assert_symmetric_D(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys):
+    for poly in cube_polys + one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys:
         M = poly.D
         assert np.all(M == M.T), "Adjacency matrix not symmetric"
 
-def test_vertex_count(one_cut_corner_polys, double_one_cut_corner_polys, delta):
+def test_vertex_count(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys):
+    for poly in cube_polys:
+        assert len(poly.E) == 2**poly.r, f"Expected {2**poly.r} vertices for the cube, but got {len(poly.E)} for E={poly.E}"
+
     for poly in one_cut_corner_polys + double_one_cut_corner_polys:
-        ones = np.ones(poly.r).tolist()
-        poly.add_constraint(ones, poly.r - delta)
         assert len(poly.E) == 2**poly.r - 1 + poly.r, f"Expected {2**poly.r - 1 + poly.r} vertices after cutting one corner of the cube, but got {len(poly.E)} for E={poly.E}"
+
+    for poly in all_corners_except_one_polys:
+        assert len(poly.E) == 1 + poly.r, f"Expected {1 + poly.r} vertices after cutting off all but one corner of the cube, but got {len(poly.E)} for E={poly.E}"
 
 def test_adjacency_rule(one_cut_corner_polys, double_one_cut_corner_polys, cube_polys):
     """Adjacency rule using bitmask representation:
