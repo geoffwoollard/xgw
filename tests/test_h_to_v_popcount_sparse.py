@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from itertools import product
 
-from xgw.h_to_v_popcount import ExtremePointPolytopeSparse
+from xgw.h_to_v_popcount import ExtremePointPolytopeSparse, masks_from_B, masks_from_B_vectorized
 
 
 def cube_mask(v):
@@ -36,6 +36,25 @@ def cube_polytope(dim):
     masks = [cube_mask(v) for v in E]
     poly = ExtremePointPolytopeSparse(E, masks, A, b)
     return poly
+
+def test_masks_from_B(dimensions):
+    '''Test that masks_from_B and masks_from_B_vectorized give the same results, and that they match the expected cube masks for the unit cube.'''
+
+    for dim in dimensions:
+        E, A, b = unit_cube(dim)
+
+        # compute boolean incidence matrix B: shape (m_constraints, n_vertices)
+        # lhs shape (n_vertices, m_constraints) so transpose to (m, n_vertices)
+        lhs = E @ A.T  # (n_vertices, m_constraints)
+        B = np.isclose(lhs, b)  # broadcasting: (n_vertices, m_constraints)
+        B = B.T  # (m_constraints, n_vertices)
+
+        masks = masks_from_B(B)
+        masks_vec = masks_from_B_vectorized(B)
+        assert np.array_equal(masks, masks_vec), f"masks_from_B and masks_from_B_vectorized give different results for dimension {dim}"
+        masks_cube = [cube_mask(v) for v in E]
+        assert np.array_equal(masks, masks_cube), f"Expected masks {masks_cube} but got {masks} for dimension {dim}"
+        assert np.array_equal(masks_vec, masks_cube), f"Expected masks {masks_cube} but got {masks_vec} for dimension {dim}"
 
 @pytest.fixture
 def dimensions():
@@ -266,4 +285,4 @@ def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys
             assert np.all(subgraph == expected)
 
 if __name__ == "__main__":
-    one_cut_corner_polys([2])
+    test_masks_from_B([2, 3, 4, 5,6,7,8,9,10])

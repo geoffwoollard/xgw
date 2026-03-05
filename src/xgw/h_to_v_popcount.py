@@ -116,6 +116,26 @@ class ExtremePointPolytope:
         self.rebuild_adjacency()
 
 
+def masks_from_B(B):
+    """B: (m_constraints, n_vertices) boolean array -> list/array of Python int masks"""
+    m, n = B.shape
+    masks = []
+    for j in range(n):
+        mask = 0
+        col = B[:, j]
+        for i, val in enumerate(col):
+            if val:
+                mask |= (1 << i)
+        masks.append(mask)
+    return np.array(masks, dtype=object)
+
+
+def masks_from_B_vectorized(B):
+    m, n = B.shape
+    bits = np.array([1 << i for i in range(m)], dtype=object)   # Python ints
+    # B.T is (n, m); multiply in object dtype then sum along axis=1
+    return (B.T.astype(object) * bits).sum(axis=1)
+
 class ExtremePointPolytopeSparse:
 
     # --------------------------------------------------

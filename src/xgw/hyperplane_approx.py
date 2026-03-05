@@ -13,7 +13,7 @@ except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
 from .h_to_v_edges import update_edges_with_new_halfplane
-from .h_to_v_popcount import ExtremePointPolytope
+from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
 
 
 def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
@@ -199,7 +199,7 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None, masks_initialization=None, A_initialization=None, b_initialization=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
@@ -210,6 +210,8 @@ class DoubleDescription():
             self.E = E_initialization
         elif self.implementation == 'h_to_v_popcount':
             self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -252,6 +254,13 @@ class DoubleDescription():
             self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
             assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
+        
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            # TODO: check correctness of this, especially the re-indexing of masks and adjacency
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.masks = self.poly.masks[unique_indices]
+            self.poly.rebuild_adjacency_subset(self.poly.masks)
+            logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
 
     def check_feasibility_V(self, A, b):
         import numpy as np
@@ -266,9 +275,11 @@ class DoubleDescription():
     def H_to_V(self):
         
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{implementation} implementation is not implemented yet')
         elif self.implementation == 'h_to_v_popcount':
-            raise NotImplementedError('h_to_v_popcount implementation is not implemented yet')
+            raise NotImplementedError(f'{implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
@@ -298,9 +309,11 @@ class DoubleDescription():
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'h_to_v_popcount':
-            raise NotImplementedError('h_to_v_popcount implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             # vertex is a d^2 by 1 vector
             self.V.extend(vertex_list)
@@ -309,7 +322,16 @@ class DoubleDescription():
     
     # could be optimized for a family of vectors and scalars
     def add_H(self, constraint_list):
-        if self.implementation == 'h_to_v_popcount':
+        if self.implementation == 'h_to_v_popcount_sparse': # TODO: refactor to avoid code duplication with h_to_v_popcount, since the only difference is the type of self.poly
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
+        elif self.implementation == 'h_to_v_popcount':
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             self.poly.add_constraint(a_new, b_new)
@@ -330,7 +352,6 @@ class DoubleDescription():
             self.E = E_final
             self.H = [A_final, b_final]
             self.remove_duplicates_V() 
-
         elif self.implementation == 'cdd':
             vector_list = [np.transpose(elem[0]) for elem in constraint_list]
             scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
@@ -388,8 +409,18 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
                                    V_initialization=V_initialization, 
                                    B_initialization=B_initialization
                                    )
-        
-        # raise NotImplementedError(f'{p_plus_implementation} implementation is not implemented yet')
+    elif p_plus_implementation == 'h_to_v_popcount_sparse':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+
+        masks_initialization = masks_from_B(B_bool)
+        p_plus = DoubleDescription(implementation=p_plus_implementation,
+                                   V_initialization=V_initialization,
+                                   masks_initialization=masks_initialization,
+                                   A_initialization=A,
+                                   b_initialization=b)
         p_plus.V = [np.array(v) for v in p_plus.poly.E]
         p_plus.H = [A, b]
             
@@ -448,7 +479,11 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
     elif p_plus.implementation == 'h_to_v_popcount':
-        assert len(half_planes_list) == 1, 'h_to_v_popcount implementation only supports adding one half-plane at a time'
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount_sparse':
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
         
@@ -460,6 +495,8 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
     elif p_minus.implementation == 'h_to_v_edges':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     elif p_minus.implementation == 'h_to_v_popcount':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount_sparse':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
 
     return p_plus, p_minus
