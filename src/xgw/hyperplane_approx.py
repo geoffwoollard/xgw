@@ -430,6 +430,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
                                    V_initialization=V_initialization, 
                                    B_initialization=B_initialization
                                    )
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'h_to_v_popcount_sparse':
         A, b = p_plus_initial.H
         V_initialization = np.array(p_plus_initial.V)
