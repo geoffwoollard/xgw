@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
-from itertools import product
 
 from xgw.h_to_v_popcount import ExtremePointPolytopeSparse, masks_from_B, masks_from_B_vectorized
-
+from xgw.hyperplane_approx import unit_cube
 
 def cube_mask(v):
     # bits 0..d-1: coordinate == 1 ; bits d..2d-1: coordinate == 0
@@ -15,16 +14,6 @@ def cube_mask(v):
         if v[i] == 0:
             m |= 1 << (d + i)
     return m
-
-def unit_cube(dim):
-    # Vertices
-    E = np.array(list(product([0,1], repeat=dim)), dtype=float)
-
-    # Halfspace form
-    A = np.vstack([np.eye(dim), -np.eye(dim)])
-    b = np.concatenate([np.ones(dim), np.zeros(dim)])
-
-    return E, A, b
 
 def cube_polytope(dim):
     """

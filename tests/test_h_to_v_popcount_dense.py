@@ -112,9 +112,9 @@ def test_cube_vertex_rank(cube_polys):
         counts = np.sum(poly.B, axis=0)
         assert np.all(counts == poly.r)
 
-def test_adjacency_rule(one_cut_corner_polys, cube_polys):
+def test_adjacency_rule(cube_polys, one_cut_corner_polys):
     '''Adjacency rule: two vertices are adjacent iff they share exactly r-1 active constraints.'''
-    for poly in one_cut_corner_polys + cube_polys:
+    for poly in cube_polys + one_cut_corner_polys:
 
         BTB = poly.B.T @ poly.B
 
@@ -125,6 +125,26 @@ def test_adjacency_rule(one_cut_corner_polys, cube_polys):
                     continue
                 expected = (BTB[i, j] == poly.r - 1)
                 assert poly.D[i, j] == expected
+
+def test_D(cube_polys, one_cut_corner_polys):
+    '''Test that the D matrix is correct for both the original cube and after cutting in one corner.'''
+
+    for poly in cube_polys:
+        D_expected = np.array([[0,1,1,0],
+                            [1,0,0,1],
+                            [1,0,0,1],
+                            [0,1,1,0]])
+        if poly.r == 2:
+            assert np.array_equal(poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{poly.D}"
+
+    for poly in one_cut_corner_polys:
+        D_expected = array([[0, 1, 1, 0, 0],
+                            [1, 0, 0, 1, 0],
+                            [1, 0, 0, 0, 1],
+                            [0, 1, 0, 0, 1],
+                            [0, 0, 1, 1, 0]], dtype=uint8)
+        if poly.r == 2:
+            assert np.array_equal(poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{poly.D}"
 
 def test_cut_removes_corner(cube_polys):
     '''Cutting the cube with should remove the corner vertex.
@@ -182,4 +202,4 @@ def test_new_constraint_active(one_cut_corner_polys):
         assert np.sum(new_constraint_row) >= poly_one_cut_corner.r
 
 if __name__ == "__main__":
-    test_new_constraint_active(one_cut_corner_polys([2]))
+    one_cut_corner_polys([2])

@@ -3,6 +3,7 @@ from numpy.linalg import qr
 from numba import njit
 import ot
 import logging
+from itertools import product
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -15,6 +16,25 @@ except ImportError as e:
 from .h_to_v_edges import update_edges_with_new_halfplane
 from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
 
+
+def build_B_from_H_and_V(A, b, V, tol=1e-5):
+    # A shape (m, d), b shape (m,), V shape (n, d)
+    B_bool = np.abs(A @ V.T - b[:, np.newaxis]) < tol
+    B = B_bool.astype(int)
+    return B
+
+def unit_cube(dim):
+    # Vertices
+    V = np.array(list(product([0,1], repeat=dim)), dtype=float)
+
+    # Halfspace form
+    A = np.vstack([np.eye(dim), -np.eye(dim)])
+    b = np.concatenate([np.ones(dim), np.zeros(dim)])
+    tol = 1e-8
+    B_bool = build_B_from_H_and_V(A, b, V, tol=tol)
+    masks = masks_from_B(B)
+
+    return V, A, b, B, masks
 
 def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
     '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
@@ -259,7 +279,8 @@ class DoubleDescription():
             # TODO: check correctness of this, especially the re-indexing of masks and adjacency
             self.poly.E = self.poly.E[unique_indices]
             self.poly.masks = self.poly.masks[unique_indices]
-            self.poly.rebuild_adjacency_subset(self.poly.masks)
+            self.poly.D = self.poly._build_adjacency()
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
 
     def check_feasibility_V(self, A, b):

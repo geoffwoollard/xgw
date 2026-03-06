@@ -8,7 +8,7 @@ class ExtremePointPolytope:
 
     def __init__(self, E, B, dim=3):
         """
-        E : (n,3) vertices
+        E : (n,dim) vertices
         B : (m,n) binary active-constraint matrix
         """
         self.r = dim
