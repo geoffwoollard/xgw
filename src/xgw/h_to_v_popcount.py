@@ -154,6 +154,8 @@ class ExtremePointPolytopeSparse:
 
         self.r = E.shape[1]
         self.D = self._build_adjacency()
+        self._POPCOUNT_TABLE = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
+
 
     # --------------------------------------------------
     # Adjacency helpers
@@ -180,6 +182,41 @@ class ExtremePointPolytopeSparse:
                 if (masks[i] & masks[j]).bit_count() == self.r - 1:
                     D[i, j] = D[j, i] = 1
         return D
+
+    def _build_adjacency_subset_vectorized(self, masks):
+        masks = np.asarray(masks, dtype=np.uint64)
+
+        # pairwise bitwise AND
+        inter = masks[:, None] & masks[None, :]
+
+        # vectorized popcount
+        bitcounts = np.bitwise_count(inter)
+
+        D = (bitcounts == self.r - 1).astype(np.uint8)
+
+        np.fill_diagonal(D, 0)
+        return D
+
+    def _build_adjacency_subset_popcount_table(self, masks):
+        masks = np.asarray(masks, dtype=np.uint64)
+        n = len(masks)
+        
+        xor_matrix = masks[:, None] ^ masks[None, :]
+        xor_matrix = np.ascontiguousarray(xor_matrix, dtype=np.uint64)
+        print(f"XOR matrix computed: {xor_matrix}")
+        
+        # Correct 3D byte view
+        bytes_view = xor_matrix.view(np.uint8).reshape(xor_matrix.shape + (8,))
+        
+        # Hamming distance
+        bitcounts = self._POPCOUNT_TABLE[bytes_view].sum(axis=-1)
+        
+        # adjacency: exactly 2 bits differ
+        D = (bitcounts == self.r - 1).astype(np.uint8)
+        np.fill_diagonal(D, 0)
+        
+        return D
+ 
 
     # --------------------------------------------------
     # MAIN ALGORITHM (Section A.3)
@@ -271,7 +308,7 @@ class ExtremePointPolytopeSparse:
                     N[i, j] = N[j, i] = 1
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old = self._build_adjacency_subset(masks_old)
+        D_old = self._build_adjacency_subset_vectorized(masks_old)
 
         logger.info('# ---------- Step H: assemble final D ----------')
         top = np.hstack([D_old, O])
@@ -281,3 +318,34 @@ class ExtremePointPolytopeSparse:
         logger.info('# ---------- Step I: store constraint ----------')
         self.A.append(a_new)
         self.b.append(b_new)
+
+# # def build_popcount_table():
+# global _POPCOUNT_TABLE
+# _POPCOUNT_TABLE = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
+
+
+
+if __name__ == "__main__":
+    # square
+    V = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
+    A = np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])
+    d = 2
+    assert V.shape == (4,d)
+    assert A.shape == (4,d)
+    b = np.array([1, 1, 0, 0])
+    from xgw.hyperplane_approx import build_B_from_H_and_V
+    B = build_B_from_H_and_V(A, b, V,)
+    masks = masks_from_B(B)
+    poly = ExtremePointPolytopeSparse(V, masks, A, b)
+    print(poly.E)
+    print(poly.D)
+    delta = 0.1
+    poly.add_constraint(np.array([1, 1]), d - delta)
+    print(poly.E)
+    print(poly.D)
+    D = poly._build_adjacency_subset_popcount_table(poly.masks)
+    print(D)
+#     masks = np.array([0b0111, 0b1011, 0b1101, 0b1110,], dtype=np.uint64)
+#     D = build_adjacency_subset(masks, 3)
+#     print(D)
+

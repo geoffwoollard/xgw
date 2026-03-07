@@ -28,7 +28,7 @@ def test_2d_classical_gw():
         print('Plan error for identical marginals (classic GW, convex): ', plan_error)
         assert np.isclose(plan_error, 0.0)
 
-@pytest.fixture
+# @pytest.fixture
 def implementations_to_test():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse', ]
 
@@ -198,7 +198,7 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_3d_convex(['h_to_v_popcount_sparse', ])
+    test_2d_convex(['h_to_v_popcount_sparse'])
     # d = np.load('debug.npz')
     # from xgw.h_to_v_edges import update_edges_with_new_halfplane
     # update_edges_with_new_halfplane(d['V'], d['E'], d['A'], d['b'], d['a_new'], d['b_new'])
