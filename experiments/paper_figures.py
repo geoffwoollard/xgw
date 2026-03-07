@@ -132,7 +132,7 @@ def convex_cost_convergence_rate(n_points, niter, d, cost):
     
     mu, nu, space_x, space_y = figure_random_pointcloud(d, n_points)
     
-    for elem in tqdm(_run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = niter, cost=cost)):
+    for elem in tqdm(_run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = niter, cost=cost, p_plus_implementation= 'cdd')):
         
         P_plus, P_minus, objective = elem
 
@@ -168,8 +168,10 @@ def convex_cost_convergence_rate(n_points, niter, d, cost):
 if __name__ == "__main__":
     # bounding_box_convergence_rate_vol_2d(10, 350)
     # bounding_box_convergence_rate_vol_2d(50, 500)
-    # bounding_box_convergence_rate(10,45,3)
-    # bounding_box_convergence_rate(10,350,2)
-    # bounding_box_convergence_rate(50,500,2)
-    convex_cost_convergence_rate(10,350,2,'IGW')
-    # convex_cost_convergence_rate(100,500,2,'IGW')
+    # bounding_box_convergence_rate(10, 45, 3)
+    # bounding_box_convergence_rate(10, 500, 2)
+    # bounding_box_convergence_rate(50, 500, 2)
+    # convex_cost_convergence_rate(50, 500, 2,'IGW')
+    # convex_cost_convergence_rate(100, 500, 2,'IGW')
+    # convex_cost_convergence_rate(5000, 500, 2,'IGW')
+    convex_cost_convergence_rate(10, 35, 3,'IGW')
