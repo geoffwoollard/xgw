@@ -1,4 +1,8 @@
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class ExtremePointPolytope:
@@ -182,9 +186,10 @@ class ExtremePointPolytopeSparse:
     # --------------------------------------------------
     def add_constraint(self, a_new, b_new):
 
+
         a_new = np.asarray(a_new, float)
 
-        # ---------- Step A: classify vertices ----------
+        logger.info('# ---------- Step A: classify vertices ----------')
         vals = self.E @ a_new
         feasible = vals <= b_new
         infeasible_idx = np.where(~feasible)[0]
@@ -198,7 +203,7 @@ class ExtremePointPolytopeSparse:
 
         new_bit = 1 << len(self.A)
 
-        # ---------- Step B: generate new vertices ----------
+        logger.info('# ---------- Step B: generate new vertices ----------')
         for i in infeasible_idx:
 
             neighbors = np.where(self.D[i] == 1)[0]
@@ -226,7 +231,7 @@ class ExtremePointPolytopeSparse:
 
                 O_links.append(j)
 
-        # ---------- Step C: remove infeasible vertices ----------
+        logger.info('# ---------- Step C: remove infeasible vertices ----------')
         E_old = self.E[feasible]
         masks_old = self.masks[feasible]
 
@@ -235,7 +240,7 @@ class ExtremePointPolytopeSparse:
             for new_i, old_i in enumerate(np.where(feasible)[0])
         }
 
-        # ---------- Step D: concatenate extreme points ----------
+        logger.info('# ---------- Step D: concatenate extreme points ----------')
         P = np.array(new_vertices)
 
         self.E = np.vstack([E_old, P])
@@ -243,7 +248,7 @@ class ExtremePointPolytopeSparse:
             [masks_old, np.array(new_masks, dtype=object)]
         )
 
-        # ---------- Step E: build O matrix ----------
+        logger.info('# ---------- Step E: build O matrix ----------')
         n_old = len(E_old)
         n_new = len(new_masks)
 
@@ -252,7 +257,7 @@ class ExtremePointPolytopeSparse:
         for k, old_j in enumerate(O_links):
             O[index_map[old_j], k] = 1
 
-        # ---------- Step F: compute N block ----------
+        logger.info('# ---------- Step F: compute N block ----------')
         N = np.zeros((n_new, n_new), dtype=int)
 
         for i in range(n_new):
@@ -265,13 +270,14 @@ class ExtremePointPolytopeSparse:
                 if shared == self.r - 2:
                     N[i, j] = N[j, i] = 1
 
-        # ---------- Step G: assemble new adjacency ----------
+        logger.info('# ---------- Step G: assemble new adjacency ----------')
         D_old = self._build_adjacency_subset(masks_old)
 
+        logger.info('# ---------- Step H: assemble final D ----------')
         top = np.hstack([D_old, O])
         bottom = np.hstack([O.T, N])
         self.D = np.vstack([top, bottom])
 
-        # store constraint
+        logger.info('# ---------- Step I: store constraint ----------')
         self.A.append(a_new)
         self.b.append(b_new)

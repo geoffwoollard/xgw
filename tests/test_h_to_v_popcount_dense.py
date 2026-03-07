@@ -89,7 +89,7 @@ def cube_polytope(dim):
 def dimensions():
     return [2,3,4]
 
-# @pytest.fixture
+@pytest.fixture
 def one_cut_corner_polys(dimensions):
 
     polys = []
@@ -133,16 +133,16 @@ def test_D(cube_polys, one_cut_corner_polys):
         D_expected = np.array([[0,1,1,0],
                             [1,0,0,1],
                             [1,0,0,1],
-                            [0,1,1,0]])
+                            [0,1,1,0]], dtype=np.uint8)
         if poly.r == 2:
             assert np.array_equal(poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{poly.D}"
 
     for poly in one_cut_corner_polys:
-        D_expected = array([[0, 1, 1, 0, 0],
+        D_expected = np.array([[0, 1, 1, 0, 0],
                             [1, 0, 0, 1, 0],
                             [1, 0, 0, 0, 1],
                             [0, 1, 0, 0, 1],
-                            [0, 0, 1, 1, 0]], dtype=uint8)
+                            [0, 0, 1, 1, 0]], dtype=np.uint8)
         if poly.r == 2:
             assert np.array_equal(poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{poly.D}"
 
