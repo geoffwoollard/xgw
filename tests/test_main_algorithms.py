@@ -55,7 +55,7 @@ def test_3d_convex(implementations_to_test):
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
             for p_plus_implementation in implementations_to_test:    
                 logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=30, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500) 
+                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=20, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500) 
                 plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
                 logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
                 logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
@@ -208,8 +208,8 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    # test_2d_convex(['h_to_v_popcount_sparse'])
-    test_3d_convex(['h_to_v_popcount_sparse'])
+    test_2d_convex(['h_to_v_popcount'])
+    # test_3d_convex(['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'])
     # d = np.load('debug.npz')
     # from xgw.h_to_v_edges import update_edges_with_new_halfplane
     # update_edges_with_new_halfplane(d['V'], d['E'], d['A'], d['b'], d['a_new'], d['b_new'])
