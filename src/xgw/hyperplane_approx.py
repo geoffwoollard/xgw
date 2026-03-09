@@ -3,6 +3,7 @@ from numpy.linalg import qr
 from numba import njit
 import ot
 import logging
+from itertools import product
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -13,9 +14,29 @@ except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
 from .h_to_v_edges import update_edges_with_new_halfplane
+from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
 
 
-def stabilize_compute_polytope_vertices(A, b, decimals_start=18, decimals_end=3):
+def build_B_from_H_and_V(A, b, V, tol=1e-5):
+    # A shape (m, d), b shape (m,), V shape (n, d)
+    B_bool = np.abs(A @ V.T - b[:, np.newaxis]) < tol
+    B = B_bool.astype(int)
+    return B
+
+def unit_cube(dim):
+    # Vertices
+    V = np.array(list(product([0,1], repeat=dim)), dtype=float)
+
+    # Halfspace form
+    A = np.vstack([np.eye(dim), -np.eye(dim)])
+    b = np.concatenate([np.ones(dim), np.zeros(dim)])
+    tol = 1e-8
+    B_bool = build_B_from_H_and_V(A, b, V, tol=tol)
+    masks = masks_from_B(B_bool)
+
+    return V, A, b, B_bool, masks
+
+def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
     '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
     
     This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
@@ -210,7 +231,7 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None, masks_initialization=None, A_initialization=None, b_initialization=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
@@ -219,6 +240,10 @@ class DoubleDescription():
             pass
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -255,6 +280,21 @@ class DoubleDescription():
             self.E = np.array([(index_map[edge[0]], index_map[edge[1]]) for edge in self.E if edge[0] in index_map and edge[1] in index_map])
             logger.info(f"Re-indexed edges, new number of edges: {len(self.E)}")
 
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.B = self.poly.B[:, unique_indices]
+            self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
+        
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            # TODO: check correctness of this, especially the re-indexing of masks and adjacency
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.masks = self.poly.masks[unique_indices]
+            self.poly.D = self.poly._build_adjacency()
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
+
     def check_feasibility_V(self, A, b):
         import numpy as np
         from scipy.optimize import linprog
@@ -268,7 +308,11 @@ class DoubleDescription():
     def H_to_V(self):
         
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
@@ -298,7 +342,11 @@ class DoubleDescription():
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             # vertex is a d^2 by 1 vector
             self.V.extend(vertex_list)
@@ -307,8 +355,26 @@ class DoubleDescription():
     
     # could be optimized for a family of vectors and scalars
     def add_H(self, constraint_list):
-        if self.implementation == 'h_to_v_edges':
-            assert len(constraint_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
+        if self.implementation == 'h_to_v_popcount_sparse': # TODO: refactor to avoid code duplication with h_to_v_popcount, since the only difference is the type of self.poly
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
+        elif self.implementation == 'h_to_v_popcount':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
+        elif self.implementation == 'h_to_v_edges':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
             V = np.array(self.V)
@@ -319,7 +385,6 @@ class DoubleDescription():
             self.E = E_final
             self.H = [A_final, b_final]
             self.remove_duplicates_V() 
-
         elif self.implementation == 'cdd':
             vector_list = [np.transpose(elem[0]) for elem in constraint_list]
             scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
@@ -372,6 +437,32 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
+    elif p_plus_implementation == 'h_to_v_popcount':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+        B_initialization = B_bool.astype(int)
+        p_plus = DoubleDescription(implementation=p_plus_implementation, 
+                                   V_initialization=V_initialization, 
+                                   B_initialization=B_initialization
+                                   )
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
+    elif p_plus_implementation == 'h_to_v_popcount_sparse':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+
+        masks_initialization = masks_from_B(B_bool)
+        p_plus = DoubleDescription(implementation=p_plus_implementation,
+                                   V_initialization=V_initialization,
+                                   masks_initialization=masks_initialization,
+                                   A_initialization=A,
+                                   b_initialization=b)
+        p_plus.V = [np.array(v) for v in p_plus.poly.E]
+        p_plus.H = [A, b]
             
     return e_base, R, p_plus, p_minus
 
@@ -434,6 +525,14 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         assert len(half_planes_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount':
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount_sparse':
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
         
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
@@ -441,7 +540,11 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         p_minus.V_to_H()
         logger.info('Updated half-planes of p_minus from vertices')
     elif p_minus.implementation == 'h_to_v_edges':
-        raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount_sparse':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
 
     return p_plus, p_minus
 
@@ -495,33 +598,42 @@ def p_plus_outside_p_minus(p_plus, p_minus):
     return residuals        
         
         
-# def build_new_constraint(A_all, b_all, A_old, b_old):
-#     # Stack A and b together for comparison
-#     all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
-#     old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
+def build_new_constraint(A_all, b_all, A_old, b_old):
+    # Stack A and b together for comparison
+    all_rows = np.hstack([A_all, b_all.reshape(-1,1)])
+    old_rows = np.hstack([A_old, b_old.reshape(-1,1)])
 
-#     # Find index where row is in all_rows but not in old_rows
-#     for i, row in enumerate(all_rows):
-#         if not any(np.all(row == r) for r in old_rows):
-#             new_index = i
-#             break
-#     a_new = A_all[new_index]
-#     b_new = b_all[new_index]
-#     return a_new, b_new
+    # Find index where row is in all_rows but not in old_rows
+    for i, row in enumerate(all_rows):
+        if not any(np.all(row == r) for r in old_rows):
+            new_index = i
+            break
+    a_new = A_all[new_index]
+    b_new = b_all[new_index]
+    return a_new, b_new
 
-# def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
-#     from .qp_incremental_projector import IncrementalQPProjector
-#     if vertex.tobytes() not in previous_solutions_to_reuse:
-#         A_all, b_all = p_minus.H
-#         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
-#         x, objective = qp_solver.solve(vertex)
-#     else:
-#         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
-#         A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
-#         A_all, b_all = p_minus.H
-#         a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
-#         x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
-#     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
-#     return x, objective, previous_solutions_to_reuse
-
+def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
+    '''Solve the optimization problem of finding the point in p_minus that is farthest from vertex.'''
+    from .qp_incremental_projector import IncrementalQPProjector
+    # print(f'solve_dist for vertex {vertex}')
+    # print(f'len p_minus half-planes: {len(p_minus.H[0])}')
+    if vertex.tobytes() not in previous_solutions_to_reuse:
+        A_all, b_all = p_minus.H
+        qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
+        x, objective = qp_solver.solve(vertex)
+    else:
+        qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
+        A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
+        A_all, b_all = p_minus.H
+        if len(A_all) > len(A_old):
+            a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old) 
+            # print('reusing: len A_old', len(A_old), 'len A_all', len(A_all))
+            x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new) 
+        else:
+            raise ValueError('No new constraints to add, but previous solution exists. This should not happen, check the logic of when to reuse previous solutions.')
+            # A_all, b_all = p_minus.H
+            # qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
+            # x, objective = qp_solver.solve(vertex)
+    previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
+    return x, objective, previous_solutions_to_reuse
 

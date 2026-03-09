@@ -9,7 +9,7 @@ from copy import deepcopy
 import math
 from pypoman.polygon import compute_polygon_hull
 
-from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outside_p_minus, projection, new_direction, initial_box, DoubleDescription
+from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outside_p_minus, projection, new_direction, initial_box, DoubleDescription, build_B_from_H_and_V, masks_from_B
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def marginals():
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    for p_plus_implementation in ['cdd', 'h_to_v_edges']:
+    for p_plus_implementation in ['h_to_v_popcount_sparse']:
         logger.info(f'Testing initial box with p_plus implementation: {p_plus_implementation}')
         e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={}, p_plus_implementation=p_plus_implementation)
         assert len(P_minus.V) == 5
@@ -329,20 +329,57 @@ def test_P_monotonicity(marginals):
         P_minus_old = deepcopy(P_minus)
 
 def test_remove_duplicates_V():
-    V = np.array([[0,0],[1,0],[0,1],[1,1],[0,0],[1,0]])
-    E = np.array([[0,1],[1,2],[2,3],[3,0],[4,5]])
+    V = np.array([[0,0],[1,0],[0,1],[1,1],[0,0],[1,0]]) #0->4, 1->5 are duplicates
+    Edges = np.array([[0,1],[0,2],[1,3],[2,3],
+                      [4,1],[4,2],
+                      [0,5],      [5,3],
+                      ]) #no 04 and 15 edges
     A = np.array([[1,0],[-1,0],[0,1],[0,-1]])
-    b = np.array([1,1,1,1])
-    for implementation in ['h_to_v_edges', 'cdd']:
+    b = np.array([1,0,1,0])
+    B_initialization = build_B_from_H_and_V(A, b, V)
+    masks_initialization = masks_from_B(B_initialization)
+    D_expected = np.array([[0,1,1,0],
+                            [1,0,0,1],
+                            [1,0,0,1],
+                            [0,1,1,0]])
+    unique_indices = np.array([0,1,2,3])
+    duplicate_indices = np.array([4,5])
+    keep_indices = np.isin(Edges, duplicate_indices).any(axis=1) == False # keep indices do no have 4,5 in Edges
+    print(f'keep_indices: {keep_indices}')
+    Edges_expected = Edges[keep_indices]
+    B_expected = B_initialization[:,unique_indices] # only the first 4 rows of B_initialization should be kept after removing duplicates
+    D_expected = D_expected[np.ix_(unique_indices, unique_indices)] # D should be updated to reflect the removal of duplicate vertices
+    for implementation in ['cdd','h_to_v_edges','h_to_v_popcount','h_to_v_popcount_sparse']:
         logger.info(f'Testing remove_duplicates_V with implementation: {implementation}')
-        p = DoubleDescription(implementation=implementation)
+        p = DoubleDescription(
+            implementation=implementation, 
+            V_initialization=V,
+            E_initialization=Edges,
+            B_initialization=B_initialization, 
+            masks_initialization=masks_initialization,
+            A_initialization=A,
+            b_initialization=b
+        )
         p.V = V.tolist()
-        p.E = E
+        p.E = Edges.tolist()
         p.H = [A,b]
         p.remove_duplicates_V()
         assert len(p.V) == 4
         assert np.array_equal(p.V, np.array([[0,0],[1,0],[0,1],[1,1]]))
         if implementation == 'h_to_v_edges':
             assert len(p.E) == 4
-            assert np.array_equal(p.E, np.array([[0,1],[1,2],[2,3],[3,0]]))
+            assert np.array_equal(p.E, Edges_expected), f"Expected E:\n{Edges_expected}\nGot:\n{p.E}"
+        elif implementation in ['h_to_v_popcount']:
+            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+            assert p.poly.B.shape == (4, 4), f"Expected B shape (4,4), got {p.poly.B.shape}"
+            assert np.array_equal(p.poly.B, B_expected), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+        elif implementation in ['h_to_v_popcount_sparse']:
+            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+            assert len(p.poly.masks) == 4, f"Expected masks shape length 4, got {len(p.poly.masks.shape)}"
+            assert np.array_equal(p.poly.masks, masks_from_B(B_expected)), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+            
 
+if __name__ == "__main__":
+    test_remove_duplicates_V()

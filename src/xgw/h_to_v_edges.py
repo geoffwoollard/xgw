@@ -6,11 +6,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def segment_plane_intersection(v0, v1, a, b, tol=1e-16):
+def segment_plane_intersection(v0, v1, a, b, tol=1e-19):
     """
     Intersection between segment [v0, v1] and hyperplane a^T x = b.
 
-    Note: have run into numerical issues with in_plane return when tol=1e-12, so reduced to 1e-16. May need to adjust if numerical issues arise.
+    Note: 
+        have run into numerical issues with in_plane return when tol=1e-12, so reduced to 1e-16. May need to adjust if numerical issues arise.
+        Again ran into numerical issue at 1e-16 so reduced to 1e-19, but may need to adjust if numerical issues arise.
     
     Returns:
         - intersection point (np.ndarray) if it exists within the segment

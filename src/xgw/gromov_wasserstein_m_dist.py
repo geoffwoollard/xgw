@@ -179,7 +179,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
         # The optimal values after each iteration is updated
         logger.info('Updating c_plus and c_minus')
         c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
-        logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, verices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}')
+        logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, vertices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}, half-spaces in P_minus {P_minus.H[0].shape[0]} and P_plus {P_plus.H[0].shape[0]}')
         
         if Tcost > c_minus:
             c_minus = Tcost
