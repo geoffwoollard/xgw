@@ -308,7 +308,7 @@ class ExtremePointPolytopeSparse:
                     N[i, j] = N[j, i] = 1
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old = self._build_adjacency_subset_vectorized(masks_old)
+        D_old = self._build_adjacency_subset(masks_old)
 
         logger.info('# ---------- Step H: assemble final D ----------')
         top = np.hstack([D_old, O])
@@ -337,14 +337,16 @@ if __name__ == "__main__":
     B = build_B_from_H_and_V(A, b, V,)
     masks = masks_from_B(B)
     poly = ExtremePointPolytopeSparse(V, masks, A, b)
-    print(poly.E)
-    print(poly.D)
+    D = poly._build_adjacency_subset_popcount_table(poly.masks)
+    print('_build_adjacency_subset_popcount_table D:', D)
+    print('poly.E:', poly.E)
+    print('poly.D:', poly.D)
     delta = 0.1
     poly.add_constraint(np.array([1, 1]), d - delta)
-    print(poly.E)
-    print(poly.D)
+    print('poly.E:', poly.E)
+    print('poly.D:', poly.D)
     D = poly._build_adjacency_subset_popcount_table(poly.masks)
-    print(D)
+    print('_build_adjacency_subset_popcount_table D:', D)
 #     masks = np.array([0b0111, 0b1011, 0b1101, 0b1110,], dtype=np.uint64)
 #     D = build_adjacency_subset(masks, 3)
 #     print(D)
