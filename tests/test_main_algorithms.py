@@ -109,7 +109,7 @@ def test_2d_convex(implementations_to_test):
             assert not_too_small_tolerance < T, f"Total cost {T} is too small, should be above {not_too_small_tolerance} for different marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
     
     
-def PASS_testing_2d_non_convex(marginals):
+def testing_2d_non_convex(marginals):
     '''passing'''
     mu, nu, space_x, space_y = marginals
     
