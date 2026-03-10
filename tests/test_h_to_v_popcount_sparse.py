@@ -20,7 +20,7 @@ def cube_polytope(dim):
     Create unit cube with correct B matrix.
     """
 
-    E, A, b = unit_cube(dim)
+    E, A, b, _, _ = unit_cube(dim)
 
     masks = [cube_mask(v) for v in E]
     poly = ExtremePointPolytopeSparse(E, masks, A, b)
@@ -30,7 +30,7 @@ def test_masks_from_B(dimensions):
     '''Test that masks_from_B and masks_from_B_vectorized give the same results, and that they match the expected cube masks for the unit cube.'''
 
     for dim in dimensions:
-        E, A, b = unit_cube(dim)
+        E, A, b, _, _ = unit_cube(dim)
 
         # compute boolean incidence matrix B: shape (m_constraints, n_vertices)
         # lhs shape (n_vertices, m_constraints) so transpose to (m, n_vertices)

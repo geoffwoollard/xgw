@@ -7,7 +7,7 @@ from dataclasses import dataclass, asdict
 import ot
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
-from xgw.utils import gw_matrix
+# from xgw.utils import gw_matrix
 
 logging.disable(logging.CRITICAL)
 

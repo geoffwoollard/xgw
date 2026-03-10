@@ -184,8 +184,12 @@ class ExtremePointPolytopeSparse:
         return D
 
     def _build_adjacency_subset_vectorized(self, masks):
-        masks = np.asarray(masks, dtype=np.uint64)
-
+        # masks = np.asarray(masks, dtype=np.uint64)
+        if max(masks) < 2**64:
+            masks = np.asarray(masks, dtype=np.uint64)
+        else:
+            masks = np.asarray(masks, dtype=object)
+        
         # pairwise bitwise AND
         inter = masks[:, None] & masks[None, :]
 

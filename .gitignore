@@ -12,3 +12,4 @@ tests/results
 *.out
 *.cif
 *.png
+experiments/figures
