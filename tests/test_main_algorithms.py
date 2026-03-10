@@ -87,7 +87,7 @@ def test_2d_convex(implementations_to_test):
             final_gap_tolerance_neg = -0.01
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation} - identical simple marginals')
             T, _, gap, _, _ = gw_m_convex(mu, space_x, mu, space_x, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, p_plus_implementation=p_plus_implementation)
-            assert -final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {final_gap_tolerance_pos} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
+            assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {final_gap_tolerance_pos} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
             assert near_zero_tolerance < T < near_zero_tolerance, f"Total cost {T} is not within tolerance {near_zero_tolerance} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
 
             final_gap_tolerance_pos = 1e-4
@@ -95,7 +95,7 @@ def test_2d_convex(implementations_to_test):
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation} - different simple marginals')
             T, _, gap, _, _ = gw_m_convex(mu, space_x, nu, space_y, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=80, p_plus_implementation=p_plus_implementation) 
             print(f'Test mu, space_x, nu, space_y {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
-            assert -final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
+            assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
             not_too_small_tolerance = 1e-4
             assert not_too_small_tolerance < T, f"Total cost {T} is too small, should be above {not_too_small_tolerance} for different marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
     
@@ -104,7 +104,7 @@ def test_2d_convex(implementations_to_test):
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation} - multiple marginals')
             T, _, gap, _, _ = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, p_plus_implementation=p_plus_implementation) 
             logger.info(f'Test mus, space_xs, nus, space_ys {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
-            assert -final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
+            assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
             not_too_small_tolerance = 1e-4
             assert not_too_small_tolerance < T, f"Total cost {T} is too small, should be above {not_too_small_tolerance} for different marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
     
