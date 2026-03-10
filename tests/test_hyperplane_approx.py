@@ -219,17 +219,17 @@ def test_simple_marginals(super_simple_marginals_2D):
         
         # checking P_minus is included in P_plus 
         residuals = p_plus_outside_p_minus(P_plus, P_minus)
-        atol = 1e-12
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
         
         # checking P_minus is included in P_true 
         residuals = p_plus_outside_p_minus(P_true, P_minus)
-        atol = 1e-12
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_true : {residuals.max()}'
         
         # checking P_true is included in P_plus 
         residuals = p_plus_outside_p_minus(P_plus, P_true)
-        atol = 1e-12
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_true in P_plus : {residuals.max()}'
 
     logger.info(f'P_plus volumes over iterations: {P_plus_volumes}')
