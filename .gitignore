@@ -6,3 +6,10 @@ __pycache__
 img
 tests/results
 !/**/.gitkeep
+*.txt
+*.csv
+*.npz
+*.out
+*.cif
+*.png
+experiments/figures

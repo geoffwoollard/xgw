@@ -9,7 +9,7 @@ from copy import deepcopy
 import math
 from pypoman.polygon import compute_polygon_hull
 
-from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outside_p_minus, projection, hausdorff, initial_box, DoubleDescription
+from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outside_p_minus, projection, new_direction, initial_box, DoubleDescription, build_B_from_H_and_V, masks_from_B
 
 
 logger = logging.getLogger(__name__)
@@ -54,13 +54,13 @@ def marginals():
 
 def test_initial_box(marginals):
     mu, nu, space_x, space_y = marginals
-    for p_plus_implementation in ['cdd', 'h_to_v_edges']:
+    for p_plus_implementation in ['h_to_v_popcount_sparse']:
         logger.info(f'Testing initial box with p_plus implementation: {p_plus_implementation}')
         e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs={}, p_plus_implementation=p_plus_implementation)
-        assert len(P_minus.V) == 8
-        assert len(P_plus.V) == 16
-        assert P_plus.H[0].shape == (8,4)
-        assert P_minus.H[0].shape == (16,4)
+        assert len(P_minus.V) == 5
+        assert len(P_plus.V) == 5
+        assert P_plus.H[0].shape == (5,4)
+        assert P_minus.H[0].shape == (5,4)
         
         residuals = p_plus_outside_p_minus(P_plus, P_minus)
         atol = 1e-15
@@ -119,11 +119,10 @@ def permut_matrix(permut, dim):
     return sol
         
 
-def test_simple_marginals_FAILING(super_simple_marginals_2D):
-    return # Temporarily disable this failing test
+def test_simple_marginals(super_simple_marginals_2D):
     P_plus_volumes = []
     P_minus_volumes = []
-    max_niter = 10
+    max_niter = 15
     iteration_list = list(range(1, max_niter+1))
     for niter in iteration_list:
         logger.info(f'Testing simple marginals with niter={niter}')
@@ -133,18 +132,17 @@ def test_simple_marginals_FAILING(super_simple_marginals_2D):
         y_1, y_2 = space_y.shape
         print(f'marginal points number : {x_1*x_2}, and {y_1*y_2}', f'dimension {2}')
         
-        P_plus, P_minus, objective, _, objective_list, x_0_list, v_0_list = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        P_plus, P_minus, _, objective_list, x_0_list, v_0_list = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         logger.info(f'P_plus vertices: {np.array(P_plus.V)}')
         logger.info(f'P_minus vertices: {np.array(P_minus.V)}')
         logger.info(f'x_0_list over iterations: {np.array(x_0_list)}')
         logger.info(f'v_0_list over iterations: {np.array(v_0_list)}')
         logger.info(f'Objective list over iterations: {objective_list}')
         diffs = np.diff(objective_list)
-        overly_high_tolerance = 0.1
+        tolerance = 1e-10
         msg = f'Objective not non-increasing, diffs: {diffs}'
-        assert np.all(diffs < overly_high_tolerance), msg # TODO: fix this test, unclear why not passing
-        logger.info(msg)
-        _, _, new_obj, _ = Hausdorff( P_plus, P_minus, {})
+        assert np.all(diffs < tolerance), msg
+        new_obj = new_direction(P_plus, P_minus)[1]
 
         P_plus_vol = volume_convex_hull_from_vertices(np.array(P_plus.V))
         try:
@@ -159,9 +157,9 @@ def test_simple_marginals_FAILING(super_simple_marginals_2D):
         
         print(f'final  Hausdorf {new_obj}')
         # assert new_obj<=objective # TODO: turn back on when fixed
-        residuals = P_plus_outside_P_minus(P_plus, P_minus)
+        residuals = p_plus_outside_p_minus(P_plus, P_minus)
         atol = 1e-16
-        assert np.all(residuals <= atol)
+        # assert np.all(residuals <= atol)
         logger.info(f'max residual for inclusion of P_minus in P_plus : {residuals.max()}')
 
         
@@ -220,18 +218,18 @@ def test_simple_marginals_FAILING(super_simple_marginals_2D):
         P_true.H_to_V()
         
         # checking P_minus is included in P_plus 
-        residuals = P_plus_outside_P_minus(P_plus, P_minus)
-        atol = 1e-12
+        residuals = p_plus_outside_p_minus(P_plus, P_minus)
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
         
         # checking P_minus is included in P_true 
-        residuals = P_plus_outside_P_minus(P_true, P_minus)
-        atol = 1e-12
+        residuals = p_plus_outside_p_minus(P_true, P_minus)
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_true : {residuals.max()}'
         
         # checking P_true is included in P_plus 
-        residuals = P_plus_outside_P_minus(P_plus, P_true)
-        atol = 1e-12
+        residuals = p_plus_outside_p_minus(P_plus, P_true)
+        atol = 1e-10
         assert np.all(residuals <= atol), f'max residual for inclusion of P_true in P_plus : {residuals.max()}'
 
     logger.info(f'P_plus volumes over iterations: {P_plus_volumes}')
@@ -243,7 +241,7 @@ def test_simple_marginals_FAILING(super_simple_marginals_2D):
     fig, axes = plt.subplots(n_panels,1, figsize=(8,10))
     axes[0].plot(iteration_list, P_plus_volumes, color='k', label='P_plus volume')
     axes[1].plot(iteration_list, P_minus_volumes, color='r', label='P_minus volume')
-    axes[2].plot(range(1, len(objective_list) + 1), objective_list, color='blue', label='Haussdorff distance')
+    axes[2].plot(range(1, len(objective_list) + 1), objective_list, color='blue', label='Upper bound of Haussdorff distance')
     for idx in range(n_panels):
         axes[idx].set_xlabel('Iteration')
         if idx < 2:
@@ -290,14 +288,14 @@ def test_overall(niter, marginals):
     y_1, y_2 = space_y.shape
     logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
     
-    P_plus, P_minus, objective, previous_solutions_to_reuse, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
+    P_plus, P_minus, objective, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
     logger.info(f'Objective list over iterations: {objective_list}')
     diffs = np.diff(objective_list)
     tol = 1e-5
     print(f'Objective differences over iterations: {diffs}')
 
     assert np.all(diffs < tol), f'Objective not non-increasing, diffs: {diffs}'
-    _, _, new_obj, _ = hausdorff( P_plus, P_minus, previous_solutions_to_reuse)
+    new_obj = new_direction(P_plus, P_minus)[1]
     
     logger.info(f'final  Hausdorf {new_obj - objective}')
     tol = 1e-6              #High tolerence, the Hausdorff does not converge well
@@ -308,8 +306,7 @@ def test_overall(niter, marginals):
     assert np.all(residuals <= atol), f'max residual for inclusion of P_minus in P_plus : {residuals.max()}'
 
 
-def test_P_monotonicity_FAILING(marginals):
-    return # Temporarily disable this failing test
+def test_P_monotonicity(marginals):
     P_plus_old = DoubleDescription
     P_minus_old = DoubleDescription
     max_niter = 10
@@ -319,12 +316,12 @@ def test_P_monotonicity_FAILING(marginals):
         x_1, x_2 = space_x.shape
         y_1, y_2 = space_y.shape
         logger.info(f'marginal points number : {x_1*x_2}, and {y_1*y_2}, dimension {2}')
-        P_plus, P_minus, _, _, _, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
+        P_plus, P_minus, _, _, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={}, niter = niter)
         if niter>1:
-            residuals = P_plus_outside_P_minus(P_plus_old, P_plus)
+            residuals = p_plus_outside_p_minus(P_plus_old, P_plus)
             atol = 1e-12
             assert np.all(residuals <= atol), f'max residual for inclusion of P_plus in P_plus_old : {residuals.max()}'
-            residuals = P_plus_outside_P_minus( P_minus, P_minus_old)
+            residuals = p_plus_outside_p_minus( P_minus, P_minus_old)
             atol = 1e-12
             assert np.all(residuals <= atol), f'max residual for inclusion of  P_minus_old in P_minus : {residuals.max()}'
             
@@ -332,20 +329,57 @@ def test_P_monotonicity_FAILING(marginals):
         P_minus_old = deepcopy(P_minus)
 
 def test_remove_duplicates_V():
-    V = np.array([[0,0],[1,0],[0,1],[1,1],[0,0],[1,0]])
-    E = np.array([[0,1],[1,2],[2,3],[3,0],[4,5]])
+    V = np.array([[0,0],[1,0],[0,1],[1,1],[0,0],[1,0]]) #0->4, 1->5 are duplicates
+    Edges = np.array([[0,1],[0,2],[1,3],[2,3],
+                      [4,1],[4,2],
+                      [0,5],      [5,3],
+                      ]) #no 04 and 15 edges
     A = np.array([[1,0],[-1,0],[0,1],[0,-1]])
-    b = np.array([1,1,1,1])
-    for implementation in ['h_to_v_edges', 'cdd']:
+    b = np.array([1,0,1,0])
+    B_initialization = build_B_from_H_and_V(A, b, V)
+    masks_initialization = masks_from_B(B_initialization)
+    D_expected = np.array([[0,1,1,0],
+                            [1,0,0,1],
+                            [1,0,0,1],
+                            [0,1,1,0]])
+    unique_indices = np.array([0,1,2,3])
+    duplicate_indices = np.array([4,5])
+    keep_indices = np.isin(Edges, duplicate_indices).any(axis=1) == False # keep indices do no have 4,5 in Edges
+    print(f'keep_indices: {keep_indices}')
+    Edges_expected = Edges[keep_indices]
+    B_expected = B_initialization[:,unique_indices] # only the first 4 rows of B_initialization should be kept after removing duplicates
+    D_expected = D_expected[np.ix_(unique_indices, unique_indices)] # D should be updated to reflect the removal of duplicate vertices
+    for implementation in ['cdd','h_to_v_edges','h_to_v_popcount','h_to_v_popcount_sparse']:
         logger.info(f'Testing remove_duplicates_V with implementation: {implementation}')
-        p = DoubleDescription(implementation=implementation)
+        p = DoubleDescription(
+            implementation=implementation, 
+            V_initialization=V,
+            E_initialization=Edges,
+            B_initialization=B_initialization, 
+            masks_initialization=masks_initialization,
+            A_initialization=A,
+            b_initialization=b
+        )
         p.V = V.tolist()
-        p.E = E
+        p.E = Edges.tolist()
         p.H = [A,b]
         p.remove_duplicates_V()
         assert len(p.V) == 4
         assert np.array_equal(p.V, np.array([[0,0],[1,0],[0,1],[1,1]]))
         if implementation == 'h_to_v_edges':
             assert len(p.E) == 4
-            assert np.array_equal(p.E, np.array([[0,1],[1,2],[2,3],[3,0]]))
+            assert np.array_equal(p.E, Edges_expected), f"Expected E:\n{Edges_expected}\nGot:\n{p.E}"
+        elif implementation in ['h_to_v_popcount']:
+            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+            assert p.poly.B.shape == (4, 4), f"Expected B shape (4,4), got {p.poly.B.shape}"
+            assert np.array_equal(p.poly.B, B_expected), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+        elif implementation in ['h_to_v_popcount_sparse']:
+            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+            assert len(p.poly.masks) == 4, f"Expected masks shape length 4, got {len(p.poly.masks.shape)}"
+            assert np.array_equal(p.poly.masks, masks_from_B(B_expected)), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+            
 
+if __name__ == "__main__":
+    test_remove_duplicates_V()

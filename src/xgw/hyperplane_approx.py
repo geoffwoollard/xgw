@@ -3,6 +3,7 @@ from numpy.linalg import qr
 from numba import njit
 import ot
 import logging
+from itertools import product
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -13,14 +14,120 @@ except ImportError as e:
     logger.info("pypoman is required for Hyperplane_approx module. Please install it via pip: pip install pypoman")
 
 from .h_to_v_edges import update_edges_with_new_halfplane
+from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
 
 
-def _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
-    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
-    g = new_direction(x_0, v_0, p_minus)
-    g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
-    p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
-    return p_plus, p_minus, objective, previous_solutions_to_reuse, x_0, v_0
+def build_B_from_H_and_V(A, b, V, tol=1e-5):
+    # A shape (m, d), b shape (m,), V shape (n, d)
+    B_bool = np.abs(A @ V.T - b[:, np.newaxis]) < tol
+    B = B_bool.astype(int)
+    return B
+
+def unit_cube(dim):
+    # Vertices
+    V = np.array(list(product([0,1], repeat=dim)), dtype=float)
+
+    # Halfspace form
+    A = np.vstack([np.eye(dim), -np.eye(dim)])
+    b = np.concatenate([np.ones(dim), np.zeros(dim)])
+    tol = 1e-8
+    B_bool = build_B_from_H_and_V(A, b, V, tol=tol)
+    masks = masks_from_B(B_bool)
+
+    return V, A, b, B_bool, masks
+
+def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
+    '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
+    
+    This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
+    This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
+    In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
+    Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
+    Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
+    The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
+    
+    '''
+    try:
+        V = compute_polytope_vertices(A, b)
+    except:
+        H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
+        for decimals in range(decimals_start, decimals_end, -1):
+            V=[]
+            try:
+                # 1. Round vertices to reduce numerical noise
+                H_rounded = [np.round(h, decimals=decimals) for h in H]
+
+                # 2. Keep only unique vertices
+                H_rounded_unique = np.unique(H_rounded, axis=0)
+                A_rounded_unique = H_rounded_unique[:,:-1]
+                b_rounded_unique = H_rounded_unique[:,-1]
+
+                # 3. Try compute_polytope_halfspaces
+                try:
+                    V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
+                except RuntimeError as e:
+                    # 4. If it fails due to numerical issues, add tiny jitter
+                    scale = 0.5 * 10**(-decimals)
+                    jitter = scale * np.random.randn(*H_rounded_unique.shape)
+                    H_perturbed = H_rounded_unique + jitter
+                    A_perturbed = H_perturbed[:,:-1]
+                    b_perturbed = H_perturbed[:,-1]
+                    V = compute_polytope_vertices(A_perturbed, b_perturbed)
+
+            except Exception as e:
+                # print(f'Failed with rounding to {decimals} decimals: {e}')
+                continue  # try next lower precision
+
+            else:
+                if len(V)>1:
+                    # print(f"Success with {decimals} decimals!")
+                    break
+    return V
+
+def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
+    '''Try to compute halfspaces from vertices with decreasing rounding precision to enhance numerical stability.
+    
+    This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
+    This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
+    In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
+    Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
+    Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
+    The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
+    
+    '''
+    try:
+        A, b = compute_polytope_halfspaces(V)
+    except:
+        for decimals in range(decimals_start, decimals_end, -1):
+            A=[]
+            try:
+                # 1. Round vertices to reduce numerical noise
+                V_rounded = [np.round(v, decimals=decimals) for v in V]
+
+                # 2. Keep only unique vertices
+                V_rounded_unique = np.unique(V_rounded, axis=0)
+
+                # 3. Try compute_polytope_halfspaces
+                try:
+                    A, b = compute_polytope_halfspaces(V_rounded_unique)
+                except RuntimeError as e:
+                    # 4. If it fails due to numerical issues, add tiny jitter
+                    scale = 0.5 * 10**(-decimals)
+                    jitter = scale * np.random.randn(*V_rounded_unique.shape)
+                    V_perturbed = V_rounded_unique + jitter
+                    A, b = compute_polytope_halfspaces(V_perturbed)
+
+            except Exception as e:
+                # print(f'Failed with rounding to {decimals} decimals: {e}')
+                continue  # try next lower precision
+
+            else:
+                if len(A)>1:
+                    # print(f"Success with {decimals} decimals!")
+                    break
+            
+    return A, b
+
 
 
 def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
@@ -28,26 +135,45 @@ def _run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     logger.info('box initialized')
     
     objective_list = []
-    x_0_list, v_0_list = [], []
+    x_0_list = []
+    v_0_list = []
     for iter in range(niter):
-        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         logger.info(f'Iteration {iter}')
-        p_plus, p_minus, objective, _, x_0, v_0 = _iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        p_plus, p_minus, objective, x_0, v_0 = iteration_loop_geometric(mu, nu, p_plus, p_minus, e_base, emd_kwargs, ret_arg=True)
         objective_list.append(objective)
         x_0_list.append(x_0)
         v_0_list.append(v_0)
-        logger.info(f'Iteration {iter}, Hausdorff distance: {objective}')
+        logger.info(f'Iteration {iter}, hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return p_plus, p_minus, objective, previous_solutions_to_reuse, objective_list, x_0_list, v_0_list
-        
+    return p_plus, p_minus, objective, objective_list, x_0_list, v_0_list
 
-def iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
-    x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
-    g = new_direction(x_0, v_0, p_minus)
+def _run_approx_yield(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+    logger.info('box initialized')
+    
+    for iter in range(niter):
+        p_plus, p_minus, objective, _, _ = iteration_loop_geometric(mu, nu, p_plus, p_minus, e_base, emd_kwargs, ret_arg=True)
+        yield(p_plus, p_minus, objective)
+        if objective < epsilon:
+            break
+
+# def iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs):
+#     #deprecated
+#     x_0, v_0, objective, previous_solutions_to_reuse = hausdorff(p_plus, p_minus, previous_solutions_to_reuse)
+#     g = new_direction(x_0, v_0, p_minus)
+#     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+#     p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
+#     return p_plus, p_minus, objective, previous_solutions_to_reuse
+
+def iteration_loop_geometric(mu, nu, P_plus, P_minus, e_base, emd_kwargs, ret_arg=False):
+    tup = new_direction(P_plus, P_minus, ret_arg=ret_arg)
+    g, objective = tup[0], tup[1]
     g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
-    p_plus, p_minus = update_box(p_plus, p_minus, [[g, g_hat]], [g_star])
-    return p_plus, p_minus, objective, previous_solutions_to_reuse
+    P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+    if ret_arg:
+        return P_plus, P_minus, objective, tup[2], g_star
+    return P_plus, P_minus, objective
 
 
 def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
@@ -56,14 +182,13 @@ def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
     
     objective_list = []
     for iter in range(niter):
-        previous_solutions_to_reuse = {} # todo: fix bug with reusing previous solutions
         logger.info(f'Iteration {iter}')
-        p_plus, p_minus, objective, previous_solutions_to_reuse  = iteration_loop_hausdorff(mu, nu, p_plus, p_minus, e_base, previous_solutions_to_reuse, emd_kwargs)
+        p_plus, p_minus, objective = iteration_loop_geometric(mu, nu, p_plus, p_minus, e_base, emd_kwargs)
         objective_list.append(objective)
         logger.info(f'Iteration {iter}, hausdorff distance: {objective}')
         if objective < epsilon:
             break
-    return p_minus, objective, R, e_base
+    return p_minus, p_plus, objective, R, e_base
 
 
 def construct_basis_eij(space_x, space_y):
@@ -106,7 +231,7 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None):
+    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None, masks_initialization=None, A_initialization=None, b_initialization=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
@@ -115,6 +240,10 @@ class DoubleDescription():
             pass
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -151,6 +280,21 @@ class DoubleDescription():
             self.E = np.array([(index_map[edge[0]], index_map[edge[1]]) for edge in self.E if edge[0] in index_map and edge[1] in index_map])
             logger.info(f"Re-indexed edges, new number of edges: {len(self.E)}")
 
+        elif self.implementation == 'h_to_v_popcount':
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.B = self.poly.B[:, unique_indices]
+            self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
+        
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            # TODO: check correctness of this, especially the re-indexing of masks and adjacency
+            self.poly.E = self.poly.E[unique_indices]
+            self.poly.masks = self.poly.masks[unique_indices]
+            self.poly.D = self.poly._build_adjacency()
+            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
+
     def check_feasibility_V(self, A, b):
         import numpy as np
         from scipy.optimize import linprog
@@ -164,111 +308,25 @@ class DoubleDescription():
     def H_to_V(self):
         
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             A, b = self.H
             logger.info(f'Computing vertices from half-planes: A shape {A.shape}, b shape {b.shape}')
             # logger.info(f'Half-planes: {A}, {b}')
             assert not self.check_feasibility_V(A, b)
-            
-            def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3):
-                '''Try to compute vertices from halfspaces with decreasing rounding precision to enhance numerical stability.
-                
-                This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
-                This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
-                In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
-                Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
-                Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
-                The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
-                
-                '''
-                try:
-                    V = compute_polytope_vertices(A, b)
-                except:
-                    H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
-                    for decimals in range(decimals_start, decimals_end, -1):
-                        V=[]
-                        try:
-                            # 1. Round vertices to reduce numerical noise
-                            H_rounded = [np.round(h, decimals=decimals) for h in H]
-
-                            # 2. Keep only unique vertices
-                            H_rounded_unique = np.unique(H_rounded, axis=0)
-                            A_rounded_unique = H_rounded_unique[:,:-1]
-                            b_rounded_unique = H_rounded_unique[:,-1]
-
-                            # 3. Try compute_polytope_halfspaces
-                            try:
-                                V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
-                            except RuntimeError as e:
-                                # 4. If it fails due to numerical issues, add tiny jitter
-                                scale = 0.5 * 10**(-decimals)
-                                jitter = scale * np.random.randn(*H_rounded_unique.shape)
-                                H_perturbed = H_rounded_unique + jitter
-                                A_perturbed = H_perturbed[:,:-1]
-                                b_perturbed = H_perturbed[:,-1]
-                                V = compute_polytope_vertices(A_perturbed, b_perturbed)
-
-                        except Exception as e:
-                            # print(f'Failed with rounding to {decimals} decimals: {e}')
-                            continue  # try next lower precision
-
-                        else:
-                            if len(V)>1:
-                                # print(f"Success with {decimals} decimals!")
-                                break
-                return V
             # logger.info(f'A,b: {A, b}')
             self.V = stabilize_compute_polytope_vertices(A, b)
             self.remove_duplicates_V()
 
     def V_to_H(self):
         # loop over high to low decimals to ensure numerical stability. take largest that works
-
-        def stabilize_compute_polytope_halfspaces(V, decimals_start=15, decimals_end=3):
-            '''Try to compute halfspaces from vertices with decreasing rounding precision to enhance numerical stability.
-            
-            This function avoids the error Error: Numerical inconsistency is found.  Use the GMP exact arithmetic.
-            This error is related to how cdd casts floating point numbers to rationals internally, which can lead to numerical issues.
-            In general, rounding more allows the function to succeed, but too much rounding can distort the polytope shape.
-            Also, aggresive rounding can fail, while moderate rounding with tiny jitter can succeed.
-            Hence the strategy of starting from high precision and decreasing it, trying jitter if needed.
-            The jitter is scaled to be small compared to the rounding scale (rounding scale is 1/2 std of the jitter, per component).
-            
-            '''
-            try:
-                A, b = compute_polytope_halfspaces(V)
-            except:
-                for decimals in range(decimals_start, decimals_end, -1):
-                    A=[]
-                    try:
-                        # 1. Round vertices to reduce numerical noise
-                        V_rounded = [np.round(v, decimals=decimals) for v in V]
-
-                        # 2. Keep only unique vertices
-                        V_rounded_unique = np.unique(V_rounded, axis=0)
-
-                        # 3. Try compute_polytope_halfspaces
-                        try:
-                            A, b = compute_polytope_halfspaces(V_rounded_unique)
-                        except RuntimeError as e:
-                            # 4. If it fails due to numerical issues, add tiny jitter
-                            scale = 0.5 * 10**(-decimals)
-                            jitter = scale * np.random.randn(*V_rounded_unique.shape)
-                            V_perturbed = V_rounded_unique + jitter
-                            A, b = compute_polytope_halfspaces(V_perturbed)
-
-                    except Exception as e:
-                        # print(f'Failed with rounding to {decimals} decimals: {e}')
-                        continue  # try next lower precision
-
-                    else:
-                        if len(A)>1:
-                            # print(f"Success with {decimals} decimals!")
-                            break
-                   
-            return A, b
+        logger.info(f'V_to_H Computing half-planes from vertices: number of vertices {len(self.V)}')
         A, b = stabilize_compute_polytope_halfspaces(self.V)
+        logger.info(f'V_to_H Computed half-planes: A shape {A.shape}, b shape {b.shape}')
         a_norm = np.linalg.norm(A, axis=1)
         b /= a_norm
         A /= a_norm[:, np.newaxis]
@@ -284,7 +342,11 @@ class DoubleDescription():
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
         if self.implementation == 'h_to_v_edges':
-            raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
+        elif self.implementation == 'h_to_v_popcount_sparse':
+            raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'cdd':
             # vertex is a d^2 by 1 vector
             self.V.extend(vertex_list)
@@ -293,8 +355,26 @@ class DoubleDescription():
     
     # could be optimized for a family of vectors and scalars
     def add_H(self, constraint_list):
-        if self.implementation == 'h_to_v_edges':
-            assert len(constraint_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
+        if self.implementation == 'h_to_v_popcount_sparse': # TODO: refactor to avoid code duplication with h_to_v_popcount, since the only difference is the type of self.poly
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
+        elif self.implementation == 'h_to_v_popcount':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
+            a_new, b_new = constraint_list[0]
+            self.poly.add_constraint(a_new, b_new)
+            self.V = [np.array(v) for v in self.poly.E]
+            A, b = self.H
+            A_all = np.vstack([A, a_new.reshape(-1,)])
+            b_all = np.hstack([b, b_new])
+            self.H = [A_all, b_all]
+        elif self.implementation == 'h_to_v_edges':
+            assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
             V = np.array(self.V)
@@ -305,7 +385,6 @@ class DoubleDescription():
             self.E = E_final
             self.H = [A_final, b_final]
             self.remove_duplicates_V() 
-
         elif self.implementation == 'cdd':
             vector_list = [np.transpose(elem[0]) for elem in constraint_list]
             scalar_list = [np.transpose(elem[1]) for elem in constraint_list]
@@ -336,7 +415,71 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
     p_minus = DoubleDescription(implementation='cdd')
     vertex_list = []
     half_plans_list = []
-    a,b,c = e_base.shape # TODO: .shape[2]
+    c = e_base.shape[2]
+    direction_list = []
+    for i in range(c):
+        dir = np.zeros(c)
+        dir[i] = 1
+        direction_list.append(dir)
+    direction_list.append(-np.ones(c))
+    for dir in direction_list:
+        g_hat, g_star = compute_hyperplane(mu, nu, dir, e_base, emd_kwargs)
+        vertex_list.append(g_star)
+        half_plans_list.append([dir, g_hat])
+            
+            
+    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    if p_plus_implementation == 'h_to_v_edges':
+        from xgw.h_to_v_edges import find_edges
+        E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
+        p_plus = DoubleDescription(implementation=p_plus_implementation, E_initialization=E_initialization)
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
+    elif p_plus_implementation == 'cdd':
+        p_plus = p_plus_initial
+    elif p_plus_implementation == 'h_to_v_popcount':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+        B_initialization = B_bool.astype(int)
+        p_plus = DoubleDescription(implementation=p_plus_implementation, 
+                                   V_initialization=V_initialization, 
+                                   B_initialization=B_initialization
+                                   )
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
+    elif p_plus_implementation == 'h_to_v_popcount_sparse':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+
+        masks_initialization = masks_from_B(B_bool)
+        p_plus = DoubleDescription(implementation=p_plus_implementation,
+                                   V_initialization=V_initialization,
+                                   masks_initialization=masks_initialization,
+                                   A_initialization=A,
+                                   b_initialization=b)
+        p_plus.V = [np.array(v) for v in p_plus.poly.E]
+        p_plus.H = [A, b]
+            
+    return e_base, R, p_plus, p_minus
+
+def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
+    '''
+    Docstring for initial_box
+    
+    :param e: orthonormal basis for V
+    :param mu: marginal 1
+    :param nu: marginal 2
+    creates an initial rectangle bounding 
+    '''
+    e_base, R = classical_gw_construct_basis_eij(space_x, space_y, g_func)
+    p_plus_initial, p_minus = DoubleDescription(implementation='cdd'), DoubleDescription(implementation='cdd')
+    vertex_list = []
+    half_plans_list = []
+    c = e_base.shape[2]
     for i in range(c):
         for sigma in [-1,1]:
             e_i = np.zeros(c)
@@ -353,32 +496,6 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
-            
-    return e_base, R, p_plus, p_minus
-
-def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs):
-    '''
-    Docstring for initial_box
-    
-    :param e: orthonormal basis for V
-    :param mu: marginal 1
-    :param nu: marginal 2
-    creates an initial rectangle bounding 
-    '''
-    e_base, R = classical_gw_construct_basis_eij(space_x, space_y, g_func)
-    p_plus, p_minus = DoubleDescription(), DoubleDescription()
-    vertex_list = []
-    half_plans_list = []
-    a,b,c = e_base.shape
-    for i in range(c):
-        for sigma in [-1,1]:
-            e_i = np.zeros(c)
-            e_i[i] = 1
-            g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
-            vertex_list.append(g_star)
-            half_plans_list.append([sigma*e_i, g_hat])
-    update_box(p_plus, p_minus, half_plans_list, vertex_list)
-            
     return e_base, R, p_plus, p_minus
 
 
@@ -408,6 +525,14 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         assert len(half_planes_list) == 1, 'h_to_v_edges implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount':
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
+    elif p_plus.implementation == 'h_to_v_popcount_sparse':
+        assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
+        a_new, b_new = half_planes_list[0]
+        p_plus.add_H([[a_new, b_new]])
         
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
@@ -415,32 +540,54 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         p_minus.V_to_H()
         logger.info('Updated half-planes of p_minus from vertices')
     elif p_minus.implementation == 'h_to_v_edges':
-        raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
+    elif p_minus.implementation == 'h_to_v_popcount_sparse':
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
 
     return p_plus, p_minus
 
 
-def new_direction(x_0, v_0, p_minus):
-    if np.allclose(x_0, v_0):
-        sol = v_0 - p_minus.get_centroid()
-        assert np.all(sol != 0), f' zero direction'
-        return v_0 - p_minus.get_centroid()
-    else:
-        sol = v_0-x_0
-    return (sol)/np.linalg.norm(sol)
+# def new_direction_old(x_0, v_0, p_minus):
+#     #deprecated
+#     if np.allclose(x_0, v_0):
+#         sol = v_0 - p_minus.get_centroid()
+#         assert np.all(sol != 0), f' zero direction'
+#         return v_0 - p_minus.get_centroid()
+#     else:
+#         sol = v_0-x_0
+#     return (sol)/np.linalg.norm(sol)
+
+def new_direction(P_plus, P_minus, tol=1e-10, ret_arg=False):
+# Normalized normal vectors of P_minus
+    A,b =  P_minus.H
+    vect_list = np.array(P_plus.V)
+    # Finding best direction 
+    testing_dir = A @ (vect_list.T) - np.tile(b,(len(vect_list), 1)).T
+    logger.info(f'shape test_dir: {testing_dir.shape}')
+    indexes = np.unravel_index(np.argmax(testing_dir), testing_dir.shape)
+    x_plus = vect_list [indexes[1]]
+    g = A[indexes[0]]
+    val = g @ x_plus - b[indexes[0]]
+    # checking that the point is outside P_minus
+    assert val >= -tol 
+    if ret_arg:
+        return g / np.linalg.norm(g), val, x_plus
+    return g / np.linalg.norm(g), val
 
 
-#we can  probably  use numba here, else it may be slow, not sure how numba works with classes though
-def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
-    cost = -np.inf
-    for vertex in p_plus.V:
-        x, objective, _ = solve_dist(vertex, p_minus, previous_solutions_to_reuse)
-        # x, objective = solve_dist_brute_force(vertex, p_minus)
-        if objective > cost:
-            x0, v_0 = x, vertex
-            cost = objective
-    logger.info(f'Hausdorff distance :{objective}')
-    return x0, v_0, objective, previous_solutions_to_reuse
+# def hausdorff(p_plus, p_minus, previous_solutions_to_reuse):
+#     #deprecated
+#     cost = -np.inf
+#     for vertex in p_plus.V:
+#         x, objective, _ = solve_dist(vertex, p_minus, previous_solutions_to_reuse)
+#         # x, objective = solve_dist_brute_force(vertex, p_minus)
+#         if objective > cost:
+#             x0, v_0 = x, vertex
+#             cost = objective
+#     logger.info(f'Hausdorff distance :{objective}')
+#     return x0, v_0, objective, previous_solutions_to_reuse
 
             
 def p_plus_outside_p_minus(p_plus, p_minus):
@@ -466,7 +613,10 @@ def build_new_constraint(A_all, b_all, A_old, b_old):
     return a_new, b_new
 
 def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
+    '''Solve the optimization problem of finding the point in p_minus that is farthest from vertex.'''
     from .qp_incremental_projector import IncrementalQPProjector
+    # print(f'solve_dist for vertex {vertex}')
+    # print(f'len p_minus half-planes: {len(p_minus.H[0])}')
     if vertex.tobytes() not in previous_solutions_to_reuse:
         A_all, b_all = p_minus.H
         qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
@@ -475,8 +625,15 @@ def solve_dist(vertex, p_minus, previous_solutions_to_reuse):
         qp_solver = previous_solutions_to_reuse[vertex.tobytes()]['solver']
         A_old, b_old = previous_solutions_to_reuse[vertex.tobytes()]['H']
         A_all, b_all = p_minus.H
-        a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old)
-        x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new)
+        if len(A_all) > len(A_old):
+            a_new, b_new = build_new_constraint(A_all, b_all, A_old, b_old) 
+            # print('reusing: len A_old', len(A_old), 'len A_all', len(A_all))
+            x, objective = qp_solver.solve_with_new_constraint(vertex, a_new, b_new) 
+        else:
+            raise ValueError('No new constraints to add, but previous solution exists. This should not happen, check the logic of when to reuse previous solutions.')
+            # A_all, b_all = p_minus.H
+            # qp_solver = IncrementalQPProjector(dim=len(vertex), A=A_all, b=b_all)
+            # x, objective = qp_solver.solve(vertex)
     previous_solutions_to_reuse[vertex.tobytes()] = {'solver': qp_solver, 'H': (A_all, b_all), 'x': x, 'objective': objective}
     return x, objective, previous_solutions_to_reuse
 
