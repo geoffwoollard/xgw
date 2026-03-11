@@ -40,7 +40,7 @@ def testing_2d_classical_gw():
 
 @pytest.fixture
 def implementations_to_test():
-    return ['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] # 'h_to_v_edges'
+    return ['cdd', 'h_to_v_popcount', 'h_to_v_edges'] # 'h_to_v_edges'
 
 def test_3d_convex(implementations_to_test):
     '''passing'''
