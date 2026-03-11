@@ -59,6 +59,7 @@ class Config:
     dimension: int 
     odir: str 
     t_eps: float
+    p_plus_implementation: str
 
 @hydra.main(version_base=None, config_path=".", config_name="proteins_config")
 def main(config: Config):
@@ -124,7 +125,7 @@ def main(config: Config):
                     space_ys = coords_ca_2[j]
                     nus = ot.unif(space_ys.shape[0])
                     try:
-                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, p_plus_implementation='h_to_v_popcount', FW_iter=500)
+                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, p_plus_implementation=config.p_plus_implementation, FW_iter=500)
                     except Exception as e:
                         print(f"Error comparing conformer {i} vs {j}: {e}")
                         loss_lower, gap, loss_upper, loss_constant = np.nan, np.nan, np.nan, np.nan

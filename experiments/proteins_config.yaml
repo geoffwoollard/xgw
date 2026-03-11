@@ -8,8 +8,9 @@ n_skip_every: 1
 compute_gw: false
 compute_xgw: true
 xgw_plot_fname: ${repo_dir}/experiments/proteins_xgw_loss_plot.png
-max_iter: 40
+max_iter: 3
 unique_label: debug
 dimension: 2
 odir: ${repo_dir}/experiments/
 t_eps: 1e-4
+p_plus_implementation: h_to_v_popcount
