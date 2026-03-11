@@ -49,7 +49,7 @@ def test_3d_convex(implementations_to_test):
     for test_id in range(n_tests):
         mus, _, space_xs, _ = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
         r2 = 1
-        t = 24*r2 / (2*r2 + 24)
+        t = 8*r2 / (2*r2 + 8)
         logger.info(f'Using t={t} for test {test_id}')
 
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):

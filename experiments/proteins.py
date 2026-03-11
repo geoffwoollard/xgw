@@ -1,10 +1,11 @@
 import gemmi
 import numpy as np
 import matplotlib.pyplot as plt
+from omegaconf import OmegaConf
+import hydra
 import ot
 import logging
 import os
-import time
 from dataclasses import dataclass, asdict
 
 logging.disable(logging.CRITICAL)
@@ -43,23 +44,24 @@ def selection_atoms(selection, model_coords, model_atoms):
 
 @dataclass
 class Config:
-    fname_1: str = '/Users/gw/repos/xgw/experiments/2M3T.cif'
-    fname_2: str = '/Users/gw/repos/xgw/experiments/2M3U.cif'
-    gw_plot_fname: str = '/Users/gw/repos/xgw/experiments/gw_loss_plot.png'
-    selection: str = 'CA'
-    n_models: int | None = 5
-    n_skip_every: int = 1
-    compute_gw: bool = False
-    compute_xgw: bool = True
-    xgw_plot_fname: str = '/Users/gw/repos/xgw/experiments/xgw_loss_plot.png'
-    max_iter: int = 20
-    unique_label: str = time.strftime("%Y%m%d-%H%M%S")
-    dimension: int = 3
-    odir: str = '/Users/gw/repos/xgw/experiments/'
+    repo_dir: str
+    fname_1: str 
+    fname_2: str
+    gw_plot_fname: str 
+    selection: str 
+    n_models: int | None 
+    n_skip_every: int
+    compute_gw: bool
+    compute_xgw: bool
+    xgw_plot_fname: str 
+    max_iter: int 
+    unique_label: str
+    dimension: int 
+    odir: str 
+    t_eps: float
 
-
-def main():
-    config = Config()
+@hydra.main(version_base=None, config_path=".", config_name="proteins_config")
+def main(config: Config):
     model_coords_1, model_atoms_1 = extract_coords_and_atoms(config.fname_1)
     label_1 = os.path.basename(config.fname_1).replace('.cif', '')
     np.savez(config.fname_1.replace('.cif', '_models.npz'), model_coords=model_coords_1, model_atoms=model_atoms_1)
@@ -103,7 +105,8 @@ def main():
         r2_x = np.linalg.norm(coords_ca_1, axis=(-1)).max()
         r2_y = np.linalg.norm(coords_ca_2, axis=(-1)).max()
         r2_max = max(r2_x, r2_y)
-        t = 24*r2_max / (2 + 24*r2_max)
+        t = 8*r2_max / (2 + 8*r2_max)
+        t += config.t_eps
         print(f"Using t={t:.4f} based on r2_max={r2_max:.4f}")
 
         def gw_m_convex_wrapper(coords_ca_1, coords_ca_2, t, symmetric, iter_max):
@@ -121,10 +124,10 @@ def main():
                     space_ys = coords_ca_2[j]
                     nus = ot.unif(space_ys.shape[0])
                     try:
-                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', cost_tol=1e-15, iter_max=iter_max, t=t)
+                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, p_plus_implementation='h_to_v_popcount', FW_iter=500)
                     except Exception as e:
                         print(f"Error comparing conformer {i} vs {j}: {e}")
-                        loss_lower, gap, loss_upper = np.nan, np.nan, np.nan
+                        loss_lower, gap, loss_upper, loss_constant = np.nan, np.nan, np.nan, np.nan
                     losses_lower_bound[i, j] = loss_lower
                     losses_upper_bound[i, j] = loss_upper
                     losses_gap[i, j] = gap
@@ -148,7 +151,7 @@ def main():
         print("Self CGW 2:")
         lower_bounds_2, upper_bounds_2, losses_gap_2, losses_constant_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max)
         np.savez(config.xgw_plot_fname.replace('.png', f'_data_{config.unique_label}.npz'), 
-                 config=asdict(config),
+                 config=OmegaConf.to_container(config, resolve=True, structured_config_mode=False),
                  lower_bounds_cross=lower_bounds_cross, 
                  upper_bounds_cross=upper_bounds_cross, 
                  lower_bounds_1=lower_bounds_1, 

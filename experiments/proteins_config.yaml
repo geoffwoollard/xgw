@@ -1,0 +1,15 @@
+repo_dir: /Users/gw/repos/xgw
+fname_1: ${repo_dir}/experiments/2M3T.cif
+fname_2: ${repo_dir}/experiments/2M3U.cif
+gw_plot_fname: ${repo_dir}/experiments/gw_loss_plot.png
+selection: CA
+n_models: 2
+n_skip_every: 1
+compute_gw: false
+compute_xgw: true
+xgw_plot_fname: ${repo_dir}/experiments/proteins_xgw_loss_plot.png
+max_iter: 40
+unique_label: debug
+dimension: 2
+odir: ${repo_dir}/experiments/
+t_eps: 1e-4
