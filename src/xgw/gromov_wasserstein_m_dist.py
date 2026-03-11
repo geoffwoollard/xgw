@@ -184,7 +184,9 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
         if Tcost > c_minus:
             c_minus = Tcost
             x_minus = g_star
+            
         if c_plus - c_minus < gap_tol:
+            x_minus = g_star
             break
 
     # Computing the optimal coupling:
