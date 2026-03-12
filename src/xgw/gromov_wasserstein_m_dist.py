@@ -3,7 +3,7 @@ from numba import njit
 import ot
 from ncpol2sdpa import generate_variables, SdpRelaxation
 from .frank_wolfe import _frank_wolfe_iter, covariance, const_cost, polynomial_cost, frank_wolfe_polynomial, center_marginal, _classical_gw_frank_wolfe, classical_gw_const_cost
-from .hyperplane_approx import run_approx, initial_box, projection, update_box, f_to_e, e_to_f, compute_hyperplane, classical_gw_initial_box
+from .hyperplane_approx import run_approx, initial_box, projection, function_to_cost, update_box, f_to_e, e_to_f, compute_hyperplane, classical_gw_initial_box
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
 
@@ -108,8 +108,20 @@ def vect_to_coupling(x_minus, mu, nu, e_base):
     # can do check on objective being close to 0 (to code later)
     pi_opt = pi_opt.reshape((len(mu),len(nu)))
     return pi_opt
+
+
+def vect_to_coupling_cvx(best_dir, mu, nu, e_base, emd_kwargs):
+    # Find the face of P_plus touching x_minus
+    cost_matrix = function_to_cost(best_dir, e_base)
+    pi , _ = ot.emd(mu, nu, M=-cost_matrix, log=True, **emd_kwargs)
+    return pi    
     
-    
+def best_init_dir(x_minus, P_plus):
+    A, b = P_plus.H
+    index = np.argmax(A@x_minus-b)
+    g = A[index]
+    return g/np.linalg.norm(g)
+
 def optimal_t(max_diam, d, cost, t, convex_tol, exp_upper_bound=True):
     if cost == 'CGW' and t is None:
         if d <= 2 :
@@ -160,7 +172,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
     c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
-    
+    best_dir = best_init_dir(x_minus, P_plus)
     
     for iter in range(iter_max):
         # choose direction
@@ -183,15 +195,14 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
         
         if Tcost > c_minus:
             c_minus = Tcost
-            x_minus = g_star
+            best_dir = g
             
         if c_plus - c_minus < gap_tol:
             # x_minus = g_star
             break
 
     # Computing the optimal coupling:
-    pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) 
-    
+    pi_opt = vect_to_coupling_cvx(best_dir, mu, nu, e_base, emd_kwargs)
     # Local optimization to finish the optimization  (may not be needed)
     c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
 
