@@ -38,9 +38,9 @@ def testing_2d_classical_gw():
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}')
         assert np.isclose(plan_error, 0.0)
 
-@pytest.fixture
+# @pytest.fixture
 def implementations_to_test():
-    return ['cdd', 'h_to_v_popcount', 'h_to_v_edges'] # 'h_to_v_edges'
+    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount']
 
 def test_3d_convex(implementations_to_test):
     '''passing'''
@@ -86,8 +86,8 @@ def test_2d_convex(implementations_to_test):
             final_gap_tolerance_pos = 1e-4
             final_gap_tolerance_neg = -0.01
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation} - identical simple marginals')
-            T, _, gap, _, _ = gw_m_convex(mu, space_x, mu, space_x, {}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, p_plus_implementation=p_plus_implementation)
-            assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {final_gap_tolerance_pos} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
+            T, _, gap, _, _ = gw_m_convex(mu, space_x, mu, space_x, {'numItermax':1000000}, cost=cost, gap_tol=near_zero_tolerance, iter_max=200, FW_iter=200, p_plus_implementation=p_plus_implementation)
+            assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
             assert -near_zero_tolerance < T < near_zero_tolerance, f"Total cost {T} is not within tolerance {near_zero_tolerance} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
 
             final_gap_tolerance_pos = 1e-4
@@ -210,7 +210,7 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    PASS_testing_2d_non_convex(marginals())
+    test_2d_convex(implementations_to_test())
     # test_2d_convex(['h_to_v_popcount'])
     # test_3d_convex(['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'])
     # d = np.load('debug.npz')

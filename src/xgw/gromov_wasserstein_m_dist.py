@@ -140,7 +140,7 @@ def new_direction_convex_slow(P_minus, x_plus, tol=1e-10):
     assert g @ x_plus - b[index]>= -tol 
     return g / np.linalg.norm(g)
 
-def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol = 1e-3, p_plus_implementation='cdd'):
+def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol=1e-3, p_plus_implementation='cdd'):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -186,7 +186,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
             x_minus = g_star
             
         if c_plus - c_minus < gap_tol:
-            x_minus = g_star
+            # x_minus = g_star
             break
 
     # Computing the optimal coupling:
@@ -244,6 +244,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
             c_minus = Tcost
             x_minus = g_star
         if c_plus - c_minus < cost_tol:
+            # x_minus = g_star
             break
 
     # Computing the optimal coupling:
