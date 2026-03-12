@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import Delaunay
 import math
-from xgw.hyperplane_approx import _run_approx_yield
+from xgw.hyperplane_approx import _run_approx_yield, projection, construct_basis_eij
 from xgw.gromov_wasserstein_m_dist import _run_convex_yield
+from xgw.frank_wolfe import _frank_wolfe_iter
 
 
 def volume_convex_hull_from_vertices(vertices):
@@ -165,6 +166,68 @@ def convex_cost_convergence_rate(n_points, niter, d, cost):
     fig.savefig(f'experiments/figures/{cost}_cost_convergence_d{d}_{n_points}points.svg', format='svg')
     plt.close(fig)  
     
+    
+    
+    
+def FW_convergence_rate(n_points, niter, d, cost):
+    
+    objective_list = []
+    coupli_list = []
+    mu, nu, space_x, space_y = figure_random_pointcloud(d, n_points)
+    d = len(space_x[0])
+    # e_base, R = construct_basis_eij(space_x, space_y)
+    # p = 0.999
+    # pi_init = p*np.outer(mu,mu)+(1-p)*np.diag(mu)
+    # # print(d)
+    # # np.random.seed(1)
+    # # init_direc = np.random.rand(d**2)
+    for elem in tqdm(_frank_wolfe_iter(mu, space_x, nu, space_y, cost=cost, iter_max=niter)):
+        objective, coupling, _= elem
+        objective_list.append(objective)
+        coupli_list.append(coupling)
+        final_plan = coupling
+    # for elem in tqdm(_frank_wolfe_iter(mu, space_x, nu, space_y, cost=cost, iter_max=niter)):
+    #     objective, coupling, _= elem
+    #     coupli_list.append(np.linalg.norm(coupling-final_plan))
+    # diff = -np.diff(np.array(objective_list))
+    diff = np.array(objective_list)
+    diff = diff-diff[-1]
+    diff = diff[:-1]
+    coupls = np.array(coupli_list)
+    coupls = coupls - coupls[-1]
+    coupls = coupls[:-1]
+    coupls = [np.linalg.norm(val) for val in coupls ]
+    
+    n_panels = 2
+    plt.rc('font', size=12)
+    fig, axes = plt.subplots(n_panels,1)
+    axes[0].plot(range(1, len(diff) + 1), coupls, color='k', label=r'Plan error')
+    axes[1].plot(range(1, len(diff) + 1), diff, color='blue', label=r' Cost error')
+    for idx in range(n_panels):
+        axes[idx].set_xlabel('Iteration')
+        if idx ==0:
+            axes[idx].set_ylabel('Error')
+        else:
+            axes[idx].set_ylabel('Error')
+            axes[idx].set_yscale('log')
+        axes[idx].legend()
+    # n_panels = 1
+    # plt.rc('font', size=12)
+    # fig, axes = plt.subplots(n_panels,1)
+    # axes.plot(range(1, len(diff) + 1), diff, color='blue', label=r' $ \epsilon$')
+    
+    # axes.set_xlabel('Iteration')
+    # axes.set_ylabel('Difference to local optimal cost')
+    # axes.set_yscale('log')
+    # axes.legend()
+    # # mkdir if not exists
+    if not os.path.exists('experiments/figures'):
+        os.makedirs('experiments/figures')
+    fig.suptitle(f'Frank-Wolfe convergence, \n {n_points} points in marginals, dimension {d}' )
+    plt.tight_layout()
+    fig.savefig(f'experiments/figures/FW_{cost}_cost_convergence_d{d}_{n_points}points.svg', format='svg')
+    plt.close(fig)  
+    
 if __name__ == "__main__":
     # bounding_box_convergence_rate_vol_2d(10, 350)
     # bounding_box_convergence_rate_vol_2d(50, 500)
@@ -174,4 +237,7 @@ if __name__ == "__main__":
     # convex_cost_convergence_rate(50, 500, 2,'IGW')
     # convex_cost_convergence_rate(100, 500, 2,'IGW')
     # convex_cost_convergence_rate(5000, 500, 2,'IGW')
-    convex_cost_convergence_rate(10, 35, 3,'IGW')
+    # convex_cost_convergence_rate(10, 35, 3,'IGW')
+    # FW_convergence_rate(1000, 29, 3,'DGW')
+    FW_convergence_rate(1000, 200, 3,'IGW')
+    # FW_convergence_rate(1000, 200, 3,'CGW')

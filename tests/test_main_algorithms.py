@@ -210,8 +210,8 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_2d_convex(implementations_to_test())
     # test_2d_convex(['h_to_v_popcount'])
+    test_2d_convex(['h_to_v_popcount_sparse'])
     # test_3d_convex(['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'])
     # d = np.load('debug.npz')
     # from xgw.h_to_v_edges import update_edges_with_new_halfplane
