@@ -189,10 +189,10 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
             # x_minus = g_star
             break
 
-    # Computing the optimal coupling:
+    logger.info('Computing the optimal coupling')
     pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) 
     
-    # Local optimization to finish the optimization  (may not be needed)
+    logger.info('Local optimization to finish the optimization  (may not be needed)')
     c_op, pi_opt = frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_opt, cost=cost, iter_max=FW_iter, t=t)
 
     total_loss = cst_cost-2*c_op

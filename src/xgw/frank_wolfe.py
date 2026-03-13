@@ -1,8 +1,19 @@
 import numpy as np
 from numba import njit
 import ot
+import logging
 
 from .hyperplane_approx import projection
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=False,
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 @njit
 def det_23d(mat):
@@ -330,6 +341,7 @@ def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
 
 def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max = 50, t=0.5, emd_kwargs={}):
     for _ in range(iter_max):
+        logger.info(f"FW it {_}")
         sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
         M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
         lin_cost = linearized_cost_function(space_x, space_y, M_pi_n)
@@ -358,6 +370,7 @@ def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, iter_max =
     initial_coupling_cost = classical_gw_cost(space_x, space_y, pi_n, g_func)
     T = initial_coupling_cost
     for it in range(iter_max):
+        logger.info(f"FW it {it}")
         M_pi_n = cross_covariance(space_x, space_y, pi_n)
         lin_cost = 2*linearized_cost_function(space_x, space_y, M_pi_n) + g_func
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
