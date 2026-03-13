@@ -254,12 +254,14 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
         if Tcost > c_minus:
             c_minus = Tcost
             x_minus = g_star
+            best_dir = g
         if c_plus - c_minus < cost_tol:
             # x_minus = g_star
             break
 
     # Computing the optimal coupling:
-    pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) 
+    # pi_opt = vect_to_coupling(x_minus, mu, nu, e_base) 
+    pi_opt = vect_to_coupling_cvx(best_dir, mu, nu, e_base, emd_kwargs)
     # Local optimization to finish the optimization 
     c_op, pi_opt, _ = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_opt, g_func, iter_max=FW_iter)
 
