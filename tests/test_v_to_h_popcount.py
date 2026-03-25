@@ -29,6 +29,10 @@ def init_unit_cube(d):
     for i, f in enumerate(facets):
         for r in facet_ridges(f["mask"]):
             ridge_map.setdefault(r, []).append(i)
+            
+    print(f"ridge_map for dim={d}:")
+    for ridge, facet_indices in ridge_map.items():
+        print(f"  ridge {bin(ridge)}: facets {facet_indices}")
 
     for fs in ridge_map.values():
         if len(fs) == 2:
@@ -43,9 +47,9 @@ def test_cube_single_vertex_expand(dims):
 
     for dim in dims:
         vertices, facets = init_unit_cube(dim)
-        # print("old vertices:\n", vertices)
-        # print("old facets:")
-        # for f in facets: print(f)
+        print("old vertices:\n", vertices)
+        print("old facets:")
+        for f in facets: print(f)
         assert len(vertices) == 2**dim
         new_vertex = 0.5*np.ones(dim)
         new_coord = 1.5
@@ -55,11 +59,14 @@ def test_cube_single_vertex_expand(dims):
         assert len(facets) == 2*dim - 1 + 2*(dim-1)
 
 if __name__ == "__main__":
-    # vertices, facets = init_unit_cube(3)
+    vertices, facets = init_unit_cube(3)
+    print("old vertices:\n", vertices)
+    print("old facets:")
+    for f in facets: print(f)
 
     # x_new = np.array([1.1, 1.1, 1.1])
     # vertices, facets = add_vertex(vertices, facets, x_new)
 
     # print(len(vertices))  # stays 8 (correct)
-    test_cube_single_vertex_expand([2, 3, 4])
+    # test_cube_single_vertex_expand([3])
 
