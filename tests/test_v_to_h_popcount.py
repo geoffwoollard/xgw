@@ -38,10 +38,28 @@ def init_unit_cube(d):
 
     return vertices, facets
 
+def test_cube_single_vertex_expand(dims):
+    '''Add one vertex on top. should only affect one facet.'''
+
+    for dim in dims:
+        vertices, facets = init_unit_cube(dim)
+        # print("old vertices:\n", vertices)
+        # print("old facets:")
+        # for f in facets: print(f)
+        assert len(vertices) == 2**dim
+        new_vertex = 0.5*np.ones(dim)
+        new_coord = 1.5
+        new_vertex[-1] = new_coord
+        vertices, facets = add_vertex(vertices, facets, new_vertex)
+        assert len(vertices) == 2**dim + 1
+        assert len(facets) == 2*dim - 1 + 2*(dim-1)
+
 if __name__ == "__main__":
-    vertices, facets = init_unit_cube(3)
+    # vertices, facets = init_unit_cube(3)
 
-    x_new = np.array([1.1, 1.1, 1.1])
-    vertices, facets = add_vertex(vertices, facets, x_new)
+    # x_new = np.array([1.1, 1.1, 1.1])
+    # vertices, facets = add_vertex(vertices, facets, x_new)
 
-    print(len(vertices))  # stays 8 (correct)
+    # print(len(vertices))  # stays 8 (correct)
+    test_cube_single_vertex_expand([2, 3, 4])
+
