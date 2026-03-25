@@ -92,6 +92,33 @@ def rebuild_adjacency(facets, vertices, d, tol=1e-10):
                 facets[i]["neighbors"].append(j)
                 facets[j]["neighbors"].append(i)
 
+
+def prune_vertices(vertices, facets):
+    """
+    Remove vertices not used by any facet.
+    Reindex everything.
+    """
+
+    # Step 1: collect used vertices
+    used = set()
+    for f in facets:
+        used.update(f["verts"])
+
+    used = sorted(used)
+
+    # Step 2: build reindex map
+    old_to_new = {old: i for i, old in enumerate(used)}
+
+    # Step 3: filter vertices
+    vertices_new = vertices[used]
+
+    # Step 4: update facets
+    for f in facets:
+        f["verts"] = [old_to_new[v] for v in f["verts"]]
+
+    return vertices_new, facets
+
+
 # -----------------------------
 # Main algorithm
 # -----------------------------
@@ -183,5 +210,8 @@ def add_vertex(vertices, facets, x_new, tol=1e-10):
 
     # Step 6: rebuild adjacency (robust)
     rebuild_adjacency(facets, vertices, d, tol)
+
+    # Step 7: prune dead vertices
+    vertices, facets = prune_vertices(vertices, facets)
 
     return vertices, facets
