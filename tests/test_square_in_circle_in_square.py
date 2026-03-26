@@ -182,3 +182,5 @@ def test_minimal_2d(n_iter, implementations):
 
         plt.clf()
             
+if __name__ == "__main__":
+    test_minimal_2d(30, ['h_to_v_popcount'])

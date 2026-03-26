@@ -102,7 +102,7 @@ def recover_vertices_from_facets(facets, d, tol=1e-10):
     return V
 
 
-def setup_dual_polytope(vertices, facets):
+def setup_dual_polytope(vertices, facets, implementation, **kwargs):
     d = vertices.shape[1]
 
     # Step 1: center
@@ -118,7 +118,7 @@ def setup_dual_polytope(vertices, facets):
     # Step 4: add halfspace in dual
     # x_new becomes inequality: x_new^T y <= 1
     # initialize h_to_v data structure from vertices
-    dd_dual_polytope = DoubleDescription(implementation='cdd')
+    dd_dual_polytope = DoubleDescription(implementation=implementation, **kwargs)
     dd_dual_polytope.add_V(dual_vertices.tolist())
     return dd_dual_polytope, center, d
 
