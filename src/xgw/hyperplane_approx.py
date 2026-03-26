@@ -5,6 +5,7 @@ import ot
 import logging
 from itertools import product
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -231,11 +232,20 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None, masks_initialization=None, A_initialization=None, b_initialization=None):
+    def __init__(self, duplicate_tol=1e-5, 
+                 implementation='cdd', 
+                 E_initialization=None, 
+                 V_initialization=None, 
+                 B_initialization=None, 
+                 masks_initialization=None, 
+                 A_initialization=None, 
+                 b_initialization=None, 
+                 dual_implementation=None):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
         self.implementation = implementation
+        self.dual_implementation = dual_implementation
         if self.implementation == 'cdd':
             pass
         elif self.implementation == 'h_to_v_edges':
@@ -244,6 +254,9 @@ class DoubleDescription():
             self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
         elif self.implementation == 'h_to_v_popcount_sparse':
             self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
+        elif self.implementation == 'v_to_h_dual':
+            assert self.dual_implementation is not None, 'dual_implementation is required for v_to_h_dual implementation'
+            assert self.dual_implementation in ['cdd', 'h_to_v_popcount'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -330,7 +343,7 @@ class DoubleDescription():
         logger.info(f'V_to_H Computed half-planes: A shape {A.shape}, b shape {b.shape}')
         a_norm = np.linalg.norm(A, axis=1)
         b /= a_norm
-        A /= a_norm[:, np.newaxis]
+        A /= a_norm[:, np.newaxis] # TODO: fix: RuntimeWarning: divide by zero encountered in divide
         self.H = (A,b)
         
     def __len__(self):
@@ -341,14 +354,16 @@ class DoubleDescription():
         return f"Vertices: {self.V}\nHalf-planes: {self.H}"
     
     # could be optimized for a family of vertices
-    def add_V(self, vertex_list, dd_dual_polytope=None):
+    def add_V(self, vertex_list, vertex_initialization=None, A_initialization=None, b_initialization=None):
         if self.implementation == 'v_to_h_dual':
-            assert dd_dual_polytope is not None, 'dd_dual_polytope is required for v_to_h_dual implementation'
+            from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual
+            # assert dd_dual_polytope is not None, 'dd_dual_polytope is required for v_to_h_dual implementation'
             assert len(vertex_list) == 1, f'{self.implementation} implementation only supports adding one vertex at a time'
             x_new = vertex_list[0]
-            setup_dual_polytope(vertices, facets, implementation)
-            add_vertex_via_dual(x_new, dd_dual_polytope.center, dd_dual_polytope, dd_dual_polytope.d)
-
+            dd_dual_polytope, center, dim = setup_dual_polytope(vertex_initialization, A_initialization, b_initialization, implementation=self.dual_implementation)
+            vertices, A, b = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
+            self.V = vertices.tolist()
+            self.H = (A, b)
 
         elif self.implementation == 'h_to_v_edges':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
@@ -542,6 +557,7 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
+
         
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
@@ -554,7 +570,13 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     elif p_minus.implementation == 'h_to_v_popcount_sparse':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
-
+    elif p_minus.implementation == 'v_to_h_dual':
+        assert len(vertex_list) == 1, f'{p_minus.implementation} implementation only supports adding one vertex at a time'
+        x_new = vertex_list[0]
+        A, b = p_minus.H
+        p_minus.add_V([x_new], vertex_initialization=np.array(p_minus.V), A_initialization=A, b_initialization=b)
+    else:
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     return p_plus, p_minus
 
 

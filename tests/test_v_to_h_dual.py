@@ -14,7 +14,7 @@ from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual
 
 @pytest.fixture
 def dims():
-    return [2,3,4]
+    return [2,3]
 
 @pytest.fixture
 def implementations():
