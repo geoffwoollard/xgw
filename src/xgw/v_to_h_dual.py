@@ -1,7 +1,7 @@
 import numpy as np
 import itertools
 
-from xgw.hyperplane_approx import DoubleDescription
+from xgw.hyperplane_approx import DoubleDescription, build_B_from_H_and_V
 
 
 def center_polytope(vertices):
@@ -118,8 +118,20 @@ def setup_dual_polytope(vertices, facets, implementation, **kwargs):
     # Step 4: add halfspace in dual
     # x_new becomes inequality: x_new^T y <= 1
     # initialize h_to_v data structure from vertices
-    dd_dual_polytope = DoubleDescription(implementation=implementation, **kwargs)
-    dd_dual_polytope.add_V(dual_vertices.tolist())
+
+    if implementation == 'cdd':
+        dd_dual_polytope = DoubleDescription(implementation=implementation, **kwargs)
+        dd_dual_polytope.add_V(dual_vertices.tolist())
+    elif implementation == 'h_to_v_popcount':
+        dual_A = vertices
+        dual_b = np.ones(len(vertices))
+        dual_B_initialization = build_B_from_H_and_V(dual_A, dual_b, dual_vertices)
+        dd_dual_polytope = DoubleDescription(implementation='h_to_v_popcount', V_initialization=dual_vertices, B_initialization=dual_B_initialization)
+        dd_dual_polytope.V = dual_vertices.tolist()
+        dd_dual_polytope.H = [dual_A, dual_b]
+    else:
+        raise ValueError(f"Unknown implementation: {implementation}")
+
     return dd_dual_polytope, center, d
 
 def add_halfspace_dual(x_new, dd_dual_polytope):

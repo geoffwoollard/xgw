@@ -32,7 +32,7 @@ class ExtremePointPolytope:
 
         BTB = self.B.T @ self.B
         D_vec = BTB - np.diag(BTB.diagonal())
-        D_vec = (D_vec == self.r - 1).astype(np.uint8)
+        D_vec = (D_vec >= self.r - 1).astype(np.uint8) # BEWARE MARJOR BUG: adjacent if they share at least r-1 active constraints (not exact!)
         self.D = D_vec
 
         # for i in range(n):

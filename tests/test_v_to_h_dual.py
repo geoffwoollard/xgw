@@ -1,75 +1,92 @@
 import numpy as np
 import pytest
+# import logging
+from time import time
+
+
 from xgw.v_to_h import init_unit_cube
-from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual, center_polytope, center_polytope_facets, normalize_facets, primal_to_dual
-from xgw.hyperplane_approx import build_B_from_H_and_V, DoubleDescription
+from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual
 
-def setup_dual_polytope_h_to_v_popcount(vertices, facets):
 
-    vertices, center = center_polytope(vertices)
-    facets = center_polytope_facets(facets, center)
-    facets = normalize_facets(facets)
-    dual_vertices = primal_to_dual(facets)
+# logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
-    dual_A = vertices
-    dual_b = np.ones(len(vertices))
-    
-    dual_B_initialization = build_B_from_H_and_V(dual_A, dual_b, dual_vertices)
-    dd_dual_polytope = DoubleDescription(implementation='h_to_v_popcount', V_initialization=dual_vertices, B_initialization=dual_B_initialization)
-    dd_dual_polytope.V = dual_vertices.tolist()
-    dd_dual_polytope.H = [dual_A, dual_b]
-
-    dim = vertices.shape[1]
-    return dd_dual_polytope, center, dim
 
 @pytest.fixture
 def dims():
-    return [2]
+    return [2,3,4]
 
-def test_cube_single_vertex_expand(dims):
+@pytest.fixture
+def implementations():
+    return ['h_to_v_popcount','cdd']
+
+def canonicalize_vertices(vertices, decimals=5):
+    vertices = np.round(vertices, decimals=decimals)
+    vertices = np.unique(vertices, axis=0)
+    return vertices
+
+def test_cube_single_vertex_expand(dims, implementations):
     for dim in dims:
-        vertices, facets = init_unit_cube(dim)
-        print(f"old vertices (len {len(vertices)}):\n", vertices)
-        print("old facets:")
-        for f in facets: print(f)
+        for implementation in implementations:
+            # logger.info(f"Testing dimension {dim} with implementation {implementation}...")
+            unit_cube_vertices, facets = init_unit_cube(dim)
+            # print(f"old vertices (len {len(unit_cube_vertices)}):\n", unit_cube_vertices)
+            # print("old facets:")
+            # for f in facets: print(f)
 
-        
-
-        x_new = np.array([0.5, 1.5]) 
-        # dd_dual_polytope, center, dim = setup_dual_polytope(vertices, facets, implementation='cdd')
-        dd_dual_polytope, center, dim = setup_dual_polytope_h_to_v_popcount(vertices, facets)
-        print(f"dd_dual_polytope.V: {dd_dual_polytope.V}")
-        print(f"dd_dual_polytope.H: {dd_dual_polytope.H}")
-        print(f"\nAdding vertex {x_new} via dual...")
-                    
-        vertices, facets = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
-        print("new vertices:\n", vertices)
-        print("new facets:")
-        for f in facets: print(f)
-
-
-
-# def test_cube_double_scale_expand(dims):
-#     for dim in dims:
-#         vertices, facets = init_unit_cube(dim)
-#         print(f"old vertices (len {len(vertices)}):\n", vertices)
-#         print("old facets:")
-#         for f in facets: print(f)
-
-#         bigger_cube_vertices = 3*vertices - 1
-
-#         for x_new in bigger_cube_vertices.tolist():
-#             # dd_dual_polytope, center, dim = setup_dual_polytope(vertices, facets, implementation='cdd')
-#             dd_dual_polytope, center, dim = setup_dual_polytope_h_to_v_popcount(vertices, facets)
-#             print(f"\nAdding vertex {x_new} via dual...")
+            x_new = 0.5 * np.ones(dim)  # add center point of cube as new vertex
+            x_new[0] = 1.5  # move one vertex outside the cube to force expansion
+            dd_dual_polytope, center, dim = setup_dual_polytope(unit_cube_vertices, facets, implementation=implementation)
+            # print(f"dd_dual_polytope.V: {dd_dual_polytope.V}")
+            # print(f"dd_dual_polytope.H: {dd_dual_polytope.H}")
+            # print(f"\nAdding vertex {x_new} via dual...")
                         
-#             vertices, facets = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
-#             print("new vertices:\n", vertices)
-#             print("new facets:")
-#             for f in facets: print(f)
+            vertices, facets = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
+            # print("new vertices:\n", vertices)
+            # print("new facets:")
+            # for f in facets: print(f)
 
-#         # canonicalize vertices for testing
-#         vertices = np.round(vertices, decimals=5)
-#         vertices = np.unique(vertices, axis=0)
-#         assert len(vertices) == 2**dim
-#         assert np.all(np.isin(bigger_cube_vertices, vertices))
+            ground_truth_vertices = unit_cube_vertices.tolist() + [x_new.tolist()]
+            ground_truth_vertices = np.array(ground_truth_vertices)
+            ground_truth_vertices = canonicalize_vertices(ground_truth_vertices)
+            assert len(ground_truth_vertices) == len(unit_cube_vertices) + 1
+            vertices = canonicalize_vertices(vertices)
+            assert len(vertices) == len(ground_truth_vertices), f"Expected {len(ground_truth_vertices)} vertices but got {len(vertices)} for dimension {dim} with implementation {implementation}"
+            assert np.all(np.isin(ground_truth_vertices, vertices)), f"Not all expected vertices are in the result for dimension {dim} with implementation {implementation}"
+
+def test_cube_double_scale_expand(dims, implementations):
+    for dim in dims:
+        for implementation in implementations:
+            vertices, facets = init_unit_cube(dim)
+            # print(f"old vertices (len {len(vertices)}):\n", vertices)
+            # print("old facets:")
+            # for f in facets: print(f)
+
+            bigger_cube_vertices = 3*vertices - 1
+
+            s = time()
+            for i, x_new in enumerate(bigger_cube_vertices.tolist()):
+                print(f"Testing dimension {dim} with implementation {implementation} on polytope with {len(vertices)} vertices (iteration {i+1}/{len(bigger_cube_vertices)})...")
+                # dd_dual_polytope, center, dim = setup_dual_polytope(vertices, facets, implementation='cdd')
+                dd_dual_polytope, center, dim = setup_dual_polytope(vertices, facets, implementation=implementation)
+                print("setup_dual_polytope done")
+                print(f"Adding vertex {x_new} via dual...")            
+                vertices, facets = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
+                print("add_vertex_via_dual done")
+                # print("new vertices:\n", vertices)
+                # print("new facets:")
+                # for f in facets: print(f)
+            e = time()
+            print(f"Total time for dimension {dim} with implementation {implementation}: {e-s:.2f} seconds")
+
+            # canonicalize vertices for testing
+            vertices = canonicalize_vertices(vertices)
+            bigger_cube_vertices = canonicalize_vertices(bigger_cube_vertices)
+            # assert len(vertices) == 2**dim
+            assert np.all(np.isin(bigger_cube_vertices, vertices)), f"Not all expected vertices are in the result for dimension {dim} with implementation {implementation}"
+
+
+if __name__ == "__main__":
+
+    for dim in [4]:
+        test_cube_double_scale_expand([dim], ['h_to_v_popcount','cdd'])
