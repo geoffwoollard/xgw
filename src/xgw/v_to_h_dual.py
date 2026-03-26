@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 from xgw.v_to_h import init_unit_cube
 from xgw.hyperplane_approx import DoubleDescription
@@ -79,7 +80,6 @@ def recover_vertices_from_facets(facets, d, tol=1e-10):
     Compute vertices by intersecting combinations of d facets.
     (brute force, OK for testing)
     """
-    import itertools
 
     vertices = []
 
@@ -123,22 +123,23 @@ def add_vertex_via_dual(vertices, facets, x_new):
     # x_new becomes inequality: x_new^T y <= 1
 
     # initialize h_to_v data structure from vertices
-    def add_halfspace_dual(dual_vertices, x_new):
+    dd_dual_polytope = DoubleDescription(implementation='cdd')
+
+    def add_halfspace_dual(dual_vertices, x_new, dd_dual_polytope):
         """
         dual_vertices: (N, d)
         x_new: (d,)
 
         returns new_dual_vertices: (N', d)
         """
-        dd = DoubleDescription(implementation='cdd')
-        dd.add_V(dual_vertices.tolist())
+        dd_dual_polytope.add_V(dual_vertices.tolist())
         a_new = x_new
         b_new = np.array([1.0])
-        dd.add_H([[a_new, b_new]])
-        return dd
+        dd_dual_polytope.add_H([[a_new, b_new]])
+        return dd_dual_polytope
     # dual_vertices = add_halfspace_dual(dual_vertices, x_new)
-    dd = add_halfspace_dual(dual_vertices, x_new - center)
-    new_dual_vertices = np.array(dd.V)
+    dd_dual_polytope = add_halfspace_dual(dual_vertices, x_new - center, dd_dual_polytope)
+    new_dual_vertices = np.array(dd_dual_polytope.V)
 
     # Step 5: dual → primal facets
     facets = dual_to_primal_facets(new_dual_vertices)

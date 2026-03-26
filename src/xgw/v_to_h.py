@@ -1,4 +1,81 @@
 import numpy as np
+import itertools
+
+
+def init_unit_cube(d):
+    """
+    Initialize unit cube [0,1]^d
+
+    Returns:
+        vertices: (2^d, d)
+        facets: list of facet dicts
+    """
+
+    # -----------------------------
+    # Step 1: vertices
+    # -----------------------------
+    vertices = np.array(list(itertools.product([0.0, 1.0], repeat=d)))
+
+    n_vertices = len(vertices)
+
+    # -----------------------------
+    # Step 2: facets
+    # -----------------------------
+    facets = []
+
+    for i in range(d):
+        # facet x_i = 0
+        verts_0 = [j for j in range(n_vertices) if vertices[j, i] == 0.0]
+        a0 = np.zeros(d)
+        a0[i] = -1.0   # outward normal
+        b0 = 0.0
+
+        facets.append({
+            "verts": verts_0,
+            "a": a0,
+            "b": b0,
+            "neighbors": []
+        })
+
+        # facet x_i = 1
+        verts_1 = [j for j in range(n_vertices) if vertices[j, i] == 1.0]
+        a1 = np.zeros(d)
+        a1[i] = 1.0
+        b1 = 1.0
+
+        facets.append({
+            "verts": verts_1,
+            "a": a1,
+            "b": b1,
+            "neighbors": []
+        })
+
+    # -----------------------------
+    # Step 3: adjacency
+    # -----------------------------
+    def rebuild_cube_adjacency(facets, d):
+        """
+        facets are ordered as:
+            [x0=0, x0=1, x1=0, x1=1, ..., x_{d-1}=0, x_{d-1}=1]
+        """
+
+        for f in facets:
+            f["neighbors"] = []
+
+        for i in range(len(facets)):
+            axis_i = i // 2
+
+            for j in range(len(facets)):
+                if i == j:
+                    continue
+
+                axis_j = j // 2
+
+                # neighbors if different axes
+                if axis_i != axis_j:
+                    facets[i]["neighbors"].append(j)
+    rebuild_cube_adjacency(facets, d)
+    return vertices, facets
 
 # -----------------------------
 # Geometry helpers

@@ -323,6 +323,7 @@ class DoubleDescription():
             self.remove_duplicates_V()
 
     def V_to_H(self):
+        assert self.implementation == 'cdd', f'{self.implementation} implementation only supports V_to_H via cdd'
         # loop over high to low decimals to ensure numerical stability. take largest that works
         logger.info(f'V_to_H Computing half-planes from vertices: number of vertices {len(self.V)}')
         A, b = stabilize_compute_polytope_halfspaces(self.V)
