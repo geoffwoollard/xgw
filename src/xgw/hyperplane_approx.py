@@ -341,8 +341,16 @@ class DoubleDescription():
         return f"Vertices: {self.V}\nHalf-planes: {self.H}"
     
     # could be optimized for a family of vertices
-    def add_V(self, vertex_list):
-        if self.implementation == 'h_to_v_edges':
+    def add_V(self, vertex_list, dd_dual_polytope=None):
+        if self.implementation == 'v_to_h_dual':
+            assert dd_dual_polytope is not None, 'dd_dual_polytope is required for v_to_h_dual implementation'
+            assert len(vertex_list) == 1, f'{self.implementation} implementation only supports adding one vertex at a time'
+            x_new = vertex_list[0]
+            setup_dual_polytope(vertices, facets, implementation)
+            add_vertex_via_dual(x_new, dd_dual_polytope.center, dd_dual_polytope, dd_dual_polytope.d)
+
+
+        elif self.implementation == 'h_to_v_edges':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'h_to_v_popcount':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')

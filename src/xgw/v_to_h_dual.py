@@ -12,52 +12,60 @@ def center_polytope(vertices):
     vertices_shifted = vertices - center
     return vertices_shifted, center
 
-def center_polytope_facets(facets, center):
+def center_polytope_facets(A, b, center):
     """
     Shift facets to match vertex shift.
     """
-    new_facets = []
-    for f in facets:
-        a = f["a"]
-        b = f["b"]
-        b_new = b - a @ center
-        new_facets.append({
-            "a": a.copy(),
-            "b": b_new
-        })
-    return new_facets
+    # new_facets = []
+    # for f in facets:
+    #     a = f["a"]
+    #     b = f["b"]
+    #     b_new = b - a @ center
+    #     new_facets.append({
+    #         "a": a.copy(),
+    #         "b": b_new
+    #     })
+    # return new_facets
+    return b - A @ center
 
-def normalize_facets(facets, tol=1e-12):
+def normalize_facets(A, b, tol=1e-12):
     """
     Convert all facets to a^T x <= 1 form.
     """
-    new_facets = []
+    # new_facets = []
 
-    for f in facets:
-        a = f["a"]
-        b = f["b"]
+    # for f in facets:
+    #     a = f["a"]
+    #     b = f["b"]
 
-        if abs(b) < tol:
-            raise ValueError("Facet too close to origin; cannot normalize")
+    #     if abs(b) < tol:
+    #         raise ValueError("Facet too close to origin; cannot normalize")
 
-        a_new = a / b
-        b_new = 1.0
+    #     a_new = a / b
+    #     b_new = 1.0
 
-        new_facets.append({
-            "a": a_new,
-            "b": b_new
-        })
+    #     new_facets.append({
+    #         "a": a_new,
+    #         "b": b_new
+    #     })
 
-    return new_facets
+    # return new_facets
+    if any(np.abs(b) < tol):
+        raise ValueError("Facet too close to origin; cannot normalize")
+    A_normalized = A / b[:, np.newaxis]
+    b_normalized = np.ones_like(b)
+    return A_normalized, b_normalized
 
-def primal_to_dual(facets):
+def primal_to_dual(A):
     """
     facets: list of {"a", "b"} with b=1
 
     returns:
         dual_vertices: (F, d)
     """
-    dual_vertices = np.array([f["a"] for f in facets])
+    # dual_vertices = np.array([f["a"] for f in facets])
+    # return dual_vertices
+    dual_vertices = A
     return dual_vertices
 
 def dual_to_primal_facets(dual_vertices):
@@ -66,21 +74,25 @@ def dual_to_primal_facets(dual_vertices):
 
     returns facets in form a^T x <= 1
     """
-    facets = []
-    for y in dual_vertices:
-        facets.append({
-            "a": y.copy(),
-            "b": 1.0
-        })
-    return facets
+    # facets = []
+    # for y in dual_vertices:
+    #     facets.append({
+    #         "a": y.copy(),
+    #         "b": 1.0
+    #     })
+    # return facets
+    A = dual_vertices
+    b = np.ones(len(dual_vertices))
+    return A, b
 
-def recover_vertices_from_facets(facets, d, tol=1e-10):
+def recover_vertices_from_facets(A, b, d, tol=1e-10):
     """
     Compute vertices by intersecting combinations of d facets.
     (brute force, OK for testing)
     """
 
     vertices = []
+    facets = [{"a": A[i], "b": b[i]} for i in range(len(b))]
 
     for combo in itertools.combinations(facets, d):
         A = np.stack([f["a"] for f in combo])
@@ -102,25 +114,25 @@ def recover_vertices_from_facets(facets, d, tol=1e-10):
     return V
 
 
-def setup_dual_polytope(vertices, facets, implementation, **kwargs):
+def setup_dual_polytope(vertices, A, b, implementation):
     d = vertices.shape[1]
 
     # Step 1: center
     vertices, center = center_polytope(vertices)
-    facets = center_polytope_facets(facets, center)
+    b = center_polytope_facets(A, b, center)
 
     # Step 2: normalize facets
-    facets = normalize_facets(facets)
+    A, b = normalize_facets(A, b)
 
     # Step 3: primal → dual
-    dual_vertices = primal_to_dual(facets)
+    dual_vertices = primal_to_dual(A)
 
     # Step 4: add halfspace in dual
     # x_new becomes inequality: x_new^T y <= 1
     # initialize h_to_v data structure from vertices
 
     if implementation == 'cdd':
-        dd_dual_polytope = DoubleDescription(implementation=implementation, **kwargs)
+        dd_dual_polytope = DoubleDescription(implementation=implementation)
         dd_dual_polytope.add_V(dual_vertices.tolist())
     elif implementation == 'h_to_v_popcount':
         dual_A = vertices
@@ -155,13 +167,13 @@ def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
     dd_dual_polytope = add_halfspace_dual(x_new - center, dd_dual_polytope)
     new_dual_vertices = np.array(dd_dual_polytope.V)
     # Step 5: dual → primal facets
-    facets = dual_to_primal_facets(new_dual_vertices)
+    A, b = dual_to_primal_facets(new_dual_vertices)
     # Step 6: recover vertices (optional)
-    vertices = recover_vertices_from_facets(facets, d)
+    vertices = recover_vertices_from_facets(A, b, d)
     # Step 7: shift back
     vertices = vertices + center
-    facets = center_polytope_facets(facets, -center)
-    return vertices, facets
+    b = center_polytope_facets(A, b, -center)
+    return vertices, A, b
 
 
 
