@@ -1,7 +1,6 @@
 import numpy as np
 import itertools
 
-from xgw.v_to_h import init_unit_cube
 from xgw.hyperplane_approx import DoubleDescription
 
 
@@ -102,11 +101,8 @@ def recover_vertices_from_facets(facets, d, tol=1e-10):
     V = np.unique(np.round(vertices, 10), axis=0)
     return V
 
-def add_vertex_via_dual(vertices, facets, x_new):
-    """
-        signature: dual_vertices -> new_dual_vertices
-    """
 
+def setup_dual_polytope(vertices, facets):
     d = vertices.shape[1]
 
     # Step 1: center
@@ -121,48 +117,40 @@ def add_vertex_via_dual(vertices, facets, x_new):
 
     # Step 4: add halfspace in dual
     # x_new becomes inequality: x_new^T y <= 1
-
     # initialize h_to_v data structure from vertices
     dd_dual_polytope = DoubleDescription(implementation='cdd')
+    dd_dual_polytope.add_V(dual_vertices.tolist())
+    return dd_dual_polytope, center, d
 
-    def add_halfspace_dual(dual_vertices, x_new, dd_dual_polytope):
-        """
-        dual_vertices: (N, d)
-        x_new: (d,)
+def add_halfspace_dual(x_new, dd_dual_polytope):
+    """
+    dual_vertices: (N, d)
+    x_new: (d,)
 
-        returns new_dual_vertices: (N', d)
-        """
-        dd_dual_polytope.add_V(dual_vertices.tolist())
-        a_new = x_new
-        b_new = np.array([1.0])
-        dd_dual_polytope.add_H([[a_new, b_new]])
-        return dd_dual_polytope
-    # dual_vertices = add_halfspace_dual(dual_vertices, x_new)
-    dd_dual_polytope = add_halfspace_dual(dual_vertices, x_new - center, dd_dual_polytope)
+    returns new_dual_vertices: (N', d)
+    """
+    a_new = x_new
+    b_new = np.array([1.0])
+    dd_dual_polytope.add_H([[a_new, b_new]])
+    return dd_dual_polytope
+    
+def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
+    """
+        signature: dual_vertices -> new_dual_vertices
+    """
+
+    # Step 1-3: setup dual polytope
+    dd_dual_polytope = add_halfspace_dual(x_new - center, dd_dual_polytope)
     new_dual_vertices = np.array(dd_dual_polytope.V)
-
     # Step 5: dual → primal facets
     facets = dual_to_primal_facets(new_dual_vertices)
-
     # Step 6: recover vertices (optional)
     vertices = recover_vertices_from_facets(facets, d)
-
     # Step 7: shift back
     vertices = vertices + center
-
     facets = center_polytope_facets(facets, -center)
-
     return vertices, facets
 
-if __name__ == "__main__":
-    d = 2
-    vertices, facets = init_unit_cube(d)
-    print("old vertices:\n", vertices)
-    print("old facets:")
-    for f in facets: print(f)
-    vertices, facets = add_vertex_via_dual(vertices, facets, np.array([0.5, 1.5]))
-    print("new vertices:\n", vertices)
-    print("new facets:")
-    for f in facets: print(f)
+
 
 
