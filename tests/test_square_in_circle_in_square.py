@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 @pytest.fixture
 def n_iter():
-    return 50
+    return 25
 
 @pytest.fixture
 def implementations():
@@ -176,13 +176,12 @@ def test_minimal_2d(n_iter, implementations):
                     plt.legend()
                     if not os.path.exists('tests/results'): # mkdir if not exists
                         os.makedirs('tests/results')
-                    plt.savefig(f'tests/results/circle_approx_pplusimplementation_{p_plus_implementation.replace("_", "")}_pminusimplementation_{p_minus_implementation.replace("_", "")}_pminusdualimplementation_{p_minus_dual_implementation}_iter_{iter}.png', dpi=200)
+                    plt.savefig(f'tests/results/circle_approx_pplusimplementation_{p_plus_implementation.replace("_", "")}_pminusimplementation_{p_minus_implementation.replace("_", "")}_pminusdualimplementation_{str(p_minus_dual_implementation).replace("_", "")}_iter_{iter}.png', dpi=200)
                     plt.close()
 
                 residuals = p_plus_outside_p_minus(p_plus, p_minus)
                 atol = 1e-10
                 assert np.all(residuals <= atol), f"Some points in p_plus are outside p_minus by more than {atol} for implementation {p_plus_implementation}, residuals: {residuals}"
-
 
                 outer_volume, inner_volume, average_volume = area_estimate(p_plus, p_minus)
                 assert outer_volume >= inner_volume

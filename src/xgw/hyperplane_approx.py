@@ -97,7 +97,7 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
     
     '''
     try:
-        A, b = compute_polytope_halfspaces(V)
+        A, b = compute_polytope_halfspaces(V) # TODO: figure out why fails for circle
     except:
         for decimals in range(decimals_start, decimals_end, -1):
             A=[]
