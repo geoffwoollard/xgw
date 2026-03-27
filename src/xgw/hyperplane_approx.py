@@ -50,10 +50,10 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
     '''
     try:
         V = compute_polytope_vertices(A, b)
-    except:
+    except Exception as e:
         H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
         for decimals in range(decimals_start, decimals_end, -1):
-            V=[]
+            V = []
             try:
                 # 1. Round vertices to reduce numerical noise
                 H_rounded = [np.round(h, decimals=decimals) for h in H]
@@ -66,7 +66,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                 # 3. Try compute_polytope_halfspaces
                 try:
                     V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
-                except RuntimeError as e:
+                except RuntimeError as _:
                     # 4. If it fails due to numerical issues, add tiny jitter
                     scale = 0.5 * 10**(-decimals)
                     jitter = scale * np.random.randn(*H_rounded_unique.shape)
@@ -75,7 +75,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                     b_perturbed = H_perturbed[:,-1]
                     V = compute_polytope_vertices(A_perturbed, b_perturbed)
 
-            except Exception as e:
+            except Exception as _:
                 # print(f'Failed with rounding to {decimals} decimals: {e}')
                 continue  # try next lower precision
 
@@ -83,6 +83,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                 if len(V)>1:
                     # print(f"Success with {decimals} decimals!")
                     break
+        raise RuntimeError(f"Failed to compute vertices from halfspaces with stable rounding, even with jitter. Last error: {e}")
     return V
 
 def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
@@ -430,7 +431,7 @@ class DoubleDescription():
         return np.mean(np.array(self.V), axis=0)
 
 
-def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount'):
     '''
     Docstring for initial_box
     
@@ -441,7 +442,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
     '''
     e_base, R = construct_basis_eij(space_x, space_y)
     p_plus_initial = DoubleDescription(implementation='cdd')
-    p_minus = DoubleDescription(implementation='cdd')
+    p_minus_initial = DoubleDescription(implementation='cdd')
+
     vertex_list = []
     half_plans_list = []
     c = e_base.shape[2]
@@ -457,7 +459,21 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         half_plans_list.append([dir, g_hat])
             
             
-    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    update_box(p_plus_initial, p_minus_initial, half_plans_list, vertex_list)
+    if p_minus_implementation == 'cdd':
+        p_minus = p_minus_initial
+    elif p_minus_implementation == 'v_to_h_dual':
+        A_p_minus, b_p_minus = p_minus_initial.H
+        p_minus = DoubleDescription(implementation=p_minus_implementation, 
+                                                dual_implementation=p_minus_dual_implementation, 
+                                                V_initialization=np.array(p_minus_initial.V),
+                                                A_initialization=A_p_minus, 
+                                                b_initialization=b_p_minus)
+        p_minus.H = p_minus_initial.H
+        p_minus.V = p_minus_initial.V
+    else:
+        raise NotImplementedError(f'{p_minus_implementation} implementation is not implemented yet')
+
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
         E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None

@@ -17,41 +17,13 @@ def center_polytope_facets(A, b, center):
     """
     Shift facets to match vertex shift.
     """
-    # new_facets = []
-    # for f in facets:
-    #     a = f["a"]
-    #     b = f["b"]
-    #     b_new = b - a @ center
-    #     new_facets.append({
-    #         "a": a.copy(),
-    #         "b": b_new
-    #     })
-    # return new_facets
     return b - A @ center
 
-def normalize_facets(A, b, tol=1e-12):
+def normalize_facets(A, b, tol=1e-19):
     """
     Convert all facets to a^T x <= 1 form.
     """
-    # new_facets = []
-
-    # for f in facets:
-    #     a = f["a"]
-    #     b = f["b"]
-
-    #     if abs(b) < tol:
-    #         raise ValueError("Facet too close to origin; cannot normalize")
-
-    #     a_new = a / b
-    #     b_new = 1.0
-
-    #     new_facets.append({
-    #         "a": a_new,
-    #         "b": b_new
-    #     })
-
-    # return new_facets
-    if any(np.abs(b) < tol):
+    if any(np.abs(b) < tol): # TODO: track down why so small and return to 1e-12
         raise ValueError("Facet too close to origin; cannot normalize")
     
     A_normalized = A / b[:, np.newaxis]
@@ -65,8 +37,6 @@ def primal_to_dual(A):
     returns:
         dual_vertices: (F, d)
     """
-    # dual_vertices = np.array([f["a"] for f in facets])
-    # return dual_vertices
     dual_vertices = A
     return dual_vertices
 
@@ -76,18 +46,11 @@ def dual_to_primal_facets(dual_vertices):
 
     returns facets in form a^T x <= 1
     """
-    # facets = []
-    # for y in dual_vertices:
-    #     facets.append({
-    #         "a": y.copy(),
-    #         "b": 1.0
-    #     })
-    # return facets
     A = dual_vertices
     b = np.ones(len(dual_vertices))
     return A, b
 
-def recover_vertices_from_facets(A, b, d, tol=1e-10):
+def _recover_vertices_from_facets(A, b, d, tol=1e-10):
     """
     Compute vertices by intersecting combinations of d facets.
     (brute force, OK for testing)
@@ -140,7 +103,7 @@ def setup_dual_polytope(vertices, A, b, implementation):
         dual_A = vertices
         dual_b = np.ones(len(vertices))
         dual_B_initialization = build_B_from_H_and_V(dual_A, dual_b, dual_vertices)
-        dd_dual_polytope = DoubleDescription(implementation='h_to_v_popcount', V_initialization=dual_vertices, B_initialization=dual_B_initialization)
+        dd_dual_polytope = DoubleDescription(implementation=implementation, V_initialization=dual_vertices, B_initialization=dual_B_initialization)
         dd_dual_polytope.V = dual_vertices.tolist()
         dd_dual_polytope.H = [dual_A, dual_b]
     else:
@@ -176,7 +139,7 @@ def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
 
     def _test_vertex_recovery():
         vertices_from_dual = canonicalize_vertices(vertices_from_dual) #TODO: beware of this. just use for tests but do not truncate vertices in main code, as it can cause issues with precision and uniqueness.
-        optional_recovered_vertices = recover_vertices_from_facets(A, b, d)
+        optional_recovered_vertices = _recover_vertices_from_facets(A, b, d)
         optional_recovered_vertices = canonicalize_vertices(optional_recovered_vertices)
         assert np.allclose(optional_recovered_vertices, vertices_from_dual), f"Dual vertices should be the a vectors of the dual facets, but they differ: {A_dual} vs {vertices_from_dual}"
         assert np.allclose(b_dual, 1.0), f"Dual facets should be in form a^T x <= 1, but b_dual is not all 1s: {b_dual}"

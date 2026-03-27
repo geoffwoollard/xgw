@@ -9,16 +9,15 @@ from test_hyperplane_approx import make_marginals, make_simple_marginals, margin
 
 import logging
 
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s.%(msecs)03d - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    force=False,
-)
+# logging.basicConfig(
+#     level=logging.WARNING,
+#     format="%(asctime)s.%(msecs)03d - %(message)s",
+#     datefmt="%Y-%m-%d %H:%M:%S",
+#     force=False,
+# )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
 
 
 def testing_2d_classical_gw():
@@ -39,10 +38,14 @@ def testing_2d_classical_gw():
         assert np.isclose(plan_error, 0.0)
 
 # @pytest.fixture
-def implementations_to_test():
+def p_plus_implementations_to_test():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount']
 
-def test_3d_convex(implementations_to_test):
+# @pytest.fixture
+def p_minus_implementations_to_test():
+    return ['cdd', 'v_to_h_dual']
+
+def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test):
     '''passing'''
 
     n_tests = 1
@@ -53,34 +56,38 @@ def test_3d_convex(implementations_to_test):
         logger.info(f'Using t={t} for test {test_id}')
 
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
-            for p_plus_implementation in implementations_to_test:    
-                logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=20, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500) 
-                plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-                logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
-                logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-                assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
-                assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+            for p_plus_implementation in p_plus_implementations_to_test:
+                for p_minus_implementation in p_minus_implementations_to_test:
+                    for p_minus_dual_implementation in ['h_to_v_popcount', ] if p_minus_implementation == 'v_to_h_dual' else [None]:
+                        logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
+                        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=10, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
+                        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+                        logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
+                        logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+                        assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+                        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
-def test_2d_convex(implementations_to_test):
+def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test):
     '''passing'''
 
     n_tests = 3
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         for cost in ['IGW', 'CGW']:
-            for p_plus_implementation in implementations_to_test:
-                print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
-                T, plan, c, _, _ = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=200, p_plus_implementation=p_plus_implementation) 
-                plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
-                print(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): ', plan_error)
-                assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+            for p_plus_implementation in p_plus_implementations_to_test:
+                for p_minus_implementation in p_minus_implementations_to_test:
+                    for p_minus_dual_implementation in ['h_to_v_popcount', 'cdd'] if p_minus_implementation == 'v_to_h_dual' else [None]:
+                        print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
+                        T, plan, c, _, _ = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=200, p_plus_implementation=p_plus_implementation, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
+                        plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
+                        print(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): ', plan_error)
+                        assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
 
     mu, nu, space_x, space_y = make_marginals(0)
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
-        for p_plus_implementation in implementations_to_test: #TODO: add in h_to_v_edges
+        for p_plus_implementation in p_plus_implementations_to_test: #TODO: add in h_to_v_edges
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
 
             final_gap_tolerance_pos = 1e-4
@@ -107,7 +114,6 @@ def test_2d_convex(implementations_to_test):
             assert final_gap_tolerance_neg < gap < final_gap_tolerance_pos, f"Gap {gap} is not within tolerance {(final_gap_tolerance_neg, final_gap_tolerance_pos)} for identical marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
             not_too_small_tolerance = 1e-4
             assert not_too_small_tolerance < T, f"Total cost {T} is too small, should be above {not_too_small_tolerance} for different marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
-    
     
 def testing_2d_non_convex(marginals):
     '''passing'''
@@ -137,8 +143,6 @@ def testing_2d_non_convex(marginals):
     logger.info(f'cost {c}')
     logger.info(f'Plan (should be id): {plan}')
     assert np.isclose(plan_error, 0.0)
-
-
 
 def test_igw_convex_reflection_invariant(implementations_to_test):
     '''passing'''
@@ -170,7 +174,6 @@ def test_igw_convex_reflection_invariant(implementations_to_test):
                 mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
                 logger.info(f'Plan (should be id): {plan}')
                 assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
-
 
 def test_igw_convex_rotation_invariant(implementations_to_test):
     n_tests = 10
@@ -210,13 +213,5 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    # test_2d_convex(['h_to_v_popcount'])
-    test_2d_convex(['h_to_v_popcount_sparse'])
-    # test_3d_convex(['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'])
-    # d = np.load('debug.npz')
-    # from xgw.h_to_v_edges import update_edges_with_new_halfplane
-    # update_edges_with_new_halfplane(d['V'], d['E'], d['A'], d['b'], d['a_new'], d['b_new'])
+    test_3d_convex(p_plus_implementations_to_test(), p_minus_implementations_to_test())
     
-    # from xgw.h_to_v_edges import segment_plane_intersection
-    # dd = np.load('debug_segment_plane_intersection.npz')
-    # segment_plane_intersection(dd['v0'], dd['v1'], dd['a'], dd['b'])
