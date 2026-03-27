@@ -52,6 +52,7 @@ def normalize_facets(A, b, tol=1e-12):
     # return new_facets
     if any(np.abs(b) < tol):
         raise ValueError("Facet too close to origin; cannot normalize")
+    
     A_normalized = A / b[:, np.newaxis]
     b_normalized = np.ones_like(b)
     return A_normalized, b_normalized

@@ -166,7 +166,7 @@ def test_minimal_2d(n_iter, implementations):
                 
                     plt.figure()
                     list_min = np.array(p_minus.V)
-                    plt.scatter(list_min[:,0], list_min[:,1], c='k',  label=r'$P_{\Pi}^=$')
+                    plt.scatter(list_min[:,0], list_min[:,1], c='k',  label=r'$P_{\Pi}^-$')
                     list_pl = np.array(p_plus.V)
                     plt.scatter(list_pl[:,0], list_pl[:,1], c='r', label=r'$P_{\Pi}^+$')
                     n_circle = 1000
@@ -174,22 +174,21 @@ def test_minimal_2d(n_iter, implementations):
                     plt.plot(np.sin(theta_grid),np.cos(theta_grid), c='b')
                     plt.title(f'circle approximation iteration n. {iter}')
                     plt.legend()
-                    # mkdir if not exists
-                    if not os.path.exists('tests/results'):
+                    if not os.path.exists('tests/results'): # mkdir if not exists
                         os.makedirs('tests/results')
-                    plt.savefig(f'tests/results/circle_approx_pplusimplementation_{p_plus_implementation}_pminusimplementation_{p_minus_implementation}_iter_{iter}.png', dpi=200)
+                    plt.savefig(f'tests/results/circle_approx_pplusimplementation_{p_plus_implementation.replace("_", "")}_pminusimplementation_{p_minus_implementation.replace("_", "")}_pminusdualimplementation_{p_minus_dual_implementation}_iter_{iter}.png', dpi=200)
                     plt.close()
 
                 residuals = p_plus_outside_p_minus(p_plus, p_minus)
-                atol = 1e-15
-                # assert np.all(residuals <= atol), f"Some points in p_plus are outside p_minus by more than {atol} for implementation {p_plus_implementation}, residuals: {residuals}"
+                atol = 1e-10
+                assert np.all(residuals <= atol), f"Some points in p_plus are outside p_minus by more than {atol} for implementation {p_plus_implementation}, residuals: {residuals}"
 
 
                 outer_volume, inner_volume, average_volume = area_estimate(p_plus, p_minus)
                 assert outer_volume >= inner_volume
-                assert np.isclose(np.pi, average_volume, atol=0.01), f'average volume {average_volume} is not close to pi, implementation {p_plus_implementation}'
+                assert np.isclose(np.pi, average_volume, atol=0.01), f'average volume {average_volume} is not close to pi, p_plus implementation {p_plus_implementation}, p_minus implementation {p_minus_implementation}, p_minus dual implementation {p_minus_dual_implementation}'
 
                 plt.clf()
             
 if __name__ == "__main__":
-    test_minimal_2d(30, ['h_to_v_popcount'])
+    test_minimal_2d(60, ['cdd'])
