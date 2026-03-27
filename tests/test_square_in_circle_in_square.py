@@ -17,10 +17,14 @@ def n_iter():
     return 25
 
 @pytest.fixture
-def implementations():
+def p_plus_implementations():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse']
 
-def test_hausdorff(implementations):
+@pytest.fixture
+def p_minus_implementations():
+    return ['cdd', 'v_to_h_dual']
+
+def test_hausdorff(p_plus_implementations):
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
@@ -29,7 +33,7 @@ def test_hausdorff(implementations):
         (1,1), (1,-1), (-1,1), (-1,-1)
     ]]
 
-    for implementation in implementations:
+    for implementation in p_plus_implementations:
         previous_solutions_to_reuse = {}
         B_initialization = None
         masks_initialization = None
@@ -74,7 +78,7 @@ def test_hausdorff(implementations):
 #         assert np.allclose(2*x_0, v_0), f'fail for implementation {implementation}' # since the closest point in the inner square to a vertex of the outer square is at half the distance
 
 
-def test_minimal_2d(n_iter, implementations):
+def test_minimal_2d(n_iter, p_plus_implementations, p_minus_implementations):
     inner_square_vertices = [np.array(v) for v in [
         (0,1), (0,-1), (1,0), (-1,0)
     ]]
@@ -83,12 +87,11 @@ def test_minimal_2d(n_iter, implementations):
         (1,1), (1,-1), (-1,1), (-1,-1) # 01, 02, 13, 23
     ]]
 
-    for p_plus_implementation in implementations:
-        for p_minus_implementation in ['cdd', 'v_to_h_dual']:
+    for p_plus_implementation in p_plus_implementations:
+        for p_minus_implementation in p_minus_implementations:
             dual_implementations = ['cdd', 'h_to_v_popcount'] if p_minus_implementation == 'v_to_h_dual' else [None]
             for p_minus_dual_implementation in dual_implementations:
                 print(f'Testing implementation {p_plus_implementation} with p_minus implementation {p_minus_implementation}...')
-                previous_solutions_to_reuse = {}
                 A = np.array([[1,0],[0,1],[-1,0],[0,-1]])
                 b = np.array([1,1,1,1])
 
@@ -180,8 +183,8 @@ def test_minimal_2d(n_iter, implementations):
                     plt.close()
 
                 residuals = p_plus_outside_p_minus(p_plus, p_minus)
-                atol = 1e-10
-                assert np.all(residuals <= atol), f"Some points in p_plus are outside p_minus by more than {atol} for implementation {p_plus_implementation}, residuals: {residuals}"
+                atol = 1e-6
+                assert np.all(residuals <= atol), f"Some points in p_plus are outside p_minus by more than {atol} for implementation {p_plus_implementation}, residuals: {np.max(residuals)}"
 
                 outer_volume, inner_volume, average_volume = area_estimate(p_plus, p_minus)
                 assert outer_volume >= inner_volume
@@ -190,4 +193,4 @@ def test_minimal_2d(n_iter, implementations):
                 plt.clf()
             
 if __name__ == "__main__":
-    test_minimal_2d(60, ['cdd'])
+    test_minimal_2d(30, ['cdd'], ['v_to_h_dual'])

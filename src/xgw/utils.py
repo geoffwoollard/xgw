@@ -28,3 +28,8 @@ def gw_matrix(coords_ca_1, coords_ca_2, symmetric, n_skip, flip):
             if symmetric:
                 gw_losses[idx_2, idx_1] = gw_loss
     return gw_losses
+
+def canonicalize_vertices(vertices, decimals=5):
+    vertices = np.round(vertices, decimals=decimals)
+    vertices = np.unique(vertices, axis=0)
+    return vertices

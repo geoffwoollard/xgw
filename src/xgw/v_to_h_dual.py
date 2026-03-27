@@ -158,7 +158,8 @@ def add_halfspace_dual(x_new, dd_dual_polytope):
     b_new = np.array([1.0])
     dd_dual_polytope.add_H([[a_new, b_new]])
     return dd_dual_polytope
-    
+
+from xgw.utils import canonicalize_vertices
 def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
     """
         signature: dual_vertices -> new_dual_vertices
@@ -169,8 +170,19 @@ def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
     new_dual_vertices = np.array(dd_dual_polytope.V)
     # Step 5: dual → primal facets
     A, b = dual_to_primal_facets(new_dual_vertices)
-    # Step 6: recover vertices (optional)
-    vertices = recover_vertices_from_facets(A, b, d)
+    # Step 6: recover vertices.
+    A_dual, b_dual = dd_dual_polytope.H
+    vertices_from_dual = A_dual / b_dual[:, np.newaxis]
+
+    def _test_vertex_recovery():
+        vertices_from_dual = canonicalize_vertices(vertices_from_dual) #TODO: beware of this. just use for tests but do not truncate vertices in main code, as it can cause issues with precision and uniqueness.
+        optional_recovered_vertices = recover_vertices_from_facets(A, b, d)
+        optional_recovered_vertices = canonicalize_vertices(optional_recovered_vertices)
+        assert np.allclose(optional_recovered_vertices, vertices_from_dual), f"Dual vertices should be the a vectors of the dual facets, but they differ: {A_dual} vs {vertices_from_dual}"
+        assert np.allclose(b_dual, 1.0), f"Dual facets should be in form a^T x <= 1, but b_dual is not all 1s: {b_dual}"
+
+    vertices = vertices_from_dual
+
     # Step 7: shift back
     vertices = vertices + center
     b = center_polytope_facets(A, b, -center)

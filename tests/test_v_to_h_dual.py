@@ -3,7 +3,7 @@ import pytest
 # import logging
 from time import time
 
-
+from xgw.utils import canonicalize_vertices
 from xgw.v_to_h import init_unit_cube
 from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual
 
@@ -19,11 +19,6 @@ def dims():
 @pytest.fixture
 def implementations():
     return ['h_to_v_popcount','cdd']
-
-def canonicalize_vertices(vertices, decimals=5):
-    vertices = np.round(vertices, decimals=decimals)
-    vertices = np.unique(vertices, axis=0)
-    return vertices
 
 def test_cube_single_vertex_expand(dims, implementations):
     for dim in dims:

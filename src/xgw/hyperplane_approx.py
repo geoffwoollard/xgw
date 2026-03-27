@@ -100,7 +100,7 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
         A, b = compute_polytope_halfspaces(V) # TODO: figure out why fails for circle
     except:
         for decimals in range(decimals_start, decimals_end, -1):
-            A=[]
+            A = []
             try:
                 # 1. Round vertices to reduce numerical noise
                 V_rounded = [np.round(v, decimals=decimals) for v in V]
@@ -123,7 +123,7 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
                 continue  # try next lower precision
 
             else:
-                if len(A)>1:
+                if len(A) > 1:
                     # print(f"Success with {decimals} decimals!")
                     break
             
