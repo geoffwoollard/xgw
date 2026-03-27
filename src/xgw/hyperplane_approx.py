@@ -232,7 +232,8 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, 
+    def __init__(self, 
+                 duplicate_tol=1e-5, 
                  implementation='cdd', 
                  E_initialization=None, 
                  V_initialization=None, 
@@ -257,6 +258,12 @@ class DoubleDescription():
         elif self.implementation == 'v_to_h_dual':
             assert self.dual_implementation is not None, 'dual_implementation is required for v_to_h_dual implementation'
             assert self.dual_implementation in ['cdd', 'h_to_v_popcount'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
+            from xgw.v_to_h_dual import setup_dual_polytope
+            dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation)
+            self.dim = dim
+            self.dd_dual_polytope = dd_dual_polytope
+            self.center = center
+
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -354,16 +361,15 @@ class DoubleDescription():
         return f"Vertices: {self.V}\nHalf-planes: {self.H}"
     
     # could be optimized for a family of vertices
-    def add_V(self, vertex_list, vertex_initialization=None, A_initialization=None, b_initialization=None):
+    def add_V(self, vertex_list):
         if self.implementation == 'v_to_h_dual':
-            from xgw.v_to_h_dual import setup_dual_polytope, add_vertex_via_dual
-            # assert dd_dual_polytope is not None, 'dd_dual_polytope is required for v_to_h_dual implementation'
             assert len(vertex_list) == 1, f'{self.implementation} implementation only supports adding one vertex at a time'
             x_new = vertex_list[0]
-            dd_dual_polytope, center, dim = setup_dual_polytope(vertex_initialization, A_initialization, b_initialization, implementation=self.dual_implementation)
-            vertices, A, b = add_vertex_via_dual(x_new, center, dd_dual_polytope, dim)
+            from xgw.v_to_h_dual import add_vertex_via_dual
+            vertices, A, b, dd_dual_polytope = add_vertex_via_dual(x_new, self.center, self.dd_dual_polytope, self.dim)
+            self.dd_dual_polytope = dd_dual_polytope
             self.V = vertices.tolist()
-            self.H = (A, b)
+            self.H = [A, b]
 
         elif self.implementation == 'h_to_v_edges':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
@@ -400,7 +406,6 @@ class DoubleDescription():
         elif self.implementation == 'h_to_v_edges':
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
-            # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
             V = np.array(self.V)
             A, b = self.H
             E = self.E
@@ -573,8 +578,7 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
     elif p_minus.implementation == 'v_to_h_dual':
         assert len(vertex_list) == 1, f'{p_minus.implementation} implementation only supports adding one vertex at a time'
         x_new = vertex_list[0]
-        A, b = p_minus.H
-        p_minus.add_V([x_new], vertex_initialization=np.array(p_minus.V), A_initialization=A, b_initialization=b)
+        p_minus.add_V([x_new])
     else:
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     return p_plus, p_minus

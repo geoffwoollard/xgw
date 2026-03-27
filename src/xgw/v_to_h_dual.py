@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 
+from xgw.utils import canonicalize_vertices
 from xgw.hyperplane_approx import DoubleDescription, build_B_from_H_and_V
 
 
@@ -159,7 +160,6 @@ def add_halfspace_dual(x_new, dd_dual_polytope):
     dd_dual_polytope.add_H([[a_new, b_new]])
     return dd_dual_polytope
 
-from xgw.utils import canonicalize_vertices
 def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
     """
         signature: dual_vertices -> new_dual_vertices
@@ -186,7 +186,7 @@ def add_vertex_via_dual(x_new, center, dd_dual_polytope, d):
     # Step 7: shift back
     vertices = vertices + center
     b = center_polytope_facets(A, b, -center)
-    return vertices, A, b
+    return vertices, A, b, dd_dual_polytope
 
 
 

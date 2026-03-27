@@ -126,11 +126,15 @@ def test_minimal_2d(n_iter, p_plus_implementations, p_minus_implementations):
                 p_plus.H = [A, b]
                 p_minus_base = DoubleDescription()
                 p_minus_base.add_V(inner_square_vertices)
-                p_minus = DoubleDescription(implementation=p_minus_implementation, dual_implementation=p_minus_dual_implementation)
                 A_p_minus, b_p_minus = p_minus_base.H
+                p_minus = DoubleDescription(implementation=p_minus_implementation, 
+                                            dual_implementation=p_minus_dual_implementation, 
+                                            V_initialization=np.array(inner_square_vertices),
+                                            A_initialization=A_p_minus, 
+                                            b_initialization=b_p_minus)
                 for v in inner_square_vertices:
                     print(f"Adding vertex {v} to p_minus via dual with primal implementation {p_minus_implementation} and dual implementation {p_minus_dual_implementation}...")
-                    p_minus.add_V([v], vertex_initialization=np.array(inner_square_vertices), A_initialization=A_p_minus, b_initialization=b_p_minus)
+                    p_minus.add_V([v])
 
                 def compute_hyperplane_on_circle_from_direction(direction):
                     direction = np.array(direction)
