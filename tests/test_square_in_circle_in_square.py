@@ -89,7 +89,7 @@ def test_minimal_2d(n_iter, p_plus_implementations, p_minus_implementations):
 
     for p_plus_implementation in p_plus_implementations:
         for p_minus_implementation in p_minus_implementations:
-            dual_implementations = ['cdd', 'h_to_v_popcount'] if p_minus_implementation == 'v_to_h_dual' else [None]
+            dual_implementations = ['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] if p_minus_implementation == 'v_to_h_dual' else [None]
             for p_minus_dual_implementation in dual_implementations:
                 print(f'Testing implementation {p_plus_implementation} with p_minus implementation {p_minus_implementation}...')
                 A = np.array([[1,0],[0,1],[-1,0],[0,-1]])

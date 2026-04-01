@@ -258,7 +258,7 @@ class DoubleDescription():
             self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
         elif self.implementation == 'v_to_h_dual':
             assert self.dual_implementation is not None, 'dual_implementation is required for v_to_h_dual implementation'
-            assert self.dual_implementation in ['cdd', 'h_to_v_popcount'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
+            assert self.dual_implementation in ['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
             from xgw.v_to_h_dual import setup_dual_polytope
             dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation)
             self.dim = dim

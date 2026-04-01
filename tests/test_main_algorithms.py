@@ -37,11 +37,11 @@ def testing_2d_classical_gw():
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}')
         assert np.isclose(plan_error, 0.0)
 
-# @pytest.fixture
+@pytest.fixture
 def p_plus_implementations_to_test():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount']
 
-# @pytest.fixture
+@pytest.fixture
 def p_minus_implementations_to_test():
     return ['cdd', 'v_to_h_dual']
 
