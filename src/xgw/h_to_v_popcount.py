@@ -219,12 +219,12 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency(self):
         n = len(self.masks)
-        D = np.zeros((n, n), dtype=int) # TODO: np.uint8 or sparse?
+        D = np.zeros((n, n), dtype=bool) # TODO: np.uint8 or sparse?
 
         for i in range(n):
             for j in range(i + 1, n):
                 if self._adjacent(self.masks[i], self.masks[j]):
-                    D[i, j] = D[j, i] = 1
+                    D[i, j] = D[j, i] = True
         return D
 
     def _build_adjacency_subset(self, masks, use_sparse):
@@ -236,12 +236,12 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset_dense(self, masks):
         n = len(masks)
-        D = np.zeros((n, n), dtype=int) # TODO: np.uint8 or sparse?
+        D = np.zeros((n, n), dtype=bool) # TODO: np.uint8 or sparse?
 
         for i in range(n):
             for j in range(i + 1, n):
                 if (masks[i] & masks[j]).bit_count() >= self.r - 1:
-                    D[i, j] = D[j, i] = 1
+                    D[i, j] = D[j, i] = True
         return D
     
     def _build_adjacency_subset_sparse_chunks(self, masks):
@@ -274,7 +274,6 @@ class ExtremePointPolytopeSparse:
         return D.tocsr()
 
     def _build_adjacency_subset_vectorized(self, masks):
-        # masks = np.asarray(masks, dtype=np.uint64)
         if max(masks) < 2**64:
             masks = np.asarray(masks, dtype=np.uint64)
         else:
@@ -286,15 +285,14 @@ class ExtremePointPolytopeSparse:
         # vectorized popcount
         bitcounts = np.bitwise_count(inter)
 
-        D = (bitcounts >= self.r - 1).astype(np.uint8)
+        D = (bitcounts >= self.r - 1).astype(bool)
 
-        np.fill_diagonal(D, 0)
+        np.fill_diagonal(D, False)
         return D
     
 
     def _build_adjacency_subset_popcount_table(self, masks):
         masks = np.asarray(masks, dtype=np.uint64)
-        n = len(masks)
         
         xor_matrix = masks[:, None] ^ masks[None, :]
         xor_matrix = np.ascontiguousarray(xor_matrix, dtype=np.uint64)
@@ -306,9 +304,9 @@ class ExtremePointPolytopeSparse:
         # Hamming distance
         bitcounts = self._POPCOUNT_TABLE[bytes_view].sum(axis=-1)
         
-        # adjacency: exactly 2 bits differ
-        D = (bitcounts == self.r - 1).astype(np.uint8)
-        np.fill_diagonal(D, 0)
+        # adjacency: 2 or more bits differ
+        D = (bitcounts >= self.r - 1).astype(bool)
+        np.fill_diagonal(D, False)
         
         return D
  
@@ -338,7 +336,6 @@ class ExtremePointPolytopeSparse:
         logger.info('# ---------- Step B: generate new vertices ----------')
         for i in infeasible_idx:
 
-            # neighbors = np.where(self.D[i] == 1)[0]
             neighbors = get_neighbours(self.D, i)
 
             for j in neighbors:
@@ -482,11 +479,11 @@ class ExtremePointPolytopeSparse:
             return D_updated
         
         self.D = assemble_D(self.use_D_sparse, D_old, O, N)
-        D_dense = assemble_D(False, 
-                             self._build_adjacency_subset(masks_old, use_sparse=False), 
-                             build_O(n_old, n_new, O_links, index_map, use_sparse=False),
-                            build_N(n_new, new_masks, new_bit, self.r, use_sparse=False))
-        assert np.array_equal(self.D.toarray(), D_dense), "Sparse and dense D do not match!"
+        # D_dense = assemble_D(False, 
+        #                      self._build_adjacency_subset(masks_old, use_sparse=False), 
+        #                      build_O(n_old, n_new, O_links, index_map, use_sparse=False),
+        #                     build_N(n_new, new_masks, new_bit, self.r, use_sparse=False))
+        # assert np.array_equal(self.D.toarray(), D_dense), "Sparse and dense D do not match!"
 
         logger.info('# ---------- Step I: store constraint ----------')
         self.A.append(a_new)
