@@ -46,15 +46,12 @@ class ExtremePointPolytope:
         D_vec = (D_vec >= self.r - 1).astype(np.uint8) # BEWARE MARJOR BUG: adjacent if they share at least r-1 active constraints (not exact!)
         self.D = D_vec
 
-
     def rebuild_adjacency_sparse_chunks(self):
-        """Compute adjacency matrix D in chunks and store as sparse COO."""
+        """Compute adjacency matrix D in chunks and store as sparse CSR (bool)."""
         n = self.E.shape[0]
-        
-        # chunk size to balance memory vs speed
         chunk_size = self.D_chunk_size
         
-        rows, cols, data = [], [], []
+        rows, cols = [], []
         
         for i in range(0, n, chunk_size):
             i_end = min(i + chunk_size, n)
@@ -63,27 +60,25 @@ class ExtremePointPolytope:
             B_chunk = self.B[:, i:i_end]  # (m, chunk_size)
             BTB_chunk = self.B.T @ B_chunk  # (n, chunk_size)
             
-            # check adjacency: exactly r-1 shared constraints
-            for local_j, global_j in enumerate(range(i, i_end)):
-                col = BTB_chunk[:, local_j]
-                # exclude diagonal
-                col[global_j] = 0
-                # find where shared == r-1
-                adj_idx = np.where(col >= self.r - 1)[0]
-                
-                for global_i in adj_idx:
-                    if global_i < global_j:  # store upper triangle only
-                        rows.append(global_i)
-                        cols.append(global_j)
-                        data.append(1)
+            # find all (i,j) where BTB_chunk[i,j] >= r-1
+            i_idx, local_j_idx = np.where(BTB_chunk >= self.r - 1)
+            
+            # convert local column indices to global
+            global_j_idx = local_j_idx + i
+            
+            # keep only upper triangle (i < j)
+            mask = i_idx < global_j_idx
+            rows.extend(i_idx[mask])
+            cols.extend(global_j_idx[mask])
         
-        # build symmetric sparse matrix from upper triangle
+        # build upper triangle COO with bool dtype
         D_upper = sparse.coo_matrix(
-            (data, (rows, cols)),
+            (np.ones(len(rows), dtype=bool), (rows, cols)),
             shape=(n, n),
-            dtype=np.uint8
+            dtype=bool
         )
-        # symmetrize
+        
+        # symmetrize: D = D_upper + D_upper^T
         self.D = D_upper + D_upper.T
         self.D = self.D.tocsr()  # convert to CSR for efficient storage/access
 
@@ -254,6 +249,7 @@ class ExtremePointPolytopeSparse:
 
         np.fill_diagonal(D, 0)
         return D
+    
 
     def _build_adjacency_subset_popcount_table(self, masks):
         masks = np.asarray(masks, dtype=np.uint64)
@@ -369,7 +365,7 @@ class ExtremePointPolytopeSparse:
                     N[i, j] = N[j, i] = 1
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old = self._build_adjacency_subset_vectorized(masks_old)
+        D_old = self._build_adjacency_subset(masks_old)
 
         logger.info('# ---------- Step H: assemble final D ----------')
         top = np.hstack([D_old, O])
