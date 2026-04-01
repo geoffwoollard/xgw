@@ -388,18 +388,48 @@ class ExtremePointPolytopeSparse:
         n_old = len(E_old)
         n_new = len(new_masks)
 
-        def build_O(n_old, n_new, O_links, index_map):
-            O = np.zeros((n_old, n_new), dtype=int) # TODO: np.uint8 or sparse?
-
+        def build_O_working(n_old, n_new, O_links, index_map):
+            O = np.zeros((n_old, n_new), dtype=bool) # TODO: np.uint8 or sparse?
             for k, old_j in enumerate(O_links):
-                O[index_map[old_j], k] = 1
+                O[index_map[old_j], k] = True
             return O
-        O = build_O(n_old, n_new, O_links, index_map)
-        O_s = sparse.csr_matrix(O, dtype=bool)
+        
+        def build_O(n_old, n_new, O_links, index_map, use_sparse=True):
+            """Build O matrix (n_old × n_new) efficiently.
+            
+            O[i, k] = 1 iff old vertex i is linked to new vertex k.
+            Typically very sparse (one 1 per column).
+            """
+            if use_sparse:
+                # Build sparse COO directly: only store the 1s
+                rows = []
+                cols = []
+                for k, old_j in enumerate(O_links):
+                    rows.append(index_map[old_j])
+                    cols.append(k)
+                
+                O = sparse.coo_matrix(
+                    (np.ones(len(rows), dtype=bool), (rows, cols)),
+                    shape=(n_old, n_new),
+                    dtype=bool
+                )
+                return O.tocsr()  # CSR for efficient row/col slicing
+            else:
+                # Dense fallback (for small polytopes)
+                O = np.zeros((n_old, n_new), dtype=bool)
+                for k, old_j in enumerate(O_links):
+                    O[index_map[old_j], k] = True
+                return O
+        O_working = build_O_working(n_old, n_new, O_links, index_map)
+        O_working_s = sparse.csr_matrix(O_working, dtype=bool)
+        O = build_O(n_old, n_new, O_links, index_map, use_sparse=False)
+        O_s = build_O(n_old, n_new, O_links, index_map, use_sparse=True)
+        assert np.array_equal(O, O_working)
+        assert np.array_equal(O, O_s.toarray())
         
         logger.info('# ---------- Step F: compute N block ----------')
         def build_N(n_new, new_masks, new_bit):
-            N = np.zeros((n_new, n_new), dtype=int)
+            N = np.zeros((n_new, n_new), dtype=bool)
 
             for i in range(n_new):
                 for j in range(i + 1, n_new):
@@ -409,8 +439,9 @@ class ExtremePointPolytopeSparse:
                     ).bit_count()
 
                     if shared >= self.r - 2:
-                        N[i, j] = N[j, i] = 1
+                        N[i, j] = N[j, i] = True
             return N
+        
         N = build_N(n_new, new_masks, new_bit)
         N_s = sparse.csr_matrix(N, dtype=bool)
 
@@ -418,7 +449,6 @@ class ExtremePointPolytopeSparse:
         D_old, D_old_s = self._build_adjacency_subset(masks_old)
 
         logger.info('# ---------- Step H: assemble final D ----------')
-
         def assemble_D(use_D_sparse, D_old, O, N, ):
             if use_D_sparse:
                 library = sparse
