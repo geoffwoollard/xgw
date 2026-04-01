@@ -229,49 +229,50 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            return self._build_adjacency_subset_sparse_chunks(masks)
+            # return self._build_adjacency_subset_sparse_chunks(masks)
+            return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
         else:
             return self._build_adjacency_subset_dense(masks)
         # return self._build_adjacency_subset_dense(masks), self._build_adjacency_subset_sparse_chunks(masks)
 
-    def _build_adjacency_subset_dense(self, masks):
-        n = len(masks)
-        D = np.zeros((n, n), dtype=bool) # TODO: np.uint8 or sparse?
+    # def _build_adjacency_subset_dense(self, masks):
+    #     n = len(masks)
+    #     D = np.zeros((n, n), dtype=bool) # TODO: np.uint8 or sparse?
 
-        for i in range(n):
-            for j in range(i + 1, n):
-                if (masks[i] & masks[j]).bit_count() >= self.r - 1:
-                    D[i, j] = D[j, i] = True
-        return D
+    #     for i in range(n):
+    #         for j in range(i + 1, n):
+    #             if (masks[i] & masks[j]).bit_count() >= self.r - 1:
+    #                 D[i, j] = D[j, i] = True
+    #     return D
     
-    def _build_adjacency_subset_sparse_chunks(self, masks):
-        """Build sparse adjacency for a subset of masks (chunked)."""
-        n = len(masks)
-        chunk_size = self.D_chunk_size
+    # def _build_adjacency_subset_sparse_chunks(self, masks):
+    #     """Build sparse adjacency for a subset of masks (chunked)."""
+    #     n = len(masks)
+    #     chunk_size = self.D_chunk_size
         
-        rows, cols = [], []
+    #     rows, cols = [], []
         
-        for j_start in range(0, n, chunk_size):
-            j_end = min(j_start + chunk_size, n)
+    #     for j_start in range(0, n, chunk_size):
+    #         j_end = min(j_start + chunk_size, n)
             
-            for local_j, j in enumerate(range(j_start, j_end)):
-                m_j = masks[j]
+    #         for local_j, j in enumerate(range(j_start, j_end)):
+    #             m_j = masks[j]
                 
-                for i in range(j):
-                    m_i = masks[i]
-                    shared = (m_i & m_j).bit_count()
+    #             for i in range(j):
+    #                 m_i = masks[i]
+    #                 shared = (m_i & m_j).bit_count()
                     
-                    if shared >= self.r - 1:
-                        rows.append(i)
-                        cols.append(j)
+    #                 if shared >= self.r - 1:
+    #                     rows.append(i)
+    #                     cols.append(j)
         
-        D_upper = sparse.coo_matrix(
-            (np.ones(len(rows), dtype=bool), (rows, cols)),
-            shape=(n, n),
-            dtype=bool
-        )
-        D = D_upper + D_upper.T
-        return D.tocsr()
+    #     D_upper = sparse.coo_matrix(
+    #         (np.ones(len(rows), dtype=bool), (rows, cols)),
+    #         shape=(n, n),
+    #         dtype=bool
+    #     )
+    #     D = D_upper + D_upper.T
+    #     return D.tocsr()
 
     def _build_adjacency_subset_vectorized_chunked(self, masks, chunk_size=None):
         """Build adjacency matrix in chunks, assemble as sparse CSR."""
@@ -319,42 +320,42 @@ class ExtremePointPolytopeSparse:
         D = D_upper + D_upper.T
         return D.tocsr()
 
-    def _build_adjacency_subset_vectorized(self, masks):
-        if max(masks) < 2**64:
-            masks = np.asarray(masks, dtype=np.uint64)
-        else:
-            masks = np.asarray(masks, dtype=object)
+    # def _build_adjacency_subset_vectorized(self, masks):
+    #     if max(masks) < 2**64:
+    #         masks = np.asarray(masks, dtype=np.uint64)
+    #     else:
+    #         masks = np.asarray(masks, dtype=object)
         
-        # pairwise bitwise AND
-        inter = masks[:, None] & masks[None, :]
+    #     # pairwise bitwise AND
+    #     inter = masks[:, None] & masks[None, :]
 
-        # vectorized popcount
-        bitcounts = np.bitwise_count(inter)
+    #     # vectorized popcount
+    #     bitcounts = np.bitwise_count(inter)
 
-        D = (bitcounts >= self.r - 1).astype(bool)
+    #     D = (bitcounts >= self.r - 1).astype(bool)
 
-        np.fill_diagonal(D, False)
-        return D
+    #     np.fill_diagonal(D, False)
+    #     return D
     
 
-    def _build_adjacency_subset_popcount_table(self, masks):
-        masks = np.asarray(masks, dtype=np.uint64)
+    # def _build_adjacency_subset_popcount_table(self, masks):
+    #     masks = np.asarray(masks, dtype=np.uint64)
         
-        xor_matrix = masks[:, None] ^ masks[None, :]
-        xor_matrix = np.ascontiguousarray(xor_matrix, dtype=np.uint64)
-        print(f"XOR matrix computed: {xor_matrix}")
+    #     xor_matrix = masks[:, None] ^ masks[None, :]
+    #     xor_matrix = np.ascontiguousarray(xor_matrix, dtype=np.uint64)
+    #     print(f"XOR matrix computed: {xor_matrix}")
         
-        # Correct 3D byte view
-        bytes_view = xor_matrix.view(np.uint8).reshape(xor_matrix.shape + (8,))
+    #     # Correct 3D byte view
+    #     bytes_view = xor_matrix.view(np.uint8).reshape(xor_matrix.shape + (8,))
         
-        # Hamming distance
-        bitcounts = self._POPCOUNT_TABLE[bytes_view].sum(axis=-1)
+    #     # Hamming distance
+    #     bitcounts = self._POPCOUNT_TABLE[bytes_view].sum(axis=-1)
         
-        # adjacency: 2 or more bits differ
-        D = (bitcounts >= self.r - 1).astype(bool)
-        np.fill_diagonal(D, False)
+    #     # adjacency: 2 or more bits differ
+    #     D = (bitcounts >= self.r - 1).astype(bool)
+    #     np.fill_diagonal(D, False)
         
-        return D
+    #     return D
  
 
     # --------------------------------------------------
@@ -509,11 +510,11 @@ class ExtremePointPolytopeSparse:
 
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old_working = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
-        D_old_also_working = self._build_adjacency_subset_vectorized(masks_old)
-        assert np.array_equal(D_old_working.toarray(), D_old_also_working), "Adjacency subsets do not match!"
-        D_old = self._build_adjacency_subset_vectorized_chunked(masks_old, self.D_chunk_size)
-        assert np.array_equal(D_old_working.toarray(), D_old.toarray()), "Adjacency subsets do not match!"
+        D_old = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
+        # D_old_also_working = self._build_adjacency_subset_vectorized(masks_old)
+        # assert np.array_equal(D_old_working.toarray(), D_old_also_working), "Adjacency subsets do not match!"
+        # D_old = self._build_adjacency_subset_vectorized_chunked(masks_old, self.D_chunk_size)
+        # assert np.array_equal(D_old_working.toarray(), D_old.toarray()), "Adjacency subsets do not match!"
 
         logger.info('# ---------- Step H: assemble final D ----------')
         def assemble_D(use_D_sparse, D_old, O, N):
