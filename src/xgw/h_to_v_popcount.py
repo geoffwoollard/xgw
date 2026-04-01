@@ -512,7 +512,7 @@ class ExtremePointPolytopeSparse:
         D_old_working = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
         D_old_also_working = self._build_adjacency_subset_vectorized(masks_old)
         assert np.array_equal(D_old_working.toarray(), D_old_also_working), "Adjacency subsets do not match!"
-        D_old = self._build_adjacency_subset_vectorized_chunked(masks_old, use_sparse=self.use_D_sparse)
+        D_old = self._build_adjacency_subset_vectorized_chunked(masks_old, self.D_chunk_size)
         assert np.array_equal(D_old_working.toarray(), D_old.toarray()), "Adjacency subsets do not match!"
 
         logger.info('# ---------- Step H: assemble final D ----------')
