@@ -271,6 +271,9 @@ class ExtremePointPolytopeSparse:
                 new_masks.append(inherited | new_bit)
 
                 O_links.append(j)
+                
+        if len(new_vertices) == 0:
+            return
 
         logger.info('# ---------- Step C: remove infeasible vertices ----------')
         E_old = self.E[feasible]

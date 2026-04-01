@@ -213,5 +213,5 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_3d_convex(['h_to_v_popcount'], ['v_to_h_dual'])
+    test_3d_convex(['cdd'], ['v_to_h_dual'])
     
