@@ -387,12 +387,6 @@ class ExtremePointPolytopeSparse:
         logger.info('# ---------- Step E: build O matrix ----------')
         n_old = len(E_old)
         n_new = len(new_masks)
-
-        def build_O_working(n_old, n_new, O_links, index_map):
-            O = np.zeros((n_old, n_new), dtype=bool) # TODO: np.uint8 or sparse?
-            for k, old_j in enumerate(O_links):
-                O[index_map[old_j], k] = True
-            return O
         
         def build_O(n_old, n_new, O_links, index_map, use_sparse=True):
             """Build O matrix (n_old × n_new) efficiently.
@@ -420,15 +414,13 @@ class ExtremePointPolytopeSparse:
                 for k, old_j in enumerate(O_links):
                     O[index_map[old_j], k] = True
                 return O
-        O_working = build_O_working(n_old, n_new, O_links, index_map)
-        O_working_s = sparse.csr_matrix(O_working, dtype=bool)
+            
         O = build_O(n_old, n_new, O_links, index_map, use_sparse=False)
         O_s = build_O(n_old, n_new, O_links, index_map, use_sparse=True)
-        assert np.array_equal(O, O_working)
         assert np.array_equal(O, O_s.toarray())
         
         logger.info('# ---------- Step F: compute N block ----------')
-        def build_N(n_new, new_masks, new_bit):
+        def build_N_working(n_new, new_masks, new_bit):
             N = np.zeros((n_new, n_new), dtype=bool)
 
             for i in range(n_new):
@@ -442,8 +434,55 @@ class ExtremePointPolytopeSparse:
                         N[i, j] = N[j, i] = True
             return N
         
-        N = build_N(n_new, new_masks, new_bit)
-        N_s = sparse.csr_matrix(N, dtype=bool)
+        def build_N(n_new, new_masks, new_bit, r, use_sparse=True):
+            """Build N matrix (n_new × n_new) efficiently.
+            
+            N[i, j] = 1 iff new vertices i and j share >= r-2 constraints
+            (excluding the new constraint).
+            """
+            if use_sparse:
+                rows, cols = [], []
+                
+                for i in range(n_new):
+                    for j in range(i + 1, n_new):
+                        shared = (
+                            (new_masks[i] & new_masks[j]) & ~new_bit
+                        ).bit_count()
+                        
+                        if shared >= r - 2:
+                            rows.append(i)
+                            cols.append(j)
+                
+                # build upper triangle COO with bool dtype
+                N = sparse.coo_matrix(
+                    (np.ones(len(rows), dtype=bool), (rows, cols)),
+                    shape=(n_new, n_new),
+                    dtype=bool
+                )
+                # symmetrize
+                N = N + N.T
+                return N.tocsr()
+            else:
+                # Dense fallback
+                N = np.zeros((n_new, n_new), dtype=bool)
+                
+                for i in range(n_new):
+                    for j in range(i + 1, n_new):
+                        shared = (
+                            (new_masks[i] & new_masks[j]) & ~new_bit
+                        ).bit_count()
+                        
+                        if shared >= self.r - 2:
+                            N[i, j] = N[j, i] = True
+                return N
+        
+        N_working = build_N_working(n_new, new_masks, new_bit)
+        N_working_s = sparse.csr_matrix(N_working, dtype=bool)
+        N = build_N(n_new, new_masks, new_bit, self.r, use_sparse=False)
+        N_s = build_N(n_new, new_masks, new_bit, self.r, use_sparse=True)
+        assert np.array_equal(N, N_working)
+        assert np.array_equal(N, N_s.toarray())
+        assert np.array_equal(N_s.toarray(), N_working_s.toarray())
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
         D_old, D_old_s = self._build_adjacency_subset(masks_old)
