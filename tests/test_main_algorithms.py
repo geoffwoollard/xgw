@@ -39,7 +39,7 @@ def testing_2d_classical_gw():
 
 @pytest.fixture
 def p_plus_implementations_to_test():
-    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount']
+    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
 
 @pytest.fixture
 def p_minus_implementations_to_test():
@@ -58,14 +58,14 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
             for p_plus_implementation in p_plus_implementations_to_test:
                 for p_minus_implementation in p_minus_implementations_to_test:
-                    for p_minus_dual_implementation in ['h_to_v_popcount_sparse', ] if p_minus_implementation == 'v_to_h_dual' else [None]:
-                        # logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                        # total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
-                        # plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
-                        # logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
-                        # logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
-                        # assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
-                        # assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+                    for p_minus_dual_implementation in ['cdd','h_to_v_popcount','h_to_v_popcount_sparse', ] if p_minus_implementation == 'v_to_h_dual' else [None]:
+                        logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
+                        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
+                        plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
+                        logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
+                        logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+                        assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
+                        assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
                         logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation} - different simple marginals')
                         total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
