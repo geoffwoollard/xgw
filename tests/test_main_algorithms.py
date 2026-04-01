@@ -221,5 +221,5 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_3d_convex(['h_to_v_popcount_sparse'], ['v_to_h_dual'], ['h_to_v_popcount_sparse'], iter_max=50)
+    test_3d_convex(['h_to_v_popcount_sparse'], ['v_to_h_dual'], ['h_to_v_popcount_sparse'], iter_max=100)
     
