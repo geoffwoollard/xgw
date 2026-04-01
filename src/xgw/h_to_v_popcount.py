@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import sparse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ class ExtremePointPolytope:
     Minimal faithful implementation of Section A.3
     """
 
-    def __init__(self, E, B, dim=3, add_constraint_tol=1e-17):
+    def __init__(self, E, B, dim=3, add_constraint_tol=1e-17, D_chunk_size=5000, use_D_sparse=True):
         """
         E : (n,dim) vertices
         B : (m,n) binary active-constraint matrix
@@ -21,13 +22,22 @@ class ExtremePointPolytope:
 
         self.n_constraints = self.B.shape[0]
         self.add_constraint_tol = add_constraint_tol
+        self.D_chunk_size = D_chunk_size
 
+        self.use_D_sparse = use_D_sparse
         self.rebuild_adjacency()
 
     # --------------------------------------------------
     # adjacency from B^T B rule
     # --------------------------------------------------
+
     def rebuild_adjacency(self):
+        if self.use_D_sparse:
+            self.rebuild_adjacency_sparse_chunks()
+        else:
+            self.rebuild_adjacency_dense()
+        
+    def rebuild_adjacency_dense(self):
         n = self.E.shape[0]
         self.D = np.zeros((n, n), dtype=np.uint8)
 
@@ -36,12 +46,55 @@ class ExtremePointPolytope:
         D_vec = (D_vec >= self.r - 1).astype(np.uint8) # BEWARE MARJOR BUG: adjacent if they share at least r-1 active constraints (not exact!)
         self.D = D_vec
 
-        # for i in range(n):
-        #     for j in range(i + 1, n):
-        #         if BTB[i, j] == self.r - 1:
-        #             self.D[i, j] = self.D[j, i] = 1
-        # assert np.array_equal(self.D, D_vec), "Adjacency matrix does not match B^T B rule"
 
+    def rebuild_adjacency_sparse_chunks(self):
+        """Compute adjacency matrix D in chunks and store as sparse COO."""
+        n = self.E.shape[0]
+        
+        # chunk size to balance memory vs speed
+        chunk_size = self.D_chunk_size
+        
+        rows, cols, data = [], [], []
+        
+        for i in range(0, n, chunk_size):
+            i_end = min(i + chunk_size, n)
+            
+            # compute B^T B for this chunk of columns
+            B_chunk = self.B[:, i:i_end]  # (m, chunk_size)
+            BTB_chunk = self.B.T @ B_chunk  # (n, chunk_size)
+            
+            # check adjacency: exactly r-1 shared constraints
+            for local_j, global_j in enumerate(range(i, i_end)):
+                col = BTB_chunk[:, local_j]
+                # exclude diagonal
+                col[global_j] = 0
+                # find where shared == r-1
+                adj_idx = np.where(col >= self.r - 1)[0]
+                
+                for global_i in adj_idx:
+                    if global_i < global_j:  # store upper triangle only
+                        rows.append(global_i)
+                        cols.append(global_j)
+                        data.append(1)
+        
+        # build symmetric sparse matrix from upper triangle
+        D_upper = sparse.coo_matrix(
+            (data, (rows, cols)),
+            shape=(n, n),
+            dtype=np.uint8
+        )
+        # symmetrize
+        self.D = D_upper + D_upper.T
+        self.D = self.D.tocsr()  # convert to CSR for efficient storage/access
+
+    def get_neighbours(self, idx):
+        if isinstance(self.D, np.ndarray):
+            neighbors = np.where(self.D[idx] == 1)[0]
+        elif sparse.issparse(self.D):
+            neighbors = self.D[idx].nonzero()[1]
+        else:
+            raise ValueError("Adjacency matrix D is unrecognized type: {}".format(type(self.D)))
+        return neighbors
     # --------------------------------------------------
     # add constraint (A_n, b_n)
     # --------------------------------------------------
@@ -60,7 +113,7 @@ class ExtremePointPolytope:
         # ---------- Step B (paper) ----------
         for i in infeasible_idx:
 
-            neighbors = np.where(self.D[i] == 1)[0]
+            neighbors = self.get_neighbours(i)
 
             for j in neighbors:
                 if not feasible[j]:
