@@ -273,6 +273,52 @@ class ExtremePointPolytopeSparse:
         D = D_upper + D_upper.T
         return D.tocsr()
 
+    def _build_adjacency_subset_vectorized_chunked(self, masks, chunk_size=None):
+        """Build adjacency matrix in chunks, assemble as sparse CSR."""
+        if chunk_size is None:
+            chunk_size = self.D_chunk_size
+        
+        n = len(masks)
+        rows, cols = [], []
+        
+        # Determine dtype for masks
+        if max(masks) < 2**64:
+            masks = np.asarray(masks, dtype=np.uint64)
+        else:
+            masks = np.asarray(masks, dtype=object)
+        
+        # Process chunks of columns
+        for j_start in range(0, n, chunk_size):
+            j_end = min(j_start + chunk_size, n)
+            masks_j_chunk = masks[j_start:j_end]
+            
+            # pairwise bitwise AND: all rows vs chunk of columns
+            # shape: (n, len(chunk))
+            inter = masks[:, None] & masks_j_chunk[None, :]
+            
+            # vectorized popcount
+            bitcounts = np.bitwise_count(inter)
+            
+            # find adjacencies (excluding diagonal)
+            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1)
+            global_j_idx = local_j_idx + j_start
+            
+            # keep only upper triangle (i < j)
+            mask = i_idx < global_j_idx
+            rows.extend(i_idx[mask])
+            cols.extend(global_j_idx[mask])
+        
+        # build upper triangle COO with bool dtype
+        D_upper = sparse.coo_matrix(
+            (np.ones(len(rows), dtype=bool), (rows, cols)),
+            shape=(n, n),
+            dtype=bool
+        )
+        
+        # symmetrize: D = D_upper + D_upper^T
+        D = D_upper + D_upper.T
+        return D.tocsr()
+
     def _build_adjacency_subset_vectorized(self, masks):
         if max(masks) < 2**64:
             masks = np.asarray(masks, dtype=np.uint64)
@@ -463,7 +509,9 @@ class ExtremePointPolytopeSparse:
 
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
+        D_old_working = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
+        D_old = self._build_adjacency_subset_vectorized_chunked(masks_old, use_sparse=self.use_D_sparse)
+        assert np.array_equal(D_old_working.toarray(), D_old.toarray()), "Adjacency subsets do not match!"
 
         logger.info('# ---------- Step H: assemble final D ----------')
         def assemble_D(use_D_sparse, D_old, O, N):
