@@ -45,7 +45,7 @@ def p_plus_implementations_to_test():
 def p_minus_implementations_to_test():
     return ['cdd', 'v_to_h_dual']
 
-def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test):
+def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, iter_max=10):
     '''passing'''
 
     n_tests = 1
@@ -60,7 +60,7 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
                 for p_minus_implementation in p_minus_implementations_to_test:
                     for p_minus_dual_implementation in ['h_to_v_popcount_sparse', ] if p_minus_implementation == 'v_to_h_dual' else [None]:
                         logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
-                        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=10, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
+                        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
                         plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
                         logger.info(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): {plan_error}')
                         logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
@@ -213,5 +213,5 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    test_3d_convex(['cdd'], ['v_to_h_dual'])
+    test_3d_convex(['h_to_v_popcount_sparse'], ['v_to_h_dual'], iter_max=30)
     
