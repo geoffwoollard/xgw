@@ -5,6 +5,14 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+def get_neighbours(D, idx):
+    if isinstance(D, np.ndarray):
+        neighbors = np.where(D[idx] == 1)[0]
+    elif sparse.issparse(D):
+        neighbors = D[idx].nonzero()[1]
+    else:
+        raise ValueError("Adjacency matrix D is unrecognized type: {}".format(type(D)))
+    return neighbors
 
 class ExtremePointPolytope:
     """
@@ -82,14 +90,7 @@ class ExtremePointPolytope:
         self.D = D_upper + D_upper.T
         self.D = self.D.tocsr()  # convert to CSR for efficient storage/access
 
-    def get_neighbours(self, idx):
-        if isinstance(self.D, np.ndarray):
-            neighbors = np.where(self.D[idx] == 1)[0]
-        elif sparse.issparse(self.D):
-            neighbors = self.D[idx].nonzero()[1]
-        else:
-            raise ValueError("Adjacency matrix D is unrecognized type: {}".format(type(self.D)))
-        return neighbors
+
     # --------------------------------------------------
     # add constraint (A_n, b_n)
     # --------------------------------------------------
@@ -108,7 +109,7 @@ class ExtremePointPolytope:
         # ---------- Step B (paper) ----------
         for i in infeasible_idx:
 
-            neighbors = self.get_neighbours(i)
+            neighbors = get_neighbours(self.D, i)
 
             for j in neighbors:
                 if not feasible[j]:
@@ -194,15 +195,19 @@ class ExtremePointPolytopeSparse:
     # --------------------------------------------------
     # Initialization
     # --------------------------------------------------
-    def __init__(self, E, masks, A=None, b=None):
+    def __init__(self, E, masks, A=None, b=None, D_chunk_size=5000, use_D_sparse=True):
         self.E = np.asarray(E, float)
         self.masks = np.array(masks, dtype=object)
 
         self.A = [] if A is None else list(A)
         self.b = [] if b is None else list(b)
+        self.D_chunk_size = D_chunk_size
 
         self.r = E.shape[1]
         self.D = self._build_adjacency()
+        self.use_D_sparse = use_D_sparse
+        if use_D_sparse:
+            self.D = sparse.csr_matrix(self.D, dtype=bool)
         self._POPCOUNT_TABLE = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
 
 
@@ -210,7 +215,7 @@ class ExtremePointPolytopeSparse:
     # Adjacency helpers
     # --------------------------------------------------
     def _adjacent(self, m1, m2):
-        return (m1 & m2).bit_count() == self.r - 1
+        return (m1 & m2).bit_count() >= self.r - 1
 
     def _build_adjacency(self):
         n = len(self.masks)
@@ -223,14 +228,50 @@ class ExtremePointPolytopeSparse:
         return D
 
     def _build_adjacency_subset(self, masks):
+        # if self.use_D_sparse:
+        #     return self._build_adjacency_subset_sparse_chunks(masks)
+        # else:
+        #     return self._build_adjacency_subset_dense(masks)
+        return self._build_adjacency_subset_dense(masks), self._build_adjacency_subset_sparse_chunks(masks)
+
+    def _build_adjacency_subset_dense(self, masks):
         n = len(masks)
         D = np.zeros((n, n), dtype=int) # TODO: np.uint8 or sparse?
 
         for i in range(n):
             for j in range(i + 1, n):
-                if (masks[i] & masks[j]).bit_count() == self.r - 1:
+                if (masks[i] & masks[j]).bit_count() >= self.r - 1:
                     D[i, j] = D[j, i] = 1
         return D
+    
+    def _build_adjacency_subset_sparse_chunks(self, masks):
+        """Build sparse adjacency for a subset of masks (chunked)."""
+        n = len(masks)
+        chunk_size = self.D_chunk_size
+        
+        rows, cols = [], []
+        
+        for j_start in range(0, n, chunk_size):
+            j_end = min(j_start + chunk_size, n)
+            
+            for local_j, j in enumerate(range(j_start, j_end)):
+                m_j = masks[j]
+                
+                for i in range(j):
+                    m_i = masks[i]
+                    shared = (m_i & m_j).bit_count()
+                    
+                    if shared >= self.r - 1:
+                        rows.append(i)
+                        cols.append(j)
+        
+        D_upper = sparse.coo_matrix(
+            (np.ones(len(rows), dtype=bool), (rows, cols)),
+            shape=(n, n),
+            dtype=bool
+        )
+        D = D_upper + D_upper.T
+        return D.tocsr()
 
     def _build_adjacency_subset_vectorized(self, masks):
         # masks = np.asarray(masks, dtype=np.uint64)
@@ -245,7 +286,7 @@ class ExtremePointPolytopeSparse:
         # vectorized popcount
         bitcounts = np.bitwise_count(inter)
 
-        D = (bitcounts == self.r - 1).astype(np.uint8)
+        D = (bitcounts >= self.r - 1).astype(np.uint8)
 
         np.fill_diagonal(D, 0)
         return D
@@ -297,7 +338,8 @@ class ExtremePointPolytopeSparse:
         logger.info('# ---------- Step B: generate new vertices ----------')
         for i in infeasible_idx:
 
-            neighbors = np.where(self.D[i] == 1)[0]
+            # neighbors = np.where(self.D[i] == 1)[0]
+            neighbors = get_neighbours(self.D, i)
 
             for j in neighbors:
                 if not feasible[j]:
@@ -346,31 +388,50 @@ class ExtremePointPolytopeSparse:
         n_old = len(E_old)
         n_new = len(new_masks)
 
-        O = np.zeros((n_old, n_new), dtype=int) # TODO: np.uint8 or sparse?
+        def build_O(n_old, n_new, O_links, index_map):
+            O = np.zeros((n_old, n_new), dtype=int) # TODO: np.uint8 or sparse?
 
-        for k, old_j in enumerate(O_links):
-            O[index_map[old_j], k] = 1
-
+            for k, old_j in enumerate(O_links):
+                O[index_map[old_j], k] = 1
+            return O
+        O = build_O(n_old, n_new, O_links, index_map)
+        O_s = sparse.csr_matrix(O, dtype=bool)
+        
         logger.info('# ---------- Step F: compute N block ----------')
-        N = np.zeros((n_new, n_new), dtype=int)
+        def build_N(n_new, new_masks, new_bit):
+            N = np.zeros((n_new, n_new), dtype=int)
 
-        for i in range(n_new):
-            for j in range(i + 1, n_new):
+            for i in range(n_new):
+                for j in range(i + 1, n_new):
 
-                shared = (
-                    (new_masks[i] & new_masks[j]) & ~new_bit
-                ).bit_count()
+                    shared = (
+                        (new_masks[i] & new_masks[j]) & ~new_bit
+                    ).bit_count()
 
-                if shared == self.r - 2:
-                    N[i, j] = N[j, i] = 1
+                    if shared >= self.r - 2:
+                        N[i, j] = N[j, i] = 1
+            return N
+        N = build_N(n_new, new_masks, new_bit)
+        N_s = sparse.csr_matrix(N, dtype=bool)
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old = self._build_adjacency_subset(masks_old)
+        D_old, D_old_s = self._build_adjacency_subset(masks_old)
 
         logger.info('# ---------- Step H: assemble final D ----------')
-        top = np.hstack([D_old, O])
-        bottom = np.hstack([O.T, N])
-        self.D = np.vstack([top, bottom])
+
+        def assemble_D(use_D_sparse, D_old, O, N, ):
+            if use_D_sparse:
+                library = sparse
+            else:
+                library = np
+            top = library.hstack([D_old, O])
+            bottom = library.hstack([O.T, N])
+            D_updated = library.vstack([top, bottom])
+            return D_updated
+        
+        self.D = assemble_D(False, D_old, O, N)
+        self.D_s = assemble_D(True, D_old_s, O_s, N_s)
+        assert np.array_equal(self.D, self.D_s.toarray())
 
         logger.info('# ---------- Step I: store constraint ----------')
         self.A.append(a_new)
