@@ -10,7 +10,7 @@ class ExtremePointPolytope:
     Minimal faithful implementation of Section A.3
     """
 
-    def __init__(self, E, B, dim=3):
+    def __init__(self, E, B, dim=3, add_constraint_tol=1e-17):
         """
         E : (n,dim) vertices
         B : (m,n) binary active-constraint matrix
@@ -20,6 +20,7 @@ class ExtremePointPolytope:
         self.B = np.asarray(B, np.uint8)
 
         self.n_constraints = self.B.shape[0]
+        self.add_constraint_tol = add_constraint_tol
 
         self.rebuild_adjacency()
 
@@ -49,7 +50,7 @@ class ExtremePointPolytope:
         a_new = np.asarray(a_new, float)
 
         values = self.E @ a_new
-        feasible = values <= b_new + 1e-12
+        feasible = values <= b_new + self.add_constraint_tol
         infeasible_idx = np.where(~feasible)[0]
 
         new_vertices = []
@@ -271,7 +272,7 @@ class ExtremePointPolytopeSparse:
                 new_masks.append(inherited | new_bit)
 
                 O_links.append(j)
-                
+
         if len(new_vertices) == 0:
             return
 
