@@ -227,12 +227,12 @@ class ExtremePointPolytopeSparse:
                     D[i, j] = D[j, i] = 1
         return D
 
-    def _build_adjacency_subset(self, masks):
-        # if self.use_D_sparse:
-        #     return self._build_adjacency_subset_sparse_chunks(masks)
-        # else:
-        #     return self._build_adjacency_subset_dense(masks)
-        return self._build_adjacency_subset_dense(masks), self._build_adjacency_subset_sparse_chunks(masks)
+    def _build_adjacency_subset(self, masks, use_sparse):
+        if use_sparse:
+            return self._build_adjacency_subset_sparse_chunks(masks)
+        else:
+            return self._build_adjacency_subset_dense(masks)
+        # return self._build_adjacency_subset_dense(masks), self._build_adjacency_subset_sparse_chunks(masks)
 
     def _build_adjacency_subset_dense(self, masks):
         n = len(masks)
@@ -415,25 +415,10 @@ class ExtremePointPolytopeSparse:
                     O[index_map[old_j], k] = True
                 return O
             
-        O = build_O(n_old, n_new, O_links, index_map, use_sparse=False)
-        O_s = build_O(n_old, n_new, O_links, index_map, use_sparse=True)
-        assert np.array_equal(O, O_s.toarray())
+        O = build_O(n_old, n_new, O_links, index_map, use_sparse=self.use_D_sparse)
+
         
-        logger.info('# ---------- Step F: compute N block ----------')
-        def build_N_working(n_new, new_masks, new_bit):
-            N = np.zeros((n_new, n_new), dtype=bool)
-
-            for i in range(n_new):
-                for j in range(i + 1, n_new):
-
-                    shared = (
-                        (new_masks[i] & new_masks[j]) & ~new_bit
-                    ).bit_count()
-
-                    if shared >= self.r - 2:
-                        N[i, j] = N[j, i] = True
-            return N
-        
+        logger.info('# ---------- Step F: compute N block ----------')      
         def build_N(n_new, new_masks, new_bit, r, use_sparse=True):
             """Build N matrix (n_new × n_new) efficiently.
             
@@ -476,31 +461,32 @@ class ExtremePointPolytopeSparse:
                             N[i, j] = N[j, i] = True
                 return N
         
-        N_working = build_N_working(n_new, new_masks, new_bit)
-        N_working_s = sparse.csr_matrix(N_working, dtype=bool)
-        N = build_N(n_new, new_masks, new_bit, self.r, use_sparse=False)
-        N_s = build_N(n_new, new_masks, new_bit, self.r, use_sparse=True)
-        assert np.array_equal(N, N_working)
-        assert np.array_equal(N, N_s.toarray())
-        assert np.array_equal(N_s.toarray(), N_working_s.toarray())
+
+        N = build_N(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
+
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
-        D_old, D_old_s = self._build_adjacency_subset(masks_old)
+        D_old = self._build_adjacency_subset(masks_old, use_sparse=self.use_D_sparse)
 
         logger.info('# ---------- Step H: assemble final D ----------')
-        def assemble_D(use_D_sparse, D_old, O, N, ):
+        def assemble_D(use_D_sparse, D_old, O, N):
             if use_D_sparse:
-                library = sparse
+                D_updated = sparse.bmat([
+                    [D_old, O],
+                    [O.T, N]
+                ], format='csr', dtype=bool)
             else:
-                library = np
-            top = library.hstack([D_old, O])
-            bottom = library.hstack([O.T, N])
-            D_updated = library.vstack([top, bottom])
+                top = np.hstack([D_old, O])
+                bottom = np.hstack([O.T, N])
+                D_updated = np.vstack([top, bottom])
             return D_updated
         
-        self.D = assemble_D(False, D_old, O, N)
-        self.D_s = assemble_D(True, D_old_s, O_s, N_s)
-        assert np.array_equal(self.D, self.D_s.toarray())
+        self.D = assemble_D(self.use_D_sparse, D_old, O, N)
+        D_dense = assemble_D(False, 
+                             self._build_adjacency_subset(masks_old, use_sparse=False), 
+                             build_O(n_old, n_new, O_links, index_map, use_sparse=False),
+                            build_N(n_new, new_masks, new_bit, self.r, use_sparse=False))
+        assert np.array_equal(self.D.toarray(), D_dense), "Sparse and dense D do not match!"
 
         logger.info('# ---------- Step I: store constraint ----------')
         self.A.append(a_new)
