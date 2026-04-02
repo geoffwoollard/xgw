@@ -3,6 +3,7 @@ import pytest
 
 from xgw.h_to_v_popcount import ExtremePointPolytopeSparse, masks_from_B, masks_from_B_vectorized
 from xgw.hyperplane_approx import unit_cube
+from xgw.utils import cast_to_dense_if_sparse
 
 def cube_mask(v):
     # bits 0..d-1: coordinate == 1 ; bits d..2d-1: coordinate == 0
@@ -15,7 +16,7 @@ def cube_mask(v):
             m |= 1 << (d + i)
     return m
 
-def cube_polytope(dim):
+def cube_polytope(dim, use_D_sparse):
     """
     Create unit cube with correct B matrix.
     """
@@ -23,7 +24,7 @@ def cube_polytope(dim):
     E, A, b, _, _ = unit_cube(dim)
 
     masks = [cube_mask(v) for v in E]
-    poly = ExtremePointPolytopeSparse(E, masks, A, b)
+    poly = ExtremePointPolytopeSparse(E, masks, A, b, use_D_sparse=use_D_sparse)
     return poly
 
 def test_masks_from_B(dimensions):
@@ -54,54 +55,62 @@ def delta():
     return 0.1
 
 @pytest.fixture
-def one_cut_corner_polys(dimensions, delta):
+def use_D_sparse_options():
+    return [True, False]
+
+@pytest.fixture
+def one_cut_corner_polys(dimensions, delta, use_D_sparse_options):
     polys = []
     for dimension in dimensions:
-        poly_one_cut_corner = cube_polytope(dim=dimension)
-        d = poly_one_cut_corner.r
-        ones = np.ones(d).tolist()
-        poly_one_cut_corner.add_constraint(ones, d - delta)
-        polys.append(poly_one_cut_corner)
+        for use_D_sparse in use_D_sparse_options:
+            poly_one_cut_corner = cube_polytope(dim=dimension, use_D_sparse=use_D_sparse)
+            d = poly_one_cut_corner.r
+            ones = np.ones(d).tolist()
+            poly_one_cut_corner.add_constraint(ones, d - delta)
+            polys.append(poly_one_cut_corner)
     return polys
 
 @pytest.fixture
-def double_one_cut_corner_polys(dimensions, delta):
+def double_one_cut_corner_polys(dimensions, delta, use_D_sparse_options):
     polys = []
     for dimension in dimensions:
-        poly_one_cut_corner = cube_polytope(dim=dimension)
-        d = poly_one_cut_corner.r
-        ones = np.ones(d).tolist()
-        poly_one_cut_corner.add_constraint(ones, d - delta)
-        poly_one_cut_corner.add_constraint(ones, d - 2*delta)
-        polys.append(poly_one_cut_corner)
+        for use_D_sparse in use_D_sparse_options:
+            poly_one_cut_corner = cube_polytope(dim=dimension, use_D_sparse=use_D_sparse)
+            d = poly_one_cut_corner.r
+            ones = np.ones(d).tolist()
+            poly_one_cut_corner.add_constraint(ones, d - delta)
+            poly_one_cut_corner.add_constraint(ones, d - 2*delta)
+            polys.append(poly_one_cut_corner)
     return polys
 
 @pytest.fixture
-def all_corners_except_one_polys(dimensions, delta):
+def all_corners_except_one_polys(dimensions, delta, use_D_sparse_options):
     polys = []
     for dimension in dimensions:
-        poly_one_cut_corner = cube_polytope(dim=dimension)
-        d = poly_one_cut_corner.r
-        ones = np.ones(d).tolist()
-        poly_one_cut_corner.add_constraint(ones, delta)
-        polys.append(poly_one_cut_corner)
+        for use_D_sparse in use_D_sparse_options:
+            poly_one_cut_corner = cube_polytope(dim=dimension, use_D_sparse=use_D_sparse)
+            d = poly_one_cut_corner.r
+            ones = np.ones(d).tolist()
+            poly_one_cut_corner.add_constraint(ones, delta)
+            polys.append(poly_one_cut_corner)
     return polys
 
 @pytest.fixture
-def double_all_corners_except_one_polys(dimensions, delta):
+def double_all_corners_except_one_polys(dimensions, delta, use_D_sparse_options):
     polys = []
     for dimension in dimensions:
-        poly_one_cut_corner = cube_polytope(dim=dimension)
-        d = poly_one_cut_corner.r
-        ones = np.ones(d).tolist()
-        poly_one_cut_corner.add_constraint(ones, delta)
-        poly_one_cut_corner.add_constraint(ones, delta/2)
-        polys.append(poly_one_cut_corner)
+        for use_D_sparse in use_D_sparse_options:
+            poly_one_cut_corner = cube_polytope(dim=dimension, use_D_sparse=use_D_sparse)
+            d = poly_one_cut_corner.r
+            ones = np.ones(d).tolist()
+            poly_one_cut_corner.add_constraint(ones, delta)
+            poly_one_cut_corner.add_constraint(ones, delta/2)
+            polys.append(poly_one_cut_corner)
     return polys
 
 @pytest.fixture
-def cube_polys(dimensions):
-    return [cube_polytope(dim=dimension) for dimension in dimensions]
+def cube_polys(dimensions, use_D_sparse_options):
+    return [cube_polytope(dim=dimension, use_D_sparse=use_D_sparse) for dimension in dimensions for use_D_sparse in use_D_sparse_options]
 
 def test_cube_vertex_rank(cube_polys):
     """Every vertex of the cube must lie on exactly r facets.
@@ -114,8 +123,8 @@ def test_cube_vertex_rank(cube_polys):
 
 def test_assert_symmetric_D(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     for poly in cube_polys + one_cut_corner_polys + double_one_cut_corner_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
-        M = poly.D
-        assert np.all(M == M.T), "Adjacency matrix not symmetric"
+        D = cast_to_dense_if_sparse(poly.D)
+        assert np.all(D == D.T), "Adjacency matrix not symmetric"
 
 def test_vertex_count(cube_polys, one_cut_corner_polys, double_one_cut_corner_polys, all_corners_except_one_polys, double_all_corners_except_one_polys):
     for poly in cube_polys:
@@ -133,12 +142,13 @@ def test_adjacency_rule(cube_polys, one_cut_corner_polys, double_one_cut_corner_
     """
     for poly in one_cut_corner_polys + double_one_cut_corner_polys + cube_polys + all_corners_except_one_polys + double_all_corners_except_one_polys:
         n = len(poly.masks)
+        D = cast_to_dense_if_sparse(poly.D)
         for i in range(n):
             for j in range(i + 1, n):
                 # number of shared active constraints = popcount(mask_i & mask_j)
                 shared = (poly.masks[i] & poly.masks[j]).bit_count()
                 expected = (shared == poly.r - 1)
-                assert bool(poly.D[i, j]) == expected, (
+                assert bool(D[i, j]) == expected, (
                     f"Adjacency mismatch for poly.r={poly.r} vertices {i},{j}: "
                     f"shared={shared}, expected={expected}"
                 )
@@ -249,12 +259,13 @@ def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys
     '''Cutting the cube with x+y+z <= 3-delta or x+y+z <= delta should create new vertices that are mutually adjacent (form a triangle in dim=3, tetrahedron in dim=4, etc).'''
     for poly_list, _delta in zip([one_cut_corner_polys, double_one_cut_corner_polys], [delta, 2*delta]):
         for poly in poly_list:
+            D = cast_to_dense_if_sparse(poly.D)
             d = poly.r
 
             vals = poly.E @ np.ones(d)
             new_idx = np.where(np.isclose(vals, d - _delta))[0]
 
-            subgraph = poly.D[np.ix_(new_idx, new_idx)]
+            subgraph = D[np.ix_(new_idx, new_idx)]
 
             # triangle adjacency
             expected = np.ones((d,d), dtype=int) - np.eye(d, dtype=int)
@@ -262,12 +273,13 @@ def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys
 
     for poly_list, _delta in zip([all_corners_except_one_polys, double_all_corners_except_one_polys], [delta, delta/2]):
         for poly in poly_list:
+            D = cast_to_dense_if_sparse(poly.D)
             d = poly.r
 
             vals = poly.E @ np.ones(d)
             new_idx = np.where(np.isclose(vals, _delta))[0]
 
-            subgraph = poly.D[np.ix_(new_idx, new_idx)]
+            subgraph = D[np.ix_(new_idx, new_idx)]
 
             # triangle adjacency
             expected = np.ones((d,d), dtype=int) - np.eye(d, dtype=int)

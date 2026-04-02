@@ -1,5 +1,6 @@
 import ot
 import numpy as np
+from scipy import sparse
 
 
 def safe_plot(arr):
@@ -33,3 +34,9 @@ def canonicalize_vertices(vertices, decimals=5):
     vertices = np.round(vertices, decimals=decimals)
     vertices = np.unique(vertices, axis=0)
     return vertices
+
+def cast_to_dense_if_sparse(matrix):
+    if sparse.issparse(matrix):
+        return matrix.toarray()
+    else:
+        return matrix

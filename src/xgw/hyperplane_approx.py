@@ -16,7 +16,7 @@ except ImportError as e:
 
 from .h_to_v_edges import update_edges_with_new_halfplane
 from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
-
+from .utils import cast_to_dense_if_sparse
 
 def build_B_from_H_and_V(A, b, V, tol=1e-5):
     # A shape (m, d), b shape (m,), V shape (n, d)
@@ -242,25 +242,29 @@ class DoubleDescription():
                  masks_initialization=None, 
                  A_initialization=None, 
                  b_initialization=None, 
-                 dual_implementation=None):
+                 dual_implementation=None,
+                 use_D_sparse=True,
+                 use_D_sparse_dual=True):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
         self.implementation = implementation
         self.dual_implementation = dual_implementation
+        self.use_D_sparse = use_D_sparse
+        self.use_D_sparse_dual = use_D_sparse_dual
         if self.implementation == 'cdd':
             pass
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
         elif self.implementation == 'h_to_v_popcount':
-            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
+            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, use_D_sparse=self.use_D_sparse)
         elif self.implementation == 'h_to_v_popcount_sparse':
-            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
+            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, use_D_sparse=self.use_D_sparse)
         elif self.implementation == 'v_to_h_dual':
             assert self.dual_implementation is not None, 'dual_implementation is required for v_to_h_dual implementation'
             assert self.dual_implementation in ['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
             from xgw.v_to_h_dual import setup_dual_polytope
-            dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation)
+            dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation, use_D_sparse=self.use_D_sparse_dual)
             self.dim = dim
             self.dd_dual_polytope = dd_dual_polytope
             self.center = center
@@ -305,7 +309,8 @@ class DoubleDescription():
             self.poly.E = self.poly.E[unique_indices]
             self.poly.B = self.poly.B[:, unique_indices]
             self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
-            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            D = cast_to_dense_if_sparse(self.poly.D)
+            assert np.allclose(D, D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
         
         elif self.implementation == 'h_to_v_popcount_sparse':
@@ -313,7 +318,8 @@ class DoubleDescription():
             self.poly.E = self.poly.E[unique_indices]
             self.poly.masks = self.poly.masks[unique_indices]
             self.poly.D = self.poly._build_adjacency()
-            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            D = cast_to_dense_if_sparse(self.poly.D)
+            assert np.allclose(D, D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
 
     def check_feasibility_V(self, A, b):
@@ -431,7 +437,7 @@ class DoubleDescription():
         return np.mean(np.array(self.V), axis=0)
 
 
-def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount'):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount', p_plus_use_D_sparse=True, p_minus_use_D_sparse=True, p_minus_use_D_sparse_dual=True):
     '''
     Docstring for initial_box
     
@@ -468,7 +474,9 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
                                                 dual_implementation=p_minus_dual_implementation, 
                                                 V_initialization=np.array(p_minus_initial.V),
                                                 A_initialization=A_p_minus, 
-                                                b_initialization=b_p_minus)
+                                                b_initialization=b_p_minus,
+                                                use_D_sparse=p_minus_use_D_sparse,
+                                                use_D_sparse_dual=p_minus_use_D_sparse_dual)
         p_minus.H = p_minus_initial.H
         p_minus.V = p_minus_initial.V
     else:
@@ -490,7 +498,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         B_initialization = B_bool.astype(int)
         p_plus = DoubleDescription(implementation=p_plus_implementation, 
                                    V_initialization=V_initialization, 
-                                   B_initialization=B_initialization
+                                   B_initialization=B_initialization,
+                                   use_D_sparse=p_plus_use_D_sparse
                                    )
         p_plus.V = p_plus_initial.V
         p_plus.H = p_plus_initial.H
@@ -505,7 +514,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
                                    V_initialization=V_initialization,
                                    masks_initialization=masks_initialization,
                                    A_initialization=A,
-                                   b_initialization=b)
+                                   b_initialization=b,
+                                   use_D_sparse=p_plus_use_D_sparse)
         p_plus.V = [np.array(v) for v in p_plus.poly.E]
         p_plus.H = [A, b]
             

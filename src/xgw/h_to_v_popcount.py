@@ -19,12 +19,12 @@ class ExtremePointPolytope:
     Minimal faithful implementation of Section A.3
     """
 
-    def __init__(self, E, B, dim=3, add_constraint_tol=1e-17, D_chunk_size=5000, use_D_sparse=True):
+    def __init__(self, E, B, add_constraint_tol=1e-17, D_chunk_size=5000, use_D_sparse=True):
         """
         E : (n,dim) vertices
         B : (m,n) binary active-constraint matrix
         """
-        self.r = dim
+        self.r = E.shape[1]
         self.E = np.asarray(E, float)
         self.B = np.asarray(B, np.uint8)
 

@@ -79,7 +79,7 @@ def _recover_vertices_from_facets(A, b, d, tol=1e-10):
     return V
 
 
-def setup_dual_polytope(vertices, A, b, implementation):
+def setup_dual_polytope(vertices, A, b, implementation, use_D_sparse):
     d = vertices.shape[1]
 
     # Step 1: center
@@ -103,7 +103,7 @@ def setup_dual_polytope(vertices, A, b, implementation):
         dual_A = vertices
         dual_b = np.ones(len(vertices))
         dual_B_initialization = build_B_from_H_and_V(dual_A, dual_b, dual_vertices)
-        dd_dual_polytope = DoubleDescription(implementation=implementation, V_initialization=dual_vertices, B_initialization=dual_B_initialization)
+        dd_dual_polytope = DoubleDescription(implementation=implementation, V_initialization=dual_vertices, B_initialization=dual_B_initialization, use_D_sparse=use_D_sparse)
         dd_dual_polytope.V = dual_vertices.tolist()
         dd_dual_polytope.H = [dual_A, dual_b]
     elif implementation == 'h_to_v_popcount_sparse': # TODO: check
@@ -111,7 +111,7 @@ def setup_dual_polytope(vertices, A, b, implementation):
         dual_b = np.ones(len(vertices))
         dual_B_initialization = build_B_from_H_and_V(dual_A, dual_b, dual_vertices)
         dual_masks_initialization = masks_from_B(dual_B_initialization)
-        dd_dual_polytope = DoubleDescription(implementation=implementation, V_initialization=dual_vertices, masks_initialization=dual_masks_initialization, A_initialization=dual_A, b_initialization=dual_b)
+        dd_dual_polytope = DoubleDescription(implementation=implementation, V_initialization=dual_vertices, masks_initialization=dual_masks_initialization, A_initialization=dual_A, b_initialization=dual_b, use_D_sparse=use_D_sparse)
         dd_dual_polytope.V = dual_vertices.tolist()
         dd_dual_polytope.H = [dual_A, dual_b]
     else:
