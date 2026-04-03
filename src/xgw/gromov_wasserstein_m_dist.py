@@ -244,7 +244,8 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
     c_minus, x_minus = classical_gw_optimal_cost(np.array(P_minus.V), R)
     
-    
+    best_dir = best_init_dir(x_minus, P_plus)
+
     for iter in range(iter_max):
         
         # choose direction
@@ -272,6 +273,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
             best_dir = g
         if c_plus - c_minus < cost_tol:
             # x_minus = g_star
+            
             break
 
     # Computing the optimal coupling:

@@ -22,6 +22,7 @@ logger.setLevel(logging.INFO)
 
 def testing_2d_classical_gw():
     '''passing'''
+    
     n_tests = 3
     for test_id in range(n_tests):
         mus, _, space_xs, _ = make_simple_marginals(test_id, d=2)
@@ -46,13 +47,12 @@ def p_minus_implementations_to_test():
     return ['cdd', 'v_to_h_dual']
 
 @pytest.fixture
-def p_minus_dual_implementation():
-    return ['cdd','h_to_v_popcount','h_to_v_popcount_sparse', ]
+def p_minus_dual_implementations_to_test():
+    return ['h_to_v_popcount','h_to_v_popcount_sparse', ]
 
-def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations, iter_max=10):
+def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test, iter_max=10):
     '''passing'''
-
-    n_tests = 1
+    n_tests = 3
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
         r2 = 1
@@ -62,7 +62,7 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
         for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
             for p_plus_implementation in p_plus_implementations_to_test:
                 for p_minus_implementation in p_minus_implementations_to_test:
-                    for p_minus_dual_implementation in p_minus_dual_implementations if p_minus_implementation == 'v_to_h_dual' else [None]:
+                    for p_minus_dual_implementation in p_minus_dual_implementations_to_test if p_minus_implementation == 'v_to_h_dual' else [None]:
                         logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation}')
                         total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
                         plan_error = np.linalg.norm(pi_opt - np.eye(len(mus))/len(mus))
@@ -75,23 +75,23 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
                         total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
                         logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
 
-def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test):
+def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test):
     '''passing'''
-
+    
     n_tests = 3
     for test_id in range(n_tests):
         mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2)
         for cost in ['IGW', 'CGW']:
             for p_plus_implementation in p_plus_implementations_to_test:
                 for p_minus_implementation in p_minus_implementations_to_test:
-                    for p_minus_dual_implementation in ['h_to_v_popcount', 'cdd'] if p_minus_implementation == 'v_to_h_dual' else [None]:
+                    for p_minus_dual_implementation in p_minus_dual_implementations_to_test if p_minus_implementation == 'v_to_h_dual' else [None]:
                         print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
                         T, plan, c, _, _ = gw_m_convex(mus, space_xs, mus, space_xs, {}, cost=cost, gap_tol=1e-15, iter_max=200, p_plus_implementation=p_plus_implementation, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
                         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
                         print(f'Plan error for identical marginals ({cost}, convex, {p_plus_implementation}): ', plan_error)
                         assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
-
+    
     mu, nu, space_x, space_y = make_marginals(0)
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
@@ -125,6 +125,7 @@ def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
     
 def testing_2d_non_convex(marginals):
     '''passing'''
+    
     mu, nu, space_x, space_y = marginals
     
     T, _, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter = 100)
@@ -152,12 +153,13 @@ def testing_2d_non_convex(marginals):
     logger.info(f'Plan (should be id): {plan}')
     assert np.isclose(plan_error, 0.0)
 
-def test_igw_convex_reflection_invariant(implementations_to_test):
+def test_igw_convex_reflection_invariant(p_plus_implementations_to_test):
     '''passing'''
+    
     n_tests = 3
     for d in [2]:
         for test_id in range(n_tests):
-            for p_plus_implementation in implementations_to_test:
+            for p_plus_implementation in p_plus_implementations_to_test:
                 mus, _, space_xs, _ = make_simple_marginals(test_id, d=d)
                 space_xs_reflected = space_xs.copy()
                 reflextion_axis = 0
@@ -183,14 +185,15 @@ def test_igw_convex_reflection_invariant(implementations_to_test):
                 logger.info(f'Plan (should be id): {plan}')
                 assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
 
-def test_igw_convex_rotation_invariant(implementations_to_test):
+def test_igw_convex_rotation_invariant(p_plus_implementations_to_test):
+    
     n_tests = 10
     for d in [2]:
         for test_id in range(n_tests):
             logger.info(f'Test {test_id}, dimension {d}')
             mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
             np.random.seed(test_id) # ensure same random rotation for each implementation
-            for p_plus_implementation in implementations_to_test:
+            for p_plus_implementation in p_plus_implementations_to_test:
                 logger.info(f'Test {test_id}, Implementation: {p_plus_implementation}')
                 rotation = random_invariance_matrix('CGW', d, random_state=test_id)
                 logger.info(f'Rotation matrix: {rotation.shape}')
@@ -203,6 +206,7 @@ def test_igw_convex_rotation_invariant(implementations_to_test):
 
 def test_cgw_convex_rotation_invariant():
     '''passing'''
+    
     np.random.seed(42)
     n_tests = 3
     for d in [2]:
@@ -220,6 +224,5 @@ def test_cgw_convex_rotation_invariant():
 
 
 
-if __name__ == "__main__":
-    test_3d_convex(['h_to_v_popcount_sparse'], ['v_to_h_dual'], ['h_to_v_popcount_sparse'], iter_max=100)
-    
+# if __name__ == "__main__":
+    # test_3d_convex(['h_to_v_popcount_sparse'], ['v_to_h_dual'], ['h_to_v_popcount_sparse'], iter_max=100)
