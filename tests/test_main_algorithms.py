@@ -128,7 +128,7 @@ def test_2d_non_convex(marginals):
 
     mu, nu, space_x, space_y = marginals
     
-    T, _, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter = 100)
+    T, _, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=300, FW_iter = 200)
     assert c < 5e-4, f"c={c}"
     assert T > 1e-3, f"T={T}"
     
