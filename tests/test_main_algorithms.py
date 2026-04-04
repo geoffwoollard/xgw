@@ -17,8 +17,7 @@ def perturbed_marginals():
 
 @pytest.fixture
 def p_plus_implementations_to_test():
-    # return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
-    return ['h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
+    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
 
 @pytest.fixture
 def p_minus_implementations_to_test():
@@ -227,4 +226,4 @@ def test_cgw_convex_rotation_invariant():
 
 if __name__ == "__main__":
     # test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0))
-    test_3d_convex(['h_to_v_edges'], p_minus_implementations_to_test(), p_minus_dual_implementations_to_test(), iter_max=10)
+    test_3d_convex(['h_to_v_edges'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount','h_to_v_popcount_sparse', ], iter_max=10)
