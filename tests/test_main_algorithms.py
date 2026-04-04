@@ -1,24 +1,31 @@
 import pytest
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+import logging
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex, classical_gw, gw_m_non_convex_geometric_approx
-
 from test_frank_wolfe import marginals_3d, random_invariance_matrix
 from test_hyperplane_approx import make_marginals, make_simple_marginals, marginals, make_marginals_preturbed
 
-import logging
-
-# logging.basicConfig(
-#     level=logging.WARNING,
-#     format="%(asctime)s.%(msecs)03d - %(message)s",
-#     datefmt="%Y-%m-%d %H:%M:%S",
-#     force=False,
-# )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+@pytest.fixture
+def perturbed_marginals():
+    return make_marginals_preturbed(seed=0, scale_space=0.01, scale_marginal=0)
+
+@pytest.fixture
+def p_plus_implementations_to_test():
+    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
+
+@pytest.fixture
+def p_minus_implementations_to_test():
+    return ['cdd', 'v_to_h_dual']
+
+@pytest.fixture
+def p_minus_dual_implementations_to_test():
+    return ['h_to_v_popcount','h_to_v_popcount_sparse', ]
 
 def test_2d_classical_gw():
     '''passing'''
@@ -37,18 +44,6 @@ def test_2d_classical_gw():
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}')
         assert np.isclose(plan_error, 0.0)
-
-@pytest.fixture
-def p_plus_implementations_to_test():
-    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
-
-@pytest.fixture
-def p_minus_implementations_to_test():
-    return ['cdd', 'v_to_h_dual']
-
-@pytest.fixture
-def p_minus_dual_implementations_to_test():
-    return ['h_to_v_popcount','h_to_v_popcount_sparse', ]
 
 def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test, iter_max=10):
     '''passing'''
@@ -123,14 +118,17 @@ def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
             not_too_small_tolerance = 1e-4
             assert not_too_small_tolerance < T, f"Total cost {T} is too small, should be above {not_too_small_tolerance} for different marginals ({cost}, convex) in test {test_id} with p_plus_implementation {p_plus_implementation}"
     
-def test_2d_non_convex(marginals):
+def test_2d_non_convex(perturbed_marginals):
     '''passing'''
 
-    mu, nu, space_x, space_y = marginals
+    mu, nu, space_x, space_y = perturbed_marginals
     
-    T, _, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=300, FW_iter = 200)
-    assert c < 5e-4, f"c={c}"
-    assert T > 1e-3, f"T={T}"
+    T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=300, FW_iter = 200)
+    plan_error = np.linalg.norm(plan - np.diag(mu))
+    logger.info(f'Non-convex plan error: {plan_error}')
+    logger.info(f'cost {c}')
+    logger.info(f'Plan (should be id): {plan}')
+    assert np.isclose(plan_error, 0.0)
     
     T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, mu, space_x, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=200, FW_iter = 200)
     assert c < 6e-4, f"c={c}"
