@@ -123,7 +123,7 @@ def test_2d_non_convex(perturbed_marginals):
 
     mu, nu, space_x, space_y = perturbed_marginals
     
-    T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=300, FW_iter = 200)
+    T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter = 200)
     plan_error = np.linalg.norm(plan - np.diag(mu))
     logger.info(f'Non-convex plan error: {plan_error}')
     logger.info(f'cost {c}')
