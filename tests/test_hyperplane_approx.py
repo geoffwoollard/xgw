@@ -48,6 +48,15 @@ def make_marginals(seed):
     return mu, nu, space_x, space_y
 
 
+def make_marginals_preturbed(seed, scale_space=0.1, scale_marginal=0.01):
+    np.random.seed(seed)
+    mu, _, space_x, _ = make_marginals(seed)
+    # add some random noise to the space to make it more challenging
+    space_y = space_x + np.random.randn(*space_x.shape) * scale_space
+    nu = mu + np.random.rand(*mu.shape) * scale_marginal
+    nu /= nu.sum()
+    return mu, nu, space_x, space_y
+
 @pytest.fixture
 def marginals():
     return make_marginals(seed=0)
