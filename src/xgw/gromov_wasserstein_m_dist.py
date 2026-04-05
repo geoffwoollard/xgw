@@ -192,6 +192,11 @@ def gw_m_convex(mu,
     for iter in range(iter_max):
         # choose direction
         logger.info('Chosing best direction')
+        logger.info(f'P_minus.V {P_minus.V}')
+        A, b = P_minus.H
+        A_norm = np.linalg.norm(A, axis=1)
+        logger.info(f'P_minus.H {P_minus.H}')
+        logger.info(f'P_minus.A_norm, b_norm {A/A_norm[:, None]}, {b/A_norm}')
         g = new_direction_convex_slow(P_minus, x_plus)
         logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
@@ -199,13 +204,18 @@ def gw_m_convex(mu,
         logger.info(f'new vertex: {g_star}')
         logger.info('Updating bounding boxes')
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-        logger.info(f'Updated box with , P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
+        logger.info(f'Updated box with P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
+        logger.info(f'P_plus.V {P_plus.V}')
+        logger.info(f'P_plus.H {P_plus.H}')
+        logger.info(f'P_minus.V {P_minus.V}')
+        logger.info(f'P_minus.H {P_minus.H}')
         logger.info('Updating c_minus (candidate optimal value)')
         Tcost = vector_cost(g_star, cost, R, d, t)
 
         # The optimal values after each iteration is updated
         logger.info('Updating c_plus and c_minus')
         c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+        logger.info(f'x_plus {x_plus}')
         logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, vertices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}, half-spaces in P_minus {P_minus.H[0].shape[0]} and P_plus {P_plus.H[0].shape[0]}')
         
         if Tcost > c_minus:

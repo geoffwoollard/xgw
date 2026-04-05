@@ -84,6 +84,7 @@ def setup_dual_polytope(vertices, A, b, implementation, use_D_sparse):
 
     # Step 1: center
     vertices, center = center_polytope(vertices)
+    # center = np.zeros(center.shape) #TODO: debug
     b = center_polytope_facets(A, b, center)
 
     # Step 2: normalize facets

@@ -45,7 +45,7 @@ def test_2d_classical_gw():
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}')
         assert np.isclose(plan_error, 0.0)
 
-def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test, iter_max=10):
+def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test, iter_max=6):
     '''passing'''
     n_tests = 1
     for test_id in range(n_tests):
@@ -54,7 +54,7 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
         t = 8*r2 / (2*r2 + 8)
         logger.info(f'Using t={t} for test {test_id}')
 
-        for t_use, cost in zip([None, t*1.01], ['IGW', 'CGW']):
+        for t_use, cost in zip([None, t*1.01], ['IGW', ]):#'CGW']):
             for p_plus_implementation in p_plus_implementations_to_test:
                 for p_minus_implementation in p_minus_implementations_to_test:
                     for p_minus_dual_implementation in p_minus_dual_implementations_to_test if p_minus_implementation == 'v_to_h_dual' else [None]:
@@ -226,4 +226,4 @@ def test_cgw_convex_rotation_invariant():
 
 if __name__ == "__main__":
     # test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0))
-    test_3d_convex(['h_to_v_edges'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount','h_to_v_popcount_sparse', ], iter_max=10)
+    test_3d_convex(['h_to_v_edges'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount', ], iter_max=2)

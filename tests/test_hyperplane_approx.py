@@ -397,3 +397,6 @@ def test_remove_duplicates_V():
                 assert np.array_equal(p.poly.masks, masks_from_B(B_expected)), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
                 assert np.array_equal(D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
                 
+
+# def test_update_box():
+#     update_box(p_plus, p_minus, [[g, g_hat]], [g_star])

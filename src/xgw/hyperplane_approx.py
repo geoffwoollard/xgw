@@ -593,7 +593,7 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
         logger.info('Added vertices to p_minus')
-        p_minus.V_to_H()
+        p_minus.V_to_H() # TODO: redundant
         logger.info('Updated half-planes of p_minus from vertices')
     elif p_minus.implementation == 'h_to_v_edges':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
