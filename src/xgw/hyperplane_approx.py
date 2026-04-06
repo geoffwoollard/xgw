@@ -412,6 +412,11 @@ class DoubleDescription():
             b_all = np.hstack([b, b_new])
             self.H = [A_all, b_all]
         elif self.implementation == 'h_to_v_edges':
+            print('Adding half-plane with h_to_v_edges implementation')
+            print(f'Vertices before: {self.V}')
+            print(f'Edges before: {self.E}')
+            print(f'Half-planes before: {self.H}')
+                  
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
             V = np.array(self.V)
