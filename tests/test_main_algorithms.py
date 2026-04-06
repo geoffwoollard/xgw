@@ -16,15 +16,15 @@ logger.setLevel(logging.INFO)
 def perturbed_marginals():
     return make_marginals_preturbed(seed=0, scale_space=0.01, scale_marginal=0)
 
-@pytest.fixture
+# @pytest.fixture
 def p_plus_implementations_to_test():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
 
-@pytest.fixture
+# @pytest.fixture
 def p_minus_implementations_to_test():
     return ['cdd', 'v_to_h_dual']
 
-@pytest.fixture
+# @pytest.fixture
 def p_minus_dual_implementations_to_test():
     return ['h_to_v_popcount','h_to_v_popcount_sparse', ]
 
@@ -100,7 +100,7 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
     
     n_tests = 3
     for test_id in range(n_tests):
-        mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2, min_points=30, max_points=30)
+        mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
         r2 = 1
         t = 8*r2 / (2*r2 + 8)
         logger.info(f'Using t={t} for test {test_id}')
@@ -230,6 +230,6 @@ def test_cgw_convex_rotation_invariant():
 
 
 if __name__ == "__main__":
-    # test_3d_convex(p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
-    test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0))
+    test_3d_convex(p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
+    # test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0))
     # test_3d_convex(['cdd'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount', ], iter_max=2)

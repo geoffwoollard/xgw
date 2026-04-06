@@ -229,8 +229,8 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
-            # return self._build_adjacency_subset_sparse_chunks(masks)  
+            # return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
+            return self._build_adjacency_subset_sparse_chunks(masks)  
         else:
             return self._build_adjacency_subset_dense(masks)
 

@@ -435,4 +435,4 @@ def test_cube_in_sphere_in_cube(n_iter, p_plus_implementations, p_minus_implemen
 if __name__ == "__main__":
     # test_H_and_V_after_cut(['h_to_v_edges'], [ 'v_to_h_dual'], ['h_to_v_popcount_sparse','h_to_v_popcount', 'cdd',])
     # test_vol_ndim(n_iter=10, p_plus_implementations=['h_to_v_edges',], p_minus_implementations=['cdd'], p_minus_dual_implementations=[None], n_dim=4)
-    test_cube_in_sphere_in_cube(n_iter=30, p_plus_implementations=['cdd','h_to_v_popcount', 'h_to_v_popcount_sparse'], p_minus_implementations=['cdd','v_to_h_dual'], p_minus_dual_implementations=['cdd','h_to_v_popcount','h_to_v_popcount_sparse'], n_dim=4) 
+    test_cube_in_sphere_in_cube(25, p_plus_implementations(), p_minus_implementations(), p_minus_dual_implementations(), n_dim=3) 
