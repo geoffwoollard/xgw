@@ -5,6 +5,7 @@ import pytest
 import logging
 from scipy.spatial import ConvexHull
 from copy import deepcopy
+import math
 
 from xgw.hyperplane_approx import DoubleDescription, new_direction, update_box, p_plus_outside_p_minus
 from xgw.h_to_v_popcount import masks_from_B
@@ -348,7 +349,7 @@ def test_cube_in_sphere_in_cube(n_iter, p_plus_implementations, p_minus_implemen
     inner_square_vertices = make_inner_square_vertices(n_dim)
     outer_square_vertices = make_outer_square_vertices(n_dim)
 
-    n_dim_volume = np.pi**(n_dim/2) / np.math.gamma(n_dim/2 + 1)
+    n_dim_volume = np.pi**(n_dim/2) / math.gamma(n_dim/2 + 1)
 
     for p_plus_implementation in p_plus_implementations:
         for p_minus_implementation in p_minus_implementations:
