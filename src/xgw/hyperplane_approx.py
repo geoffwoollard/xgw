@@ -267,7 +267,8 @@ class DoubleDescription():
             dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation, use_D_sparse=self.use_D_sparse_dual)
             self.dim = dim
             self.dd_dual_polytope = dd_dual_polytope
-            self.center = center
+            ERROR = 0.00
+            self.center = center + ERROR
 
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')

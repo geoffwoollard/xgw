@@ -117,8 +117,6 @@ def test_cube_vertex_rank(cube_polys):
     for poly in cube_polys:
         counts = np.sum(poly.B, axis=0)
         assert np.all(counts == poly.r)
-
-
     
 def test_adjacency_rule(cube_polys, one_cut_corner_polys):
     '''Adjacency rule: two vertices are adjacent iff they share exactly r-1 active constraints.'''

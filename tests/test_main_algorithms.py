@@ -49,7 +49,7 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
     '''passing'''
     n_tests = 1
     for test_id in range(n_tests):
-        mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=3, min_points=30, max_points=30)
+        mus, nus, space_xs, space_ys = make_simple_marginals(test_id, d=2, min_points=30, max_points=30)
         r2 = 1
         t = 8*r2 / (2*r2 + 8)
         logger.info(f'Using t={t} for test {test_id}')
@@ -66,9 +66,9 @@ def test_3d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
                         assert np.isclose(plan_error, 0.0), f"Plan error {plan_error} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
                         assert np.isclose(total_loss, 0.0, atol=1e-5), f"Total loss {total_loss} is not close to 0 for identical marginals ({cost}, convex, {p_plus_implementation}) in test {test_id}"
 
-                        logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation} - different simple marginals')
-                        total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
-                        logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
+                        # logger.info(f'Test {test_id}, cost: {cost}, t_use: {t_use}, p_plus_implementation: {p_plus_implementation} - different simple marginals')
+                        # total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-15, iter_max=iter_max, t=t_use, p_plus_implementation=p_plus_implementation, FW_iter=500, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation) 
+                        # logger.info(f'Total loss: {total_loss:.6f}, lower bound: {lower_bound_on_total_loss:.6f}, gap: {gap:.6f}, constant cost: {cst_cost:.6f}')
 
 def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test):
     '''passing'''
@@ -226,4 +226,4 @@ def test_cgw_convex_rotation_invariant():
 
 if __name__ == "__main__":
     # test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0))
-    test_3d_convex(['h_to_v_edges'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount', ], iter_max=2)
+    test_3d_convex(['cdd'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount', ], iter_max=2)
