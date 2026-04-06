@@ -21,15 +21,15 @@ logger.setLevel(logging.INFO)
 def n_iter():
     return 25
 
-# @pytest.fixture
+@pytest.fixture
 def p_plus_implementations():
     return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse']
 
-# @pytest.fixture
+@pytest.fixture
 def p_minus_implementations():
     return ['cdd', 'v_to_h_dual']
 
-# @pytest.fixture
+@pytest.fixture
 def p_minus_dual_implementations():
     return ['cdd','h_to_v_popcount', 'h_to_v_popcount_sparse']
 
