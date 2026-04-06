@@ -347,14 +347,16 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
 #     return cst_cost-2*c_op, pi_opt, c_plus - c_minus
 
 
-def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, relax_level=2, cost='IGW', geom_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
+def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual, relax_level=2, cost='IGW', geom_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     # Computing bounding box
-    P_minus, P_plus, objective, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=geom_tol)
+    P_minus, P_plus, objective, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, 
+                                                       p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual,
+                                                       niter=iter_max, epsilon=geom_tol)
     # Global optimization
     logger.info('Starting global polynomial optimization over the approximated polytope')
     _, x_op = optimal_polynomial_cost(P_plus, cost, relax_level, R, t)

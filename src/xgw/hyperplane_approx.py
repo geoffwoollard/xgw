@@ -178,8 +178,8 @@ def iteration_loop_geometric(mu, nu, P_plus, P_minus, e_base, emd_kwargs, ret_ar
     return P_plus, P_minus, objective
 
 
-def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+def run_approx(mu, nu, space_x, space_y, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual, niter=100, epsilon=1e-15):
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual)
     logger.info('box initialized')
     
     objective_list = []
