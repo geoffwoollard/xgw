@@ -47,6 +47,75 @@ def test_2d_classical_gw():
         assert np.isclose(plan_error, 0.0)
     print('passed the test')
 
+def test_igw_convex_reflection_invariant(p_plus_implementations_to_test):
+    '''passing'''
+    
+    n_tests = 3
+    for d in [2]:
+        for test_id in range(n_tests):
+            for p_plus_implementation in p_plus_implementations_to_test:
+                mus, _, space_xs, _ = make_simple_marginals(test_id, d=d)
+                space_xs_reflected = space_xs.copy()
+                reflextion_axis = 0
+                space_xs_reflected[:,reflextion_axis] = -space_xs_reflected[:,reflextion_axis]
+                cost = 'IGW' 
+                T, plan, gap, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_reflected, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
+                logger.info(f'Test mus, space_xs, mus, space_xs_reflected {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+                logger.info(f'Plan (should be id): {plan}')
+                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+                
+                space_xs_transformed = space_xs@random_invariance_matrix('IGW', d, random_state=test_id)
+                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_transformed, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+                logger.info(f'Plan (should be id): {plan}')
+                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+                
+                space_xs_transformed = space_xs@random_invariance_matrix('IGW', d, random_state=test_id)
+                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_transformed, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+                logger.info(f'Plan (should be id): {plan}')
+                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
+    print('passed the test')
+
+def test_igw_convex_rotation_invariant(p_plus_implementations_to_test):
+    
+    n_tests = 3
+    for d in [2]:
+        for test_id in range(n_tests):
+            logger.info(f'Test {test_id}, dimension {d}')
+            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
+            np.random.seed(test_id) # ensure same random rotation for each implementation
+            for p_plus_implementation in p_plus_implementations_to_test:
+                logger.info(f'Test {test_id}, Implementation: {p_plus_implementation}')
+                rotation = random_invariance_matrix('CGW', d, random_state=test_id)
+                logger.info(f'Rotation matrix: {rotation.shape}')
+                space_xs_rotated = space_xs @  rotation.T
+                cost = 'IGW'
+                T, plan, gap, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
+                logger.info(f'Test mus, space_xs, mus, space_xs_rotated {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
+                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+                assert np.isclose(mis_match.sum(), 0.0), f"Rotation test failed! Plan (should be id): {plan}"
+
+def test_cgw_convex_rotation_invariant():
+    '''passing'''
+    
+    np.random.seed(42)
+    n_tests = 3
+    for d in [2]:
+        for test_id in range(n_tests):
+            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
+            rotation = random_invariance_matrix('CGW', d, random_state=test_id)
+            logger.info(f'Rotation matrix: {rotation.shape}')
+            space_xs_rotated = space_xs @  rotation.T
+            _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', gap_tol=1e-5, iter_max=50)
+            mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
+
+            logger.info(f'Plan (should be id): {plan}')
+            assert np.isclose(mis_match.sum(), 0.0), "Rotation test failed!"
+    print('passed the test')
+
+
 def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_test, p_minus_dual_implementations_to_test):
     '''passing'''
     
@@ -67,7 +136,7 @@ def test_2d_convex(p_plus_implementations_to_test, p_minus_implementations_to_te
     mu, nu, space_x, space_y = make_marginals(0)
     near_zero_tolerance = 1e-15
     for cost in ['IGW', 'CGW']:
-        for p_plus_implementation in p_plus_implementations_to_test: #TODO: add in h_to_v_edges
+        for p_plus_implementation in p_plus_implementations_to_test: 
             print(f'Test {test_id}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
 
             final_gap_tolerance_pos = 1e-4
@@ -137,14 +206,18 @@ def test_2d_non_convex(perturbed_marginals, p_plus_implementations_to_test, p_mi
     
                             # since x and y are close, the plan should be id 
                             mu_id = np.ones(len(mu))/len(mu)
-                            T, plan, c = gw_m_non_convex_geometric_approx(mu_id, space_x, mu_id, space_y, {}, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual,relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
+                            T, plan, c = gw_m_non_convex_geometric_approx(mu_id, space_x, mu_id, space_y, {}, 
+                                                                          p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual, 
+                                                                          relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
                             plan_error = np.linalg.norm(plan - np.diag(mu_id))
                             logger.info(f'Non-convex plan error: {plan_error}')
                             logger.info(f'cost {c}')
                             logger.info(f'Plan (should be id): {plan}')
                             assert np.isclose(plan_error, 0.0)
                             
-                            T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, mu, space_x, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
+                            T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, mu, space_x, {}, 
+                                                                          p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual,
+                                                                          relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
                             too_big = 1.0
                             assert c < too_big, f"c={c}"
                             assert T < too_big, f"T={T}"
@@ -157,7 +230,9 @@ def test_2d_non_convex(perturbed_marginals, p_plus_implementations_to_test, p_mi
                             # checking invariance under SL transform
                             transform = random_invariance_matrix('DGW', 2)
                             space_x_transformed = space_x @  transform.T
-                            T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, mu, space_x_transformed, {}, relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
+                            T, plan, c = gw_m_non_convex_geometric_approx(mu, space_x, mu, space_x_transformed, {}, 
+                                                                          p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual,
+                                                                          relax_level=2, cost='DGW', geom_tol=1e-15, iter_max=100, FW_iter=200)
                             assert c < too_big, f"c={c}"
                             assert T < too_big, f"T={T}" # todo: should be smaller. passing on clement's local env 
                             plan_error = np.linalg.norm(plan - np.diag(mu))
@@ -166,75 +241,6 @@ def test_2d_non_convex(perturbed_marginals, p_plus_implementations_to_test, p_mi
                             logger.info(f'Plan (should be diag(mu)): {plan}')
                             assert np.isclose(plan_error, 0.0)
 
-def test_igw_convex_reflection_invariant(p_plus_implementations_to_test):
-    '''passing'''
-    
-    n_tests = 3
-    for d in [2]:
-        for test_id in range(n_tests):
-            for p_plus_implementation in p_plus_implementations_to_test:
-                mus, _, space_xs, _ = make_simple_marginals(test_id, d=d)
-                space_xs_reflected = space_xs.copy()
-                reflextion_axis = 0
-                space_xs_reflected[:,reflextion_axis] = -space_xs_reflected[:,reflextion_axis]
-                cost = 'IGW' 
-                T, plan, gap, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_reflected, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                logger.info(f'Test mus, space_xs, mus, space_xs_reflected {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
-                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-                logger.info(f'Plan (should be id): {plan}')
-                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
-                
-                
-                space_xs_transformed = space_xs@random_invariance_matrix('IGW', d, random_state=test_id)
-                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_transformed, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-                logger.info(f'Plan (should be id): {plan}')
-                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
-                
-                
-                space_xs_transformed = space_xs@random_invariance_matrix('IGW', d, random_state=test_id)
-                _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_transformed, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-                logger.info(f'Plan (should be id): {plan}')
-                assert np.isclose(mis_match.sum(), 0.0), "Reflection test failed!"
-    print('passed the test')
-
-def test_igw_convex_rotation_invariant(p_plus_implementations_to_test):
-    
-    n_tests = 3
-    for d in [2]:
-        for test_id in range(n_tests):
-            logger.info(f'Test {test_id}, dimension {d}')
-            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=4, max_points=6)
-            np.random.seed(test_id) # ensure same random rotation for each implementation
-            for p_plus_implementation in p_plus_implementations_to_test:
-                logger.info(f'Test {test_id}, Implementation: {p_plus_implementation}')
-                rotation = random_invariance_matrix('CGW', d, random_state=test_id)
-                logger.info(f'Rotation matrix: {rotation.shape}')
-                space_xs_rotated = space_xs @  rotation.T
-                cost = 'IGW'
-                T, plan, gap, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost=cost, gap_tol=1e-5, iter_max=50, p_plus_implementation=p_plus_implementation)
-                logger.info(f'Test mus, space_xs, mus, space_xs_rotated {cost} convex T: {T}, gap: {gap}, cost: {cost}, p_plus_implementation: {p_plus_implementation}')
-                mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-                assert np.isclose(mis_match.sum(), 0.0), f"Rotation test failed! Plan (should be id): {plan}"
-
-def test_cgw_convex_rotation_invariant():
-    '''passing'''
-    
-    np.random.seed(42)
-    n_tests = 3
-    for d in [2]:
-        for test_id in range(n_tests):
-            mus, _, space_xs, _ = make_simple_marginals(test_id, d=d, min_points=10, max_points=20)
-            rotation = random_invariance_matrix('CGW', d, random_state=test_id)
-            logger.info(f'Rotation matrix: {rotation.shape}')
-            space_xs_rotated = space_xs @  rotation.T
-            _, plan, _, _, _ = gw_m_convex(mus, space_xs, mus, space_xs_rotated, {}, cost='CGW', gap_tol=1e-5, iter_max=50)
-            mis_match = np.isclose(plan, np.eye(len(mus))/len(mus), atol=1e-7/len(mus)) == False
-
-            logger.info(f'Plan (should be id): {plan}')
-            assert np.isclose(mis_match.sum(), 0.0), "Rotation test failed!"
-    print('passed the test')
 
 
 
