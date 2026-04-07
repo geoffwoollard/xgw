@@ -522,7 +522,7 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
             
     return e_base, R, p_plus, p_minus
 
-def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
+def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='cdd'):
     '''
     Docstring for initial_box
     
@@ -532,7 +532,7 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
     creates an initial rectangle bounding 
     '''
     e_base, R = classical_gw_construct_basis_eij(space_x, space_y, g_func)
-    p_plus_initial, p_minus = DoubleDescription(implementation='cdd'), DoubleDescription(implementation='cdd')
+    p_plus_initial, p_minus_initial = DoubleDescription(implementation='cdd'), DoubleDescription(implementation='cdd')
     vertex_list = []
     half_plans_list = []
     c = e_base.shape[2]
@@ -543,7 +543,7 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
             g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
-    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    update_box(p_plus_initial, p_minus_initial, half_plans_list, vertex_list)
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
         E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
@@ -552,6 +552,14 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
+    if p_minus_implementation == 'h_to_v_edges':
+        from xgw.h_to_v_edges import find_edges
+        E_initialization = find_edges(p_minus_initial.V) if p_minus_implementation == 'h_to_v_edges' else None
+        p_minus = DoubleDescription(implementation=p_minus_implementation, E_initialization=E_initialization)
+        p_minus.V = p_minus_initial.V
+        p_minus.H = p_minus_initial.H
+    elif p_minus_implementation == 'cdd':
+        p_minus = p_minus_initial
     return e_base, R, p_plus, p_minus
 
 

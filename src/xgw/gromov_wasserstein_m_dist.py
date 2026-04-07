@@ -240,7 +240,7 @@ def gw_m_convex(mu,
     return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
 
 
-def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd'):
+def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd', p_minus_implementation='cdd'):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -248,7 +248,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     # Computing constant cost
     g_func, cst_cost = classical_gw_const_cost(mu, space_x, nu, space_y)
     # Bounding box initialization
-    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation, p_minus_implementation=p_minus_implementation)
 
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
