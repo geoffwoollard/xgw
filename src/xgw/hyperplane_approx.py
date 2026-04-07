@@ -5,6 +5,7 @@ import ot
 import logging
 from itertools import product
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -15,7 +16,7 @@ except ImportError as e:
 
 from .h_to_v_edges import update_edges_with_new_halfplane
 from .h_to_v_popcount import ExtremePointPolytope, ExtremePointPolytopeSparse, masks_from_B
-
+from .utils import cast_to_dense_if_sparse
 
 def build_B_from_H_and_V(A, b, V, tol=1e-5):
     # A shape (m, d), b shape (m,), V shape (n, d)
@@ -49,10 +50,10 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
     '''
     try:
         V = compute_polytope_vertices(A, b)
-    except:
+    except Exception as e:
         H = np.hstack([A, b.reshape(-1, 1)]) # cdd format
         for decimals in range(decimals_start, decimals_end, -1):
-            V=[]
+            V = []
             try:
                 # 1. Round vertices to reduce numerical noise
                 H_rounded = [np.round(h, decimals=decimals) for h in H]
@@ -65,7 +66,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                 # 3. Try compute_polytope_halfspaces
                 try:
                     V = compute_polytope_vertices(A_rounded_unique, b_rounded_unique)
-                except RuntimeError as e:
+                except RuntimeError as _:
                     # 4. If it fails due to numerical issues, add tiny jitter
                     scale = 0.5 * 10**(-decimals)
                     jitter = scale * np.random.randn(*H_rounded_unique.shape)
@@ -74,7 +75,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                     b_perturbed = H_perturbed[:,-1]
                     V = compute_polytope_vertices(A_perturbed, b_perturbed)
 
-            except Exception as e:
+            except Exception as _:
                 # print(f'Failed with rounding to {decimals} decimals: {e}')
                 continue  # try next lower precision
 
@@ -82,6 +83,7 @@ def stabilize_compute_polytope_vertices(A, b, decimals_start=15, decimals_end=3)
                 if len(V)>1:
                     # print(f"Success with {decimals} decimals!")
                     break
+        raise RuntimeError(f"Failed to compute vertices from halfspaces with stable rounding, even with jitter. Last error: {e}")
     return V
 
 def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
@@ -96,10 +98,10 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
     
     '''
     try:
-        A, b = compute_polytope_halfspaces(V)
+        A, b = compute_polytope_halfspaces(V) # TODO: figure out why fails for circle
     except:
         for decimals in range(decimals_start, decimals_end, -1):
-            A=[]
+            A = []
             try:
                 # 1. Round vertices to reduce numerical noise
                 V_rounded = [np.round(v, decimals=decimals) for v in V]
@@ -122,7 +124,7 @@ def stabilize_compute_polytope_halfspaces(V, decimals_start=18, decimals_end=3):
                 continue  # try next lower precision
 
             else:
-                if len(A)>1:
+                if len(A) > 1:
                     # print(f"Success with {decimals} decimals!")
                     break
             
@@ -176,8 +178,8 @@ def iteration_loop_geometric(mu, nu, P_plus, P_minus, e_base, emd_kwargs, ret_ar
     return P_plus, P_minus, objective
 
 
-def run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=100, epsilon=1e-15):
-    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs)
+def run_approx(mu, nu, space_x, space_y, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual, niter=100, epsilon=1e-15):
+    e_base, R, p_plus, p_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual)
     logger.info('box initialized')
     
     objective_list = []
@@ -231,19 +233,43 @@ def f_to_e(vect, R_inv):
 
 
 class DoubleDescription():
-    def __init__(self, duplicate_tol=1e-5, implementation='cdd', E_initialization=None, V_initialization=None, B_initialization=None, masks_initialization=None, A_initialization=None, b_initialization=None):
+    def __init__(self, 
+                 duplicate_tol=1e-5, 
+                 implementation='cdd', 
+                 E_initialization=None, 
+                 V_initialization=None, 
+                 B_initialization=None, 
+                 masks_initialization=None, 
+                 A_initialization=None, 
+                 b_initialization=None, 
+                 dual_implementation=None,
+                 use_D_sparse=True,
+                 use_D_sparse_dual=True):
         self.V = []
         self.H = ()
         self.duplicate_tol = duplicate_tol
         self.implementation = implementation
+        self.dual_implementation = dual_implementation
+        self.use_D_sparse = use_D_sparse
+        self.use_D_sparse_dual = use_D_sparse_dual
         if self.implementation == 'cdd':
             pass
         elif self.implementation == 'h_to_v_edges':
             self.E = E_initialization
         elif self.implementation == 'h_to_v_popcount':
-            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, dim=V_initialization.shape[1])
+            self.poly = ExtremePointPolytope(E=V_initialization, B=B_initialization, use_D_sparse=self.use_D_sparse)
         elif self.implementation == 'h_to_v_popcount_sparse':
-            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, )
+            self.poly = ExtremePointPolytopeSparse(E=V_initialization, masks=masks_initialization, A=A_initialization, b=b_initialization, use_D_sparse=self.use_D_sparse)
+        elif self.implementation == 'v_to_h_dual':
+            assert self.dual_implementation is not None, 'dual_implementation is required for v_to_h_dual implementation'
+            assert self.dual_implementation in ['cdd', 'h_to_v_popcount', 'h_to_v_popcount_sparse'], f'Unknown dual implementation {self.dual_implementation} for v_to_h_dual implementation'
+            from xgw.v_to_h_dual import setup_dual_polytope
+            dd_dual_polytope, center, dim = setup_dual_polytope(V_initialization, A_initialization, b_initialization, implementation=self.dual_implementation, use_D_sparse=self.use_D_sparse_dual)
+            self.dim = dim
+            self.dd_dual_polytope = dd_dual_polytope
+            ERROR = 0.00
+            self.center = center + ERROR
+
         else:
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         # self.n_decimals_for_v_round = 30
@@ -284,7 +310,8 @@ class DoubleDescription():
             self.poly.E = self.poly.E[unique_indices]
             self.poly.B = self.poly.B[:, unique_indices]
             self.poly.rebuild_adjacency() # TODO: remove if test blow is passing
-            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            D = cast_to_dense_if_sparse(self.poly.D)
+            assert np.allclose(D, D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed active-constraint matrix, new shape: {self.poly.B.shape}")
         
         elif self.implementation == 'h_to_v_popcount_sparse':
@@ -292,7 +319,8 @@ class DoubleDescription():
             self.poly.E = self.poly.E[unique_indices]
             self.poly.masks = self.poly.masks[unique_indices]
             self.poly.D = self.poly._build_adjacency()
-            assert np.allclose(self.poly.D, self.poly.D[np.ix_(unique_indices, unique_indices)])
+            D = cast_to_dense_if_sparse(self.poly.D)
+            assert np.allclose(D, D[np.ix_(unique_indices, unique_indices)])
             logger.info(f"Re-indexed masks, new shape: {self.poly.masks.shape}")
 
     def check_feasibility_V(self, A, b):
@@ -323,13 +351,14 @@ class DoubleDescription():
             self.remove_duplicates_V()
 
     def V_to_H(self):
+        assert self.implementation == 'cdd', f'{self.implementation} implementation only supports V_to_H via cdd'
         # loop over high to low decimals to ensure numerical stability. take largest that works
         logger.info(f'V_to_H Computing half-planes from vertices: number of vertices {len(self.V)}')
         A, b = stabilize_compute_polytope_halfspaces(self.V)
         logger.info(f'V_to_H Computed half-planes: A shape {A.shape}, b shape {b.shape}')
         a_norm = np.linalg.norm(A, axis=1)
         b /= a_norm
-        A /= a_norm[:, np.newaxis]
+        A /= a_norm[:, np.newaxis] # TODO: fix: RuntimeWarning: divide by zero encountered in divide
         self.H = (A,b)
         
     def __len__(self):
@@ -341,7 +370,16 @@ class DoubleDescription():
     
     # could be optimized for a family of vertices
     def add_V(self, vertex_list):
-        if self.implementation == 'h_to_v_edges':
+        if self.implementation == 'v_to_h_dual':
+            assert len(vertex_list) == 1, f'{self.implementation} implementation only supports adding one vertex at a time'
+            x_new = vertex_list[0]
+            from xgw.v_to_h_dual import add_vertex_via_dual
+            vertices, A, b, dd_dual_polytope = add_vertex_via_dual(x_new, self.center, self.dd_dual_polytope, self.dim)
+            self.dd_dual_polytope = dd_dual_polytope
+            self.V = vertices.tolist()
+            self.H = [A, b]
+
+        elif self.implementation == 'h_to_v_edges':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
         elif self.implementation == 'h_to_v_popcount':
             raise NotImplementedError(f'{self.implementation} implementation is not implemented yet')
@@ -373,10 +411,9 @@ class DoubleDescription():
             A_all = np.vstack([A, a_new.reshape(-1,)])
             b_all = np.hstack([b, b_new])
             self.H = [A_all, b_all]
-        elif self.implementation == 'h_to_v_edges':
+        elif self.implementation == 'h_to_v_edges':                  
             assert len(constraint_list) == 1, f'{self.implementation} implementation only supports adding one half-plane at a time'
             a_new, b_new = constraint_list[0]
-            # raise NotImplementedError('h_to_v_edges implementation is not implemented yet')
             V = np.array(self.V)
             A, b = self.H
             E = self.E
@@ -401,7 +438,7 @@ class DoubleDescription():
         return np.mean(np.array(self.V), axis=0)
 
 
-def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
+def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount', p_plus_use_D_sparse=True, p_minus_use_D_sparse=True, p_minus_use_D_sparse_dual=True):
     '''
     Docstring for initial_box
     
@@ -412,7 +449,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
     '''
     e_base, R = construct_basis_eij(space_x, space_y)
     p_plus_initial = DoubleDescription(implementation='cdd')
-    p_minus = DoubleDescription(implementation='cdd')
+    p_minus_initial = DoubleDescription(implementation='cdd')
+
     vertex_list = []
     half_plans_list = []
     c = e_base.shape[2]
@@ -428,7 +466,23 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         half_plans_list.append([dir, g_hat])
             
             
-    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    update_box(p_plus_initial, p_minus_initial, half_plans_list, vertex_list)
+    if p_minus_implementation == 'cdd':
+        p_minus = p_minus_initial
+    elif p_minus_implementation == 'v_to_h_dual':
+        A_p_minus, b_p_minus = p_minus_initial.H
+        p_minus = DoubleDescription(implementation=p_minus_implementation, 
+                                                dual_implementation=p_minus_dual_implementation, 
+                                                V_initialization=np.array(p_minus_initial.V),
+                                                A_initialization=A_p_minus, 
+                                                b_initialization=b_p_minus,
+                                                use_D_sparse=p_minus_use_D_sparse,
+                                                use_D_sparse_dual=p_minus_use_D_sparse_dual)
+        p_minus.H = p_minus_initial.H
+        p_minus.V = p_minus_initial.V
+    else:
+        raise NotImplementedError(f'{p_minus_implementation} implementation is not implemented yet')
+
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
         E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
@@ -445,7 +499,8 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
         B_initialization = B_bool.astype(int)
         p_plus = DoubleDescription(implementation=p_plus_implementation, 
                                    V_initialization=V_initialization, 
-                                   B_initialization=B_initialization
+                                   B_initialization=B_initialization,
+                                   use_D_sparse=p_plus_use_D_sparse
                                    )
         p_plus.V = p_plus_initial.V
         p_plus.H = p_plus_initial.H
@@ -460,13 +515,14 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
                                    V_initialization=V_initialization,
                                    masks_initialization=masks_initialization,
                                    A_initialization=A,
-                                   b_initialization=b)
+                                   b_initialization=b,
+                                   use_D_sparse=p_plus_use_D_sparse)
         p_plus.V = [np.array(v) for v in p_plus.poly.E]
         p_plus.H = [A, b]
             
     return e_base, R, p_plus, p_minus
 
-def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd'):
+def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='cdd'):
     '''
     Docstring for initial_box
     
@@ -476,7 +532,7 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
     creates an initial rectangle bounding 
     '''
     e_base, R = classical_gw_construct_basis_eij(space_x, space_y, g_func)
-    p_plus_initial, p_minus = DoubleDescription(implementation='cdd'), DoubleDescription(implementation='cdd')
+    p_plus_initial, p_minus_initial = DoubleDescription(implementation='cdd'), DoubleDescription(implementation='cdd')
     vertex_list = []
     half_plans_list = []
     c = e_base.shape[2]
@@ -487,7 +543,7 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
             g_hat, g_star = compute_hyperplane(mu, nu, sigma*e_i, e_base, emd_kwargs)
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
-    update_box(p_plus_initial, p_minus, half_plans_list, vertex_list)
+    update_box(p_plus_initial, p_minus_initial, half_plans_list, vertex_list)
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
         E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
@@ -496,6 +552,14 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
+    if p_minus_implementation == 'h_to_v_edges':
+        from xgw.h_to_v_edges import find_edges
+        E_initialization = find_edges(p_minus_initial.V) if p_minus_implementation == 'h_to_v_edges' else None
+        p_minus = DoubleDescription(implementation=p_minus_implementation, E_initialization=E_initialization)
+        p_minus.V = p_minus_initial.V
+        p_minus.H = p_minus_initial.H
+    elif p_minus_implementation == 'cdd':
+        p_minus = p_minus_initial
     return e_base, R, p_plus, p_minus
 
 
@@ -533,11 +597,12 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         assert len(half_planes_list) == 1, f'{p_plus.implementation} implementation only supports adding one half-plane at a time'
         a_new, b_new = half_planes_list[0]
         p_plus.add_H([[a_new, b_new]])
+
         
     if p_minus.implementation == 'cdd':
         p_minus.add_V(vertex_list)
         logger.info('Added vertices to p_minus')
-        p_minus.V_to_H()
+        p_minus.V_to_H() # TODO: redundant
         logger.info('Updated half-planes of p_minus from vertices')
     elif p_minus.implementation == 'h_to_v_edges':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
@@ -545,7 +610,12 @@ def update_box(p_plus, p_minus, half_planes_list, vertex_list):
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     elif p_minus.implementation == 'h_to_v_popcount_sparse':
         raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
-
+    elif p_minus.implementation == 'v_to_h_dual':
+        assert len(vertex_list) == 1, f'{p_minus.implementation} implementation only supports adding one vertex at a time'
+        x_new = vertex_list[0]
+        p_minus.add_V([x_new])
+    else:
+        raise NotImplementedError(f'{p_minus.implementation} implementation is not implemented yet')
     return p_plus, p_minus
 
 

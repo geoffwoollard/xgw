@@ -152,7 +152,22 @@ def new_direction_convex_slow(P_minus, x_plus, tol=1e-10):
     assert g @ x_plus - b[index]>= -tol 
     return g / np.linalg.norm(g)
 
-def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, iter_max=100, FW_iter=100, t=None, max_diam=None, convex_tol=1e-3, p_plus_implementation='cdd'):
+def gw_m_convex(mu, 
+                space_x, 
+                nu, 
+                space_y, 
+                emd_kwargs, 
+                cost='IGW', 
+                gap_tol=1e-5, 
+                iter_max=100, 
+                FW_iter=100, 
+                t=None, 
+                max_diam=None, 
+                convex_tol=1e-3, 
+                p_plus_implementation='cdd', 
+                p_minus_implementation='cdd',
+                p_minus_dual_implementation='cdd'
+                ):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -165,7 +180,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     
     # Bounding box initialization
-    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation, p_minus_implementation=p_minus_implementation, p_minus_dual_implementation=p_minus_dual_implementation)
     # print('Initial box with ', len(P_minus.V), ' vertices and ', P_minus.H[0].shape[0], ' half-planes.')
     # print('Vertices: ', P_minus.V)
     
@@ -177,6 +192,11 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     for iter in range(iter_max):
         # choose direction
         logger.info('Chosing best direction')
+        # logger.info(f'P_minus.V {P_minus.V}')
+        A, b = P_minus.H
+        A_norm = np.linalg.norm(A, axis=1)
+        # logger.info(f'P_minus.H {P_minus.H}')
+        # logger.info(f'P_minus.A_norm, b_norm {A/A_norm[:, None]}, {b/A_norm}')
         g = new_direction_convex_slow(P_minus, x_plus)
         logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
@@ -184,13 +204,18 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
         logger.info(f'new vertex: {g_star}')
         logger.info('Updating bounding boxes')
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
-        logger.info(f'Updated box with , P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
+        logger.info(f'Updated box with P_plus {len(P_plus.V)} P_minus {len(P_minus.V)} vertices.')
+        # logger.info(f'P_plus.V {P_plus.V}')
+        # logger.info(f'P_plus.H {P_plus.H}')
+        # logger.info(f'P_minus.V {P_minus.V}')
+        # logger.info(f'P_minus.H {P_minus.H}')
         logger.info('Updating c_minus (candidate optimal value)')
         Tcost = vector_cost(g_star, cost, R, d, t)
 
         # The optimal values after each iteration is updated
         logger.info('Updating c_plus and c_minus')
         c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
+        logger.info(f'x_plus {x_plus}')
         logger.info(f'Iteration {iter}: c_minus={c_minus:1.20f}, c_plus={c_plus:1.20f}, c_plus - c_minus = {(c_plus - c_minus):1.20f}, vertices in P_minus {len(P_minus.V)} and P_plus {len(P_plus.V)}, half-spaces in P_minus {P_minus.H[0].shape[0]} and P_plus {P_plus.H[0].shape[0]}')
         
         if Tcost > c_minus:
@@ -215,7 +240,7 @@ def gw_m_convex(mu, space_x, nu, space_y, emd_kwargs, cost='IGW', gap_tol=1e-5, 
     return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
 
 
-def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd'):
+def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd', p_minus_implementation='cdd'):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -223,13 +248,14 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     # Computing constant cost
     g_func, cst_cost = classical_gw_const_cost(mu, space_x, nu, space_y)
     # Bounding box initialization
-    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation, p_minus_implementation=p_minus_implementation)
 
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
     c_minus, x_minus = classical_gw_optimal_cost(np.array(P_minus.V), R)
     
-    
+    best_dir = best_init_dir(x_minus, P_plus)
+
     for iter in range(iter_max):
         
         # choose direction
@@ -257,6 +283,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
             best_dir = g
         if c_plus - c_minus < cost_tol:
             # x_minus = g_star
+            
             break
 
     # Computing the optimal coupling:
@@ -320,14 +347,16 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
 #     return cst_cost-2*c_op, pi_opt, c_plus - c_minus
 
 
-def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, relax_level=2, cost='IGW', geom_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
+def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual, relax_level=2, cost='IGW', geom_tol=1e-8, iter_max=100, FW_iter=100, t=0.5):
     space_x, space_y = center_marginal(mu, space_x, nu, space_y,)
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     # Computing bounding box
-    P_minus, P_plus, objective, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, niter=iter_max, epsilon=geom_tol)
+    P_minus, P_plus, objective, R, e_base = run_approx(mu, nu, space_x, space_y, emd_kwargs, 
+                                                       p_plus_implementation, p_minus_implementation, p_minus_dual_implementation, p_plus_use_D_sparse, p_minus_use_D_sparse, p_minus_use_D_sparse_dual,
+                                                       niter=iter_max, epsilon=geom_tol)
     # Global optimization
     logger.info('Starting global polynomial optimization over the approximated polytope')
     _, x_op = optimal_polynomial_cost(P_plus, cost, relax_level, R, t)
