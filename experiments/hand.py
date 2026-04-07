@@ -1,14 +1,19 @@
-from xgw.gromov_wasserstein_m_dist import gw_m_convex, classical_gw
-
-# open and convert to grayscale
+import cv2 as cv
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
-    fname = 'hand.png'
-    img = Image.open(fname).convert('L')
+from xgw.gromov_wasserstein_m_dist import gw_m_convex, classical_gw
+
+def open_and_convert_to_grayscale(path):
+    '''open and convert to grayscale'''
+    img = Image.open(path).convert('L')
     img_array = np.array(img)
+    return img_array
+
+def filled_hand_experiment(path):
+    img_array = open_and_convert_to_grayscale(path)
+
     img_array.shape
 
     crop = img_array[20:-20, 250:]
@@ -121,3 +126,87 @@ if __name__ == '__main__':
     plt.axis("off")
     plt.title('Classical GW')
     plt.savefig('hand/hand_gw.png', dpi=300, bbox_inches='tight')
+
+def plot(points, title, fname, colors_perm, figsize=(10, 8)):
+    # Color points as rainbow on scatter plot with looping rainbow
+    # Create looping rainbow colors (wraps around multiple times)
+
+    n_points = len(points)
+    n_loops = 1  # number of times to loop through the rainbow
+    colors_idx = (np.arange(n_points) / n_points * n_loops) % 1.0  # normalized to [0, 1]
+    colors_idx = colors_idx[colors_perm]
+    # Plot points with looping rainbow colors
+    fig, ax = plt.subplots(figsize=figsize)
+    scatter = ax.scatter(points[:, 0], points[:, 1], 
+                        c=colors_idx,  # looping color index
+                        cmap='hsv',    # hsv wraps nicely
+                        s=100, 
+                        alpha=0.7,
+                        edgecolors='white',
+                        linewidth=0.5)
+
+
+    # Add colorbar
+    cbar = plt.colorbar(scatter, ax=ax, )
+
+    ax.set_aspect('equal')
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(fname, dpi=300)
+
+def border_hand_experiment(path):
+    img_array = open_and_convert_to_grayscale(path)
+    crop = img_array[20:-10, 250:]
+    # binarize
+    crop = (crop > 128).astype(float)
+    ret, thresh = cv.threshold(crop*128, 127, 255, 0)
+    thresh = thresh.astype(np.uint8)
+    contours, _ = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)     
+    outline = contours[0].reshape(-1, 2)
+    
+    import seaborn as sns
+
+    # Set poster style (larger fonts, thicker lines)
+    sns.set_context("poster")  # options: "paper", "notebook", "talk", "poster"
+    sns.set_style("white")
+
+    n_skip = 3
+    points = outline.astype(float)
+    points = points[::n_skip]
+    points /= np.max(np.linalg.norm(points, axis=1, keepdims=True))
+    points -= points.mean(axis=0, keepdims=True)
+    points_flipped = points.copy()
+    points_flipped[:,0] *= -1
+    mu = np.ones(len(points)) / len(points)
+
+    fname = 'hand/hand_contour_reference.svg'
+    title = 'Hand Contour - Reference'
+    perm = np.arange(len(points))
+    plot(points, title, fname, perm)
+
+    _, plan_cgw, _, _, _ = gw_m_convex(mu, points, mu, points_flipped, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=300, FW_iter=100, 
+                               p_plus_implementation='h_to_v_popcount_sparse', 
+                               p_minus_implementation='v_to_h_dual',
+                               p_minus_dual_implementation='h_to_v_popcount_sparse') 
+    
+    title = 'Hand Contour - Chiral GW'
+    fname = 'hand/hand_contour_cgw.svg'
+    perm = plan_cgw.argmax(axis=0)
+    plot(points, title, fname, perm)
+
+    _, plan_classicalgw, _, _, _ = classical_gw(mu, points, mu, points_flipped, {'numItermax': 10**10}, cost_tol=1e-18, iter_max=100, FW_iter=100, 
+                                p_plus_implementation='cdd', 
+                                p_minus_implementation='cdd',
+                                ) 
+
+    title = 'Hand Contour - Classical GW'
+    fname = 'hand/hand_contour_classicalgw.svg'
+    perm = plan_classicalgw.argmax(axis=0)
+    plot(points, title, fname, perm)
+
+    np.savez('hand/hand_contour_plans.npz', plan_cgw=plan_cgw, plan_classicalgw=plan_classicalgw)
+    assert np.allclose(plan_classicalgw * len(plan_classicalgw), np.eye(len(plan_classicalgw)))
+
+if __name__ == '__main__':
+    path = 'hand.png'
+    border_hand_experiment(path)
