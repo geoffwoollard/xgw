@@ -60,7 +60,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Original Image with Gradient Colors')
-    plt.savefig('hand/hand_original.png', dpi=300, bbox_inches='tight')
+    plt.savefig('hand/filled_original.png', dpi=300, bbox_inches='tight')
 
     ### perfect flip
     # vertical gradient
@@ -80,7 +80,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.title('Perfect Mirror Image')
     plt.axis("off")
-    plt.savefig('hand/hand_perfect_flip.png', dpi=300, bbox_inches='tight')
+    plt.savefig('hand/filled_perfect_flip.png', dpi=300, bbox_inches='tight')
 
     ### CGW
     perm = plan.argmax(axis=0)
@@ -102,7 +102,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Chiral GW')
-    plt.savefig('hand/hand_cgw.png', dpi=300, bbox_inches='tight')
+    plt.savefig('hand/filled_cgw.png', dpi=300, bbox_inches='tight')
 
     ### classical gw
     _, plan_gw, _, _, _ = classical_gw(mu, points, mu_flipped, points, {'numItermax': 10**10},  cost_tol=1e-18, iter_max=iter_max, FW_iter=100, p_plus_implementation='cdd') 
@@ -125,7 +125,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Classical GW')
-    plt.savefig('hand/hand_gw.png', dpi=300, bbox_inches='tight')
+    plt.savefig('hand/filled_classicalgw.png', dpi=300, bbox_inches='tight')
 
 def plot(points, title, fname, colors_perm, figsize=(10, 8)):
     # Color points as rainbow on scatter plot with looping rainbow
@@ -209,4 +209,4 @@ def border_hand_experiment(path):
 
 if __name__ == '__main__':
     path = 'hand.png'
-    border_hand_experiment(path)
+    filled_hand_experiment(path)
