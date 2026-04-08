@@ -60,7 +60,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Original Image with Gradient Colors')
-    plt.savefig('hand/filled_original.png', dpi=300, bbox_inches='tight')
+    plt.savefig('filled_original.png', dpi=300, bbox_inches='tight')
 
     ### perfect flip
     # vertical gradient
@@ -80,7 +80,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.title('Perfect Mirror Image')
     plt.axis("off")
-    plt.savefig('hand/filled_perfect_flip.png', dpi=300, bbox_inches='tight')
+    plt.savefig('filled_perfect_flip.png', dpi=300, bbox_inches='tight')
 
     ### CGW
     perm = plan.argmax(axis=0)
@@ -102,7 +102,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Chiral GW')
-    plt.savefig('hand/filled_cgw.png', dpi=300, bbox_inches='tight')
+    plt.savefig('filled_cgw.png', dpi=300, bbox_inches='tight')
 
     ### classical gw
     _, plan_gw, _, _, _ = classical_gw(mu, points, mu_flipped, points, {'numItermax': 10**10},  cost_tol=1e-18, iter_max=iter_max, FW_iter=100, p_plus_implementation='cdd') 
@@ -125,7 +125,7 @@ def filled_hand_experiment(path):
     plt.imshow(colored)
     plt.axis("off")
     plt.title('Classical GW')
-    plt.savefig('hand/filled_classicalgw.png', dpi=300, bbox_inches='tight')
+    plt.savefig('filled_classicalgw.png', dpi=300, bbox_inches='tight')
 
 def plot(points, title, fname, colors_perm, figsize=(10, 8)):
     # Color points as rainbow on scatter plot with looping rainbow
@@ -179,7 +179,7 @@ def border_hand_experiment(path):
     points_flipped[:,0] *= -1
     mu = np.ones(len(points)) / len(points)
 
-    fname = 'hand/hand_contour_reference.svg'
+    fname = 'hand_contour_reference.svg'
     title = 'Hand Contour - Reference'
     perm = np.arange(len(points))
     plot(points, title, fname, perm)
@@ -190,7 +190,7 @@ def border_hand_experiment(path):
                                p_minus_dual_implementation='h_to_v_popcount_sparse') 
     
     title = 'Hand Contour - Chiral GW'
-    fname = 'hand/hand_contour_cgw.svg'
+    fname = 'hand_contour_cgw.svg'
     perm = plan_cgw.argmax(axis=0)
     plot(points, title, fname, perm)
 
@@ -200,11 +200,11 @@ def border_hand_experiment(path):
                                 ) 
 
     title = 'Hand Contour - Classical GW'
-    fname = 'hand/hand_contour_classicalgw.svg'
+    fname = 'hand_contour_classicalgw.svg'
     perm = plan_classicalgw.argmax(axis=0)
     plot(points, title, fname, perm)
 
-    np.savez('hand/hand_contour_plans.npz', plan_cgw=plan_cgw, plan_classicalgw=plan_classicalgw)
+    np.savez('hand_contour_plans.npz', plan_cgw=plan_cgw, plan_classicalgw=plan_classicalgw)
     assert np.allclose(plan_classicalgw * len(plan_classicalgw), np.eye(len(plan_classicalgw)))
 
 if __name__ == '__main__':
