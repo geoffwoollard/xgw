@@ -1,19 +1,26 @@
 repo_dir: /Users/gw/repos/xgw
-fname_1: ${repo_dir}/experiments/2M3T.cif
-fname_2: ${repo_dir}/experiments/2M3U.cif
-selection: CA
+fname_1: ${repo_dir}/experiments/protein/2M3T.cif
+fname_2: ${repo_dir}/experiments/protein/2M3U.cif
+selection: 
+  - CA
 n_models: 20
 n_skip_every: 1
 compute_gw: false
 compute_xgw: true
 unique_label: dimension3_nmodels20_fliptrue
-xgw_plot_fname: ${repo_dir}/experiments/proteins_${unique_label}_xgw_loss_plot.png
-gw_plot_fname: ${repo_dir}/experiments/proteins_${unique_label}_gw_loss_plot.png
+xgw_plot_fname: ${repo_dir}/experiments/protein/proteins_${unique_label}_xgw_loss_plot.png
+gw_plot_fname: ${repo_dir}/experiments/protein/proteins_${unique_label}_gw_loss_plot.png
 max_iter: 30
 dimension: 3
-odir: ${repo_dir}/experiments/
+odir: ${repo_dir}/experiments/protein/
 t_eps: 1e-4
 p_plus_implementation: h_to_v_popcount_sparse
 p_minus_implementation: v_to_h_dual
 p_minus_dual_implementation: h_to_v_popcount_sparse
-flip: true
+flip: False
+
+# hydra:
+#   run:
+#     dir: .
+#   job:
+#     name: myscript

@@ -8,13 +8,37 @@ import logging
 import os
 from dataclasses import dataclass, asdict
 
-logging.disable(logging.CRITICAL)
+# logging.disable(logging.CRITICAL)
+# import logging
+# logger = logging.getLogger(__name__)
+
+# import sys
+
+# # Clear existing handlers (important with Hydra)
+# root = logging.getLogger()
+# root.handlers.clear()
+
+# # Send logs to stderr
+# handler = logging.StreamHandler(sys.stderr)
+# formatter = logging.Formatter(
+#     "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+# )
+# handler.setFormatter(formatter)
+
+# root.addHandler(handler)
+# root.setLevel(logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,  # or DEBUG
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 from xgw.utils import gw_matrix, safe_plot
 
 
-def extract_coords_and_atoms(fname):
+def extract_coords_and_atoms(fname, chosen_altloc='A'):
+    
     st = gemmi.read_structure(fname)
     model_coords = []
     model_atoms = []
@@ -24,6 +48,8 @@ def extract_coords_and_atoms(fname):
         for chain in st[idx_model]:
             for res in chain:
                 for atom in res:
+                    if atom.has_altloc() and atom.altloc != chosen_altloc:
+                        continue
                     coords.append([atom.pos.x, atom.pos.y, atom.pos.z])
                     atoms.append((chain.name, res.seqid.num, atom.name))
 
@@ -37,8 +63,9 @@ def extract_coords_and_atoms(fname):
 
 def selection_atoms(selection, model_coords, model_atoms):
     atom_type_idx = 2
-    idx = (model_atoms[:,:,atom_type_idx] == selection)
-    coords = model_coords[idx]
+    # idx = (model_atoms[:,:,atom_type_idx] in selection)
+    mask = np.isin(model_atoms[:,:,atom_type_idx], selection)
+    coords = model_coords[mask]
     return coords.reshape(model_coords.shape[0], -1, 3)
 
 
@@ -48,7 +75,7 @@ class Config:
     fname_1: str 
     fname_2: str
     gw_plot_fname: str 
-    selection: str 
+    selection: list[str] 
     n_models: int | None 
     n_skip_every: int
     compute_gw: bool
@@ -126,6 +153,7 @@ def main(config: Config):
             losses_lower_bound = np.zeros_like(losses_upper_bound)
             losses_gap = np.zeros_like(losses_upper_bound)
             losses_constant = np.zeros_like(losses_upper_bound)
+            plans = np.zeros((coords_ca_1.shape[0], coords_ca_2.shape[0], coords_ca_1.shape[1], coords_ca_1.shape[1]))
             for i in range(coords_ca_1.shape[0]):
                 space_xs = coords_ca_1[i]
                 mus = ot.unif(space_xs.shape[0])
@@ -139,7 +167,7 @@ def main(config: Config):
                         space_ys = space_ys.copy()
                         space_ys[:,0] *= -1
                     try:
-                        loss_upper, _, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, p_plus_implementation=config.p_plus_implementation, p_minus_implementation=config.p_minus_implementation, p_minus_dual_implementation=config.p_minus_dual_implementation, FW_iter=500)
+                        loss_upper, plan, gap, loss_lower, loss_constant = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, p_plus_implementation=config.p_plus_implementation, p_minus_implementation=config.p_minus_implementation, p_minus_dual_implementation=config.p_minus_dual_implementation, FW_iter=500)
                     except Exception as e:
                         print(f"Error comparing conformer {i} vs {j}: {e}")
                         loss_lower, gap, loss_upper, loss_constant = np.nan, np.nan, np.nan, np.nan
@@ -147,24 +175,26 @@ def main(config: Config):
                     losses_upper_bound[i, j] = loss_upper
                     losses_gap[i, j] = gap
                     losses_constant[i, j] = loss_constant
+                    plans[i, j] = plan
                     if symmetric:
-                        losses_lower_bound[j, i] = loss_lower
-                        losses_upper_bound[j, i] = loss_upper
-                        losses_gap[j, i] = gap
-                        losses_constant[j, i] = loss_constant
+                        losses_lower_bound[j, i] = losses_lower_bound[i, j]
+                        losses_upper_bound[j, i] = losses_upper_bound[i, j]
+                        losses_gap[j, i] = losses_gap[i, j]
+                        losses_constant[j, i] = losses_constant[i, j]
+                        plans[j, i] = plans[i, j]
 
 
                     print(f"Conformers {i} vs {j}: loss_lower={loss_lower:.8f}, loss_upper={loss_upper:.8f}, gap={gap:.8f}, constant={loss_constant:.8f}")
-            return losses_lower_bound, losses_upper_bound, losses_gap, losses_constant
+            return losses_lower_bound, losses_upper_bound, losses_gap, losses_constant, plans
 
         iter_max = config.max_iter
         n_proteins = config.n_models
         print("Cross CGW:")
-        lower_bounds_cross, upper_bounds_cross, losses_gap_cross, losses_constant_cross = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=False, iter_max=iter_max, flip=flip)
+        lower_bounds_cross, upper_bounds_cross, losses_gap_cross, losses_constant_cross, plans_cross = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=False, iter_max=iter_max, flip=flip)
         print("Self CGW 1:")
-        lower_bounds_1, upper_bounds_1, losses_gap_1, losses_constant_1 = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_1[:n_proteins], t, symmetric=True, iter_max=iter_max, flip=flip)
+        lower_bounds_1, upper_bounds_1, losses_gap_1, losses_constant_1, plans_1 = gw_m_convex_wrapper(coords_ca_1[:n_proteins], coords_ca_1[:n_proteins], t, symmetric=True, iter_max=iter_max, flip=flip)
         print("Self CGW 2:")
-        lower_bounds_2, upper_bounds_2, losses_gap_2, losses_constant_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max, flip=flip)
+        lower_bounds_2, upper_bounds_2, losses_gap_2, losses_constant_2, plans_2 = gw_m_convex_wrapper(coords_ca_2[:n_proteins], coords_ca_2[:n_proteins], t, symmetric=True, iter_max=iter_max, flip=flip)
         np.savez(config.xgw_plot_fname.replace('.png', f'_data_{config.unique_label}.npz'), 
                  config=OmegaConf.to_container(config, resolve=True, structured_config_mode=False),
                  lower_bounds_cross=lower_bounds_cross, 
@@ -178,7 +208,10 @@ def main(config: Config):
                  losses_gap_1=losses_gap_1,
                  losses_constant_1=losses_constant_1,
                  losses_gap_2=losses_gap_2,
-                 losses_constant_2=losses_constant_2)
+                 losses_constant_2=losses_constant_2,
+                 plans_cross=plans_cross,
+                 plans_1=plans_1,
+                 plans_2=plans_2,)
 
         fig = plt.figure(figsize=(12, 12))  
         plt.boxplot([safe_plot(upper_bounds_cross.flatten()), safe_plot(upper_bounds_1.flatten()), safe_plot(upper_bounds_2.flatten())])

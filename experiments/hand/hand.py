@@ -24,7 +24,7 @@ def filled_hand_experiment(path):
 
     # downsample image
     ds_factor = 4
-    iter_max = 10
+    iter_max = 100
     crop = crop[::ds_factor, ::ds_factor]
     plt.imshow(crop, cmap='gray')
     plt.axis('off')
@@ -154,6 +154,49 @@ def plot(points, title, fname, colors_perm, figsize=(10, 8)):
     plt.tight_layout()
     plt.savefig(fname, dpi=300)
 
+def gif(path, points, points_flipped):
+    import imageio
+    from PIL import Image as PILImage
+    import io
+
+    # Create frames
+    frames = []
+    n_frames = 50
+    t_values = np.linspace(0, 1, n_frames)
+    n_points = len(points)
+    n_loops = 1
+    colors_idx = (np.arange(n_points) / n_points * n_loops) % 1.0
+
+    for t in t_values:
+        points_interpolated = (1-t)*points + t*points_flipped
+        
+        fig, ax = plt.subplots(figsize=(10, 8), dpi=100)
+        scatter = ax.scatter(points_interpolated[:, 0], points_interpolated[:, 1], 
+                            c=colors_idx,
+                            cmap='hsv',
+                            s=100, 
+                            alpha=0.7,
+                            edgecolors='white',
+                            linewidth=0.5)
+        
+        ax.set_aspect('equal')
+        ax.set_title(f'Hand Contour Interpolation (t={t:.2f})')
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(points_flipped[:,1].min()-0.1, points_flipped[:,1].max()+0.1)
+        ax.set_xlim(points_flipped[:,0].min()-0.1, points_flipped[:,0].max()+0.1)
+        
+        # Save to buffer and convert with PIL
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        buf.seek(0)
+        img = PILImage.open(buf)
+        frames.append(np.array(img))
+        plt.close(fig)
+
+    # Save GIF
+    imageio.mimsave(path, frames, fps=20)
+    print(f"GIF saved as '{path}'")
+
 def border_hand_experiment(path):
     img_array = open_and_convert_to_grayscale(path)
     crop = img_array[20:-10, 250:]
@@ -176,37 +219,49 @@ def border_hand_experiment(path):
     points /= np.max(np.linalg.norm(points, axis=1, keepdims=True))
     points -= points.mean(axis=0, keepdims=True)
     points_flipped = points.copy()
-    points_flipped[:,0] *= -1
+    points_flipped[:,1] *= -1
     mu = np.ones(len(points)) / len(points)
 
     fname = 'hand_contour_reference.svg'
     title = 'Hand Contour - Reference'
     perm = np.arange(len(points))
     plot(points, title, fname, perm)
+    iter_max = 300
 
-    _, plan_cgw, _, _, _ = gw_m_convex(mu, points, mu, points_flipped, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=300, FW_iter=100, 
+    _, plan_igw, _, _, _ = gw_m_convex(mu, points, mu, points_flipped, {'numItermax': 10**10}, cost='IGW', gap_tol=1e-15, iter_max=iter_max, FW_iter=100, 
                                p_plus_implementation='h_to_v_popcount_sparse', 
                                p_minus_implementation='v_to_h_dual',
                                p_minus_dual_implementation='h_to_v_popcount_sparse') 
-    
+    title = 'Hand Contour - IGW'
+    fname = 'hand_contour_igw.svg'
+    perm = plan_igw.argmax(axis=0)
+    plot(points, title, fname, perm)
+    gif('hand_interpolation_igw.gif', points, points_flipped[perm])
+
+    _, plan_cgw, _, _, _ = gw_m_convex(mu, points, mu, points_flipped, {'numItermax': 10**10}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, FW_iter=100, 
+                               p_plus_implementation='h_to_v_popcount_sparse', 
+                               p_minus_implementation='v_to_h_dual',
+                               p_minus_dual_implementation='h_to_v_popcount_sparse') 
     title = 'Hand Contour - Chiral GW'
     fname = 'hand_contour_cgw.svg'
     perm = plan_cgw.argmax(axis=0)
     plot(points, title, fname, perm)
+    gif('hand_interpolation_cgw.gif', points, points_flipped[perm])
 
-    _, plan_classicalgw, _, _, _ = classical_gw(mu, points, mu, points_flipped, {'numItermax': 10**10}, cost_tol=1e-18, iter_max=100, FW_iter=100, 
+
+    _, plan_classicalgw, _, _, _ = classical_gw(mu, points, mu, points_flipped, {'numItermax': 10**10}, cost_tol=1e-18, iter_max=iter_max, FW_iter=100, 
                                 p_plus_implementation='cdd', 
                                 p_minus_implementation='cdd',
                                 ) 
-
     title = 'Hand Contour - Classical GW'
     fname = 'hand_contour_classicalgw.svg'
     perm = plan_classicalgw.argmax(axis=0)
     plot(points, title, fname, perm)
+    gif('hand_interpolation_classicalgw.gif', points, points_flipped[perm])
 
     np.savez('hand_contour_plans.npz', plan_cgw=plan_cgw, plan_classicalgw=plan_classicalgw)
     assert np.allclose(plan_classicalgw * len(plan_classicalgw), np.eye(len(plan_classicalgw)))
 
 if __name__ == '__main__':
     path = 'hand.png'
-    filled_hand_experiment(path)
+    border_hand_experiment(path)
