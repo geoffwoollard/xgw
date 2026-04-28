@@ -48,7 +48,7 @@ def main(fname_output,iter_max,n_conformers):
 
     for i in range(n_conformers):
         for j in range(i, n_conformers):
-            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100, p_plus_implementation='h_to_v_popcount', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount') 
+            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100, p_plus_implementation='h_to_v_popcount_sparse', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount_sparse') 
             cgws[i, j] = cgws[j, i] = cgw
             plans[i, j] = plans[j, i] = plan
 
