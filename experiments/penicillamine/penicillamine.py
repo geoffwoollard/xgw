@@ -97,11 +97,10 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    iter_max = 15
-    n_conformers = 3
+    n_conformers = 4
+    iter_max = 40
     
-    fname_molecule_input = "/home/gw/repos/xgw/experiments/penicilamine/Conformer3D_COMPOUND_CID_4727.sdf"
-    fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicillamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
-    # fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers.npz"
+    fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
+    fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
     main(fname_molecule_input, fname, iter_max, n_conformers)
     plot(fname)
