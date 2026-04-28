@@ -107,5 +107,5 @@ if __name__ == "__main__":
     
     fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
     fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}.npz"
-    # main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
+    main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
     plot(fname)
