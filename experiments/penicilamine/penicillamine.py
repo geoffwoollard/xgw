@@ -1,5 +1,5 @@
 from rdkit import Chem
-from xgw.gromov_wasserstein_m_dist import gw_m_convex, classical_gw
+from xgw.gromov_wasserstein_m_dist import gw_m_convex
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -48,7 +48,10 @@ def main(fname_molecule_input, fname_output,iter_max,n_conformers):
 
     for i in range(n_conformers):
         for j in range(i, n_conformers):
-            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100, p_plus_implementation='h_to_v_popcount_sparse', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount_sparse') 
+            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+                                             p_plus_implementation='h_to_v_popcount_sparse', 
+                                             p_minus_implementation='v_to_h_dual', 
+                                             p_minus_dual_implementation='h_to_v_popcount_sparse') 
             cgws[i, j] = cgws[j, i] = cgw
             plans[i, j] = plans[j, i] = plan
 
@@ -56,7 +59,7 @@ def main(fname_molecule_input, fname_output,iter_max,n_conformers):
             rmsd = np.linalg.norm(conformers[i] - conformers[j]) / np.sqrt(len(points))
             rmsds[i, j] = rmsds[j, i] = rmsd
 
-    np.savez(fname_output, conformers=conformers, noise=noise, cgws=cgws, rmsds=rmsds)
+    np.savez(fname_output, conformers=conformers, noise=noise, cgws=cgws, rmsds=rmsds, plans=plans)
 
 def plot(fname):
     data = np.load(fname)
@@ -94,10 +97,11 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    iter_max = 20
-    n_conformers = 10
+    iter_max = 30
+    n_conformers = 3
     
     fname_molecule_input = "/home/gw/repos/xgw/experiments/penicilamine/Conformer3D_COMPOUND_CID_4727.sdf"
     fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
+    # fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers.npz"
     main(fname_molecule_input, fname, iter_max, n_conformers)
     plot(fname)
