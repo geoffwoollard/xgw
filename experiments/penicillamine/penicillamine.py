@@ -46,6 +46,7 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
 
     cgws = np.zeros((n_conformers, n_conformers))
     rmsds = np.zeros((n_conformers, n_conformers))
+    rmsds_otalignment = np.zeros((n_conformers, n_conformers))
     plans = np.zeros((n_conformers, n_conformers, len(points), len(points)))
 
     for i in range(n_conformers):
@@ -66,6 +67,9 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
             plans[i, j] = plans[j, i] = plan
 
             # Compute RMSD
+            optimal_alignment = conformer_j[plan.argmax(axis=1)]
+            rmsds_otalignment[i, j] = rmsds_otalignment[j, i] = np.linalg.norm(conformers[i] - optimal_alignment) / np.sqrt(len(points))
+
             rmsd = np.linalg.norm(conformers[i] - conformers[j]) / np.sqrt(len(points))
             rmsds[i, j] = rmsds[j, i] = rmsd
 
@@ -107,7 +111,7 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    n_conformers = 3
+    n_conformers = 10
     noise_level = 0.001
     iter_max = 20
     flip = True
