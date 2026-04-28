@@ -48,14 +48,14 @@ def main(fname_molecule_input, fname_output,iter_max, n_conformers, noise_level)
 
     for i in range(n_conformers):
         for j in range(i, n_conformers):
-            if i == 0 and j == 1:
-                cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+            # if i == 0 and j == 1:
+            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
                                                 p_plus_implementation='h_to_v_popcount_sparse', 
                                                 p_minus_implementation='v_to_h_dual', 
                                                 p_minus_dual_implementation='h_to_v_popcount_sparse') 
-            else:
-                cgw = np.nan
-                plan = np.eye(len(points))
+            # else:
+            #     cgw = np.nan
+            #     plan = np.eye(len(points)) / len(points)
             cgws[i, j] = cgws[j, i] = cgw
             plans[i, j] = plans[j, i] = plan
 
@@ -101,11 +101,11 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    n_conformers = 3
+    n_conformers = 10
     noise_level = 0.001
-    iter_max = 40
+    iter_max = 20
     
     fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
     fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}.npz"
-    main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
+    # main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
     plot(fname)
