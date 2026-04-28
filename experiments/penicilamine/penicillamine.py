@@ -33,8 +33,8 @@ def make_conformers(points, n_conformers=10, noise_level=0.01):
     conformers += noise
     return conformers, noise
 
-def main(fname_output,iter_max,n_conformers):
-    coords, _ = read_molecule("/Users/gw/repos/xgw/experiments/penicilamine/Conformer3D_COMPOUND_CID_4727.sdf")
+def main(fname_molecule_input, fname_output,iter_max,n_conformers):
+    coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
     conformers, noise = make_conformers(points, n_conformers=n_conformers)
     r2_max_after = np.linalg.norm(conformers.reshape(-1, 3), axis=1).max()**2
@@ -96,6 +96,8 @@ def plot(fname):
 if __name__ == "__main__":
     iter_max = 20
     n_conformers = 10
-    fname = f"/Users/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
-    main(fname, iter_max, n_conformers)
+    
+    fname_molecule_input = "/home/gw/repos/xgw/experiments/penicilamine/penicilamine.sdf"
+    fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
+    main(fname_molecule_input, fname, iter_max, n_conformers)
     plot(fname)
