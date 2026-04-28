@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from proteins import extract_coords_and_atoms, selection_atoms
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 
-def gif(points, coords_ca_rotated, r2_max, path):
+def gif(coords_ca_rotated, points_flipped, perm, r2_max, path):
 
     # Create frames
     frames = []
@@ -19,17 +19,18 @@ def gif(points, coords_ca_rotated, r2_max, path):
     colors_idx = colors_idx  # Permute colors to match flipped points
 
     # Need full 3D coordinates, rescale back
-    coords_ca_3d = coords_ca_rotated * np.sqrt(r2_max)
-    points_3d = points * np.sqrt(r2_max)
+    rev_perm  = np.argsort(perm)
+    coords_ca_3d = coords_ca_rotated[rev_perm] * np.sqrt(r2_max)
+    points_flipped_3d = points_flipped * np.sqrt(r2_max)
 
     # Pre-compute axis limits (CRITICAL for stable plot)
-    all_points = np.vstack([coords_ca_3d, points_3d])
+    all_points = np.vstack([coords_ca_3d, points_flipped_3d])
     x_min, x_max = all_points[:, 0].min() - 1, all_points[:, 0].max() + 1
     y_min, y_max = all_points[:, 1].min() - 1, all_points[:, 1].max() + 1
     z_min, z_max = all_points[:, 2].min() - 1, all_points[:, 2].max() + 1
 
     for t in t_values:
-        points_interpolated = (1-t)*points_3d + t*coords_ca_3d
+        points_interpolated = (1-t)*points_flipped_3d + t*coords_ca_3d
         
         fig = plt.figure(figsize=(10, 8), dpi=100)
         ax = fig.add_subplot(111, projection='3d')
@@ -148,16 +149,16 @@ def experiment(fname, cost, iter_max):
                                 p_plus_implementation='h_to_v_popcount_sparse', 
                                 p_minus_implementation='v_to_h_dual',
                                 p_minus_dual_implementation='h_to_v_popcount_sparse') 
-    perm = np.argmax(plan, axis=0)
-    R, coords_ca_rotated, rmse_i, rmse_f, _ = optimal_rotation(points_flipped, points[perm])
+    perm = np.argmax(plan, axis=1)
+    R, coords_ca_rotated, rmse_i, rmse_f, _ = optimal_rotation(points, points_flipped[perm])
     print(f"Rotation matrix:\n{R}")
     print(f"RMSE before {rmse_i:.6f} and after {rmse_f:.6f} alignment")
 
 
 
     path = f'protein_barycenter_{cost}_itermax{iter_max}.gif'
-    gif(coords_ca_rotated, points, r2_max, path)
+    gif(coords_ca_rotated, points_flipped, perm, r2_max, path)
 
 if __name__ == "__main__":
-    experiment('3PG0.cif', 'CGW', iter_max=10)
-    experiment('3PG0.cif', 'IGW', iter_max=10)
+    experiment('3PG0.cif', 'CGW', iter_max=25)
+    experiment('3PG0.cif', 'IGW', iter_max=25)
