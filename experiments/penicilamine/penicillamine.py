@@ -97,7 +97,7 @@ if __name__ == "__main__":
     iter_max = 20
     n_conformers = 10
     
-    fname_molecule_input = "/home/gw/repos/xgw/experiments/penicilamine/penicilamine.sdf"
+    fname_molecule_input = "/home/gw/repos/xgw/experiments/penicilamine/Conformer3D_COMPOUND_CID_4727.sdf"
     fname = f"/home/gw/repos/xgw/experiments/penicilamine/penicilamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
     main(fname_molecule_input, fname, iter_max, n_conformers)
     plot(fname)
