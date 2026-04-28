@@ -26,17 +26,17 @@ def center_and_normalize(coords):
     points
     return points
 
-def make_conformers(points, n_conformers=10, noise_level=0.01):
+def make_conformers(points, n_conformers, noise_level):
     conformers = np.tile(points, (n_conformers, 1))
     conformers = conformers.reshape(n_conformers, -1, 3)
     noise = noise_level * np.random.randn(*conformers.shape)
     conformers += noise
     return conformers, noise
 
-def main(fname_molecule_input, fname_output,iter_max,n_conformers):
+def main(fname_molecule_input, fname_output,iter_max, n_conformers, noise_level):
     coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
-    conformers, noise = make_conformers(points, n_conformers=n_conformers)
+    conformers, noise = make_conformers(points, n_conformers=n_conformers, noise_level=noise_level)
     r2_max_after = np.linalg.norm(conformers.reshape(-1, 3), axis=1).max()**2
     t = 8*r2_max_after / (2 + 8*r2_max_after) 
 
@@ -48,10 +48,14 @@ def main(fname_molecule_input, fname_output,iter_max,n_conformers):
 
     for i in range(n_conformers):
         for j in range(i, n_conformers):
-            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
-                                             p_plus_implementation='h_to_v_popcount_sparse', 
-                                             p_minus_implementation='v_to_h_dual', 
-                                             p_minus_dual_implementation='h_to_v_popcount_sparse') 
+            if i == 0 and j == 1:
+                cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+                                                p_plus_implementation='h_to_v_popcount_sparse', 
+                                                p_minus_implementation='v_to_h_dual', 
+                                                p_minus_dual_implementation='h_to_v_popcount_sparse') 
+            else:
+                cgw = np.nan
+                plan = np.eye(len(points))
             cgws[i, j] = cgws[j, i] = cgw
             plans[i, j] = plans[j, i] = plan
 
@@ -97,10 +101,11 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    n_conformers = 4
+    n_conformers = 3
+    noise_level = 0.001
     iter_max = 40
     
     fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
-    fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_itermax{iter_max}.npz"
-    main(fname_molecule_input, fname, iter_max, n_conformers)
+    fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}.npz"
+    main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
     plot(fname)
