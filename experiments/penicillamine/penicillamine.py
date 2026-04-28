@@ -1,7 +1,9 @@
+from copy import deepcopy
 from rdkit import Chem
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 import numpy as np
 from matplotlib import pyplot as plt
+
 
 def read_molecule(fname):
 
@@ -33,7 +35,7 @@ def make_conformers(points, n_conformers, noise_level):
     conformers += noise
     return conformers, noise
 
-def main(fname_molecule_input, fname_output,iter_max, n_conformers, noise_level):
+def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level, flip):
     coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
     conformers, noise = make_conformers(points, n_conformers=n_conformers, noise_level=noise_level)
@@ -49,7 +51,11 @@ def main(fname_molecule_input, fname_output,iter_max, n_conformers, noise_level)
     for i in range(n_conformers):
         for j in range(i, n_conformers):
             # if i == 0 and j == 1:
-            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformers[j], {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+            
+            conformer_j = deepcopy(conformers[j])
+            if flip:
+                conformer_j[:, 0] *= -1
+            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
                                                 p_plus_implementation='h_to_v_popcount_sparse', 
                                                 p_minus_implementation='v_to_h_dual', 
                                                 p_minus_dual_implementation='h_to_v_popcount_sparse') 
@@ -101,11 +107,12 @@ def plot(fname):
 
 
 if __name__ == "__main__":
-    n_conformers = 10
+    n_conformers = 3
     noise_level = 0.001
     iter_max = 20
+    flip = True
     
     fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
-    fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}.npz"
-    main(fname_molecule_input, fname, iter_max, n_conformers, noise_level )
+    fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flip{flip}.npz"
+    main(fname_molecule_input, fname, iter_max, n_conformers, noise_level, flip )
     plot(fname)
