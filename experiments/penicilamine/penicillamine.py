@@ -69,20 +69,20 @@ def plot(fname):
     plt.imshow(rmsds, cmap='gray')
     plt.title('RMSD Distances')
     plt.colorbar()
-    plt.show()
+    plt.savefig('rmsd.png')
     plt.clf()
 
     plt.imshow(cgws, cmap='gray')
     plt.title('CGW Distances')
     plt.colorbar()
-    plt.show()
+    plt.savefig('cgw.png')
     plt.clf()
 
     plt.scatter(cgws.flatten(), rmsds.flatten())
     plt.xlabel('CGW Distance')
     plt.ylabel('RMSD Distance')
     plt.title('CGW vs RMSD')
-    plt.show()
+    plt.savefig('cgw_vs_rmsd.png')
     plt.clf()
 
     # mismatch from id
@@ -91,7 +91,7 @@ def plot(fname):
     plt.imshow(traces, cmap='gray')
     plt.title('Trace of Optimal Transport Plans')
     plt.colorbar()
-    plt.show()
+    plt.savefig('trace.png')
     plt.clf()
 
 

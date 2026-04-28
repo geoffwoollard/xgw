@@ -195,7 +195,7 @@ class ExtremePointPolytopeSparse:
     # --------------------------------------------------
     # Initialization
     # --------------------------------------------------
-    def __init__(self, E, masks, A=None, b=None, D_chunk_size=4_000, use_D_sparse=True):
+    def __init__(self, E, masks, A=None, b=None, D_chunk_size=10_000, use_D_sparse=True):
         self.E = np.asarray(E, float)
         self.masks = np.array(masks, dtype=object)
 
