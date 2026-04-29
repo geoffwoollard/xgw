@@ -1,4 +1,5 @@
 from copy import deepcopy
+import os
 from rdkit import Chem
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 import numpy as np
@@ -39,6 +40,7 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
     coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
     conformers, noise = make_conformers(points, n_conformers=n_conformers, noise_level=noise_level)
+    conformers = center_and_normalize(conformers.reshape(-1, 3)).reshape(conformers.shape)
     r2_max_after = np.linalg.norm(conformers.reshape(-1, 3), axis=1).max()**2
     t = 8*r2_max_after / (2 + 8*r2_max_after) 
 
@@ -50,9 +52,7 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
     plans = np.zeros((n_conformers, n_conformers, len(points), len(points)))
 
     for i in range(n_conformers):
-        for j in range(i, n_conformers):
-            # if i == 0 and j == 1:
-            
+        for j in range(i, n_conformers):            
             conformer_j = deepcopy(conformers[j])
             if flip:
                 conformer_j[:, 0] *= -1
@@ -60,9 +60,6 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
                                                 p_plus_implementation='h_to_v_popcount_sparse', 
                                                 p_minus_implementation='v_to_h_dual', 
                                                 p_minus_dual_implementation='h_to_v_popcount_sparse') 
-            # else:
-            #     cgw = np.nan
-            #     plan = np.eye(len(points)) / len(points)
             cgws[i, j] = cgws[j, i] = cgw
             plans[i, j] = plans[j, i] = plan
 
@@ -73,9 +70,9 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
             rmsd = np.linalg.norm(conformers[i] - conformers[j]) / np.sqrt(len(points))
             rmsds[i, j] = rmsds[j, i] = rmsd
 
-    np.savez(fname_output, conformers=conformers, noise=noise, cgws=cgws, rmsds=rmsds, plans=plans)
+    np.savez(fname_output, conformers=conformers, noise=noise, cgws=cgws, rmsds=rmsds, plans=plans, rmsds_otalignment=rmsds_otalignment)
 
-def plot(fname):
+def plot(fname, odir):
     data = np.load(fname)
     cgws = data['cgws']
     rmsds = data['rmsds']
@@ -83,20 +80,20 @@ def plot(fname):
     plt.imshow(rmsds, cmap='gray')
     plt.title('RMSD Distances')
     plt.colorbar()
-    plt.savefig('rmsd.png')
+    plt.savefig(os.path.join(odir, 'rmsd.png'))
     plt.clf()
 
     plt.imshow(cgws, cmap='gray')
     plt.title('CGW Distances')
     plt.colorbar()
-    plt.savefig('cgw.png')
+    plt.savefig(os.path.join(odir, 'cgw.png'))
     plt.clf()
 
     plt.scatter(cgws.flatten(), rmsds.flatten())
     plt.xlabel('CGW Distance')
     plt.ylabel('RMSD Distance')
     plt.title('CGW vs RMSD')
-    plt.savefig('cgw_vs_rmsd.png')
+    plt.savefig(os.path.join(odir, 'cgw_vs_rmsd.png'))
     plt.clf()
 
     # mismatch from id
@@ -105,17 +102,20 @@ def plot(fname):
     plt.imshow(traces, cmap='gray')
     plt.title('Trace of Optimal Transport Plans')
     plt.colorbar()
-    plt.savefig('trace.png')
+    plt.savefig(os.path.join(odir, 'trace.png'))
     plt.clf()
 
 
 
 if __name__ == "__main__":
-    n_conformers = 5
-    noise_level = 0.001
+    n_conformers = 10
+    noise_level = 0.1
     iter_max = 40
     for flip in [False, True]:
         fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
         fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flip{flip}.npz"
         main(fname_molecule_input, fname, iter_max, n_conformers, noise_level, flip)
-        plot(fname)
+        odir = fname.replace('.npz', '_output')
+        if not os.path.exists(odir):
+            os.makedirs(odir)
+        plot(fname, odir)
