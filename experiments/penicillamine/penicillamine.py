@@ -4,7 +4,7 @@ from rdkit import Chem
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 import numpy as np
 from matplotlib import pyplot as plt
-
+import pandas as pd
 
 def read_molecule(fname):
 
@@ -105,11 +105,68 @@ def plot(fname, odir):
     plt.savefig(os.path.join(odir, 'trace.png'))
     plt.clf()
 
+    df = pd.DataFrame({'CGW': cgws.flatten(), 'RMSD': rmsds.flatten()})
+    df.to_csv(os.path.join(odir, 'cgw_rmsd.csv'), index=False)
+    
+def plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir):
+    # Or configure matplotlib directly without seaborn
+    plt.rcParams.update({
+        'figure.figsize': (12, 10),
+        'font.size': 16,
+        'axes.labelsize': 18,
+        'axes.titlesize': 20,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 16,
+        'lines.linewidth': 2.5,
+        'axes.linewidth': 2,
+    })
+    data_flip = np.load(fname_flip)
+    data_non_flip = np.load(fname_non_flip)
 
+    rmsd_scale = 1000
+    cgw_scale = 10**6
+    cgws_flip = data_flip['cgws'] * cgw_scale
+    rmsds_flip = data_flip['rmsds'] * rmsd_scale
+    cgws_non_flip = data_non_flip['cgws'] * cgw_scale
+    rmsds_non_flip = data_non_flip['rmsds'] * rmsd_scale
+
+    # _, axes = plt.subplots(2, 1, figsize=(5, 12))
+    # # share x axis
+    # axes[1].scatter(y=cgws_flip.flatten(), x=rmsds_flip.flatten(), alpha=1, s=50)
+    # axes[0].scatter(y=cgws_non_flip.flatten(), x=rmsds_non_flip.flatten(), alpha=1, s=50)
+    # axes[1].set_ylabel('CGW')
+    # axes[1].set_xlabel('RMSD')
+    # axes[0].set_title('Without Reflection')
+    # axes[1].set_title('With Reflection')
+    # axes[0].set_xlim(axes[1].get_xlim())
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(odir, 'cgw_vs_rmsd_flip_vs_nonflip.svg'), dpi=300)
+    # plt.clf()
+        # _, axes = plt.subplots(2, 1, figsize=(5, 12))
+    # # share x axis
+    _, axis = plt.subplots(figsize=(5, 5))
+    axis.scatter(y=cgws_non_flip.flatten(), x=rmsds_non_flip.flatten(), alpha=1, s=50, color='black')
+    axis.set_ylabel('CGW')
+    axis.set_xlabel('RMSD')
+    plt.tight_layout()
+    plt.savefig(os.path.join(odir, 'cgw_vs_rmsd.pdf'), dpi=300)
+    plt.clf()
+
+    _, axis = plt.subplots(figsize=(5, 5))
+
+    # Boxplots
+    upper_triangle_indices = np.triu_indices_from(cgws_flip, k=1)
+    axis.boxplot([cgws_non_flip[upper_triangle_indices].flatten(), cgws_flip[upper_triangle_indices].flatten()], labels=['Without Reflection', 'With Reflection'])
+    axis.set_ylabel('CGW Distance')
+    # axis.set_title('Boxplot Comparison')
+    plt.tight_layout()
+    plt.savefig(os.path.join(odir, 'cgw_hist.pdf'), dpi=300)
+    plt.clf()
 
 if __name__ == "__main__":
     n_conformers = 10
-    noise_level = 0.1
+    noise_level = 0.01
     iter_max = 40
     for flip in [False, True]:
         fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
@@ -119,3 +176,10 @@ if __name__ == "__main__":
         if not os.path.exists(odir):
             os.makedirs(odir)
         plot(fname, odir)
+
+    fname_flip = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipTrue.npz"
+    fname_non_flip = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipFalse.npz"
+    odir = f"/home/gw/repos/xgw/experiments/penicillamine/comparison_flip_nonflip_output"
+    if not os.path.exists(odir):
+        os.makedirs(odir)
+    plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir)
