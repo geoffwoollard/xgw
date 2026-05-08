@@ -1,10 +1,13 @@
 from copy import deepcopy
 import os
+import hydra
+from hydra.core.hydra_config import HydraConfig
 from rdkit import Chem
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
+from dataclasses import dataclass
 
 def read_molecule(fname):
 
@@ -36,7 +39,7 @@ def make_conformers(points, n_conformers, noise_level):
     conformers += noise
     return conformers, noise
 
-def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level, flip):
+def run(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level, flip):
     coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
     conformers, noise = make_conformers(points, n_conformers=n_conformers, noise_level=noise_level)
@@ -56,11 +59,14 @@ def main(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level
             conformer_j = deepcopy(conformers[j])
             if flip:
                 conformer_j[:, 0] *= -1
-            cgw, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
-                                                p_plus_implementation='h_to_v_popcount_sparse', 
-                                                p_minus_implementation='v_to_h_dual', 
-                                                p_minus_dual_implementation='h_to_v_popcount_sparse') 
-            cgws[i, j] = cgws[j, i] = cgw
+            # cgw2, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+            #                                     p_plus_implementation='h_to_v_popcount_sparse', 
+            #                                     p_minus_implementation='v_to_h_dual', 
+            #                                     p_minus_dual_implementation='h_to_v_popcount_sparse') 
+            plan = np.eye(len(points)) / len(points)
+            from xgw.evalulate_fixed_plan import evaluate_cost
+            cgw2 = evaluate_cost(conformers[i], conformer_j, plan, 'CGW', t)
+            cgws[i, j] = cgws[j, i] = np.sqrt(cgw2)
             plans[i, j] = plans[j, i] = plan
 
             # Compute RMSD
@@ -164,22 +170,42 @@ def plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir):
     plt.savefig(os.path.join(odir, 'cgw_hist.pdf'), dpi=300)
     plt.clf()
 
-if __name__ == "__main__":
-    n_conformers = 10
-    noise_level = 0.01
-    iter_max = 40
-    for flip in [False, True]:
-        fname_molecule_input = "/home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf"
-        fname = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flip{flip}.npz"
-        main(fname_molecule_input, fname, iter_max, n_conformers, noise_level, flip)
-        odir = fname.replace('.npz', '_output')
-        if not os.path.exists(odir):
-            os.makedirs(odir)
-        plot(fname, odir)
 
-    fname_flip = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipTrue.npz"
-    fname_non_flip = f"/home/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipFalse.npz"
-    odir = f"/home/gw/repos/xgw/experiments/penicillamine/comparison_flip_nonflip_output"
+@dataclass
+class Config:
+    fname_molecule_input: str 
+    n_conformers: int 
+    noise_level: float 
+    iter_max: int | None
+    output_fname: str 
+    flip: bool 
+
+
+@hydra.main(version_base=None, config_path=".", config_name="config")
+def main(config: Config):
+    print(config)
+    n_conformers = config.n_conformers
+    noise_level = config.noise_level
+    iter_max = config.iter_max
+
+    # hydra working directory
+    hydra_cfg = HydraConfig.get()
+    output_dir = hydra_cfg.runtime.output_dir
+    fname_molecule_input = config.fname_molecule_input
+    output_fname = os.path.join(output_dir, config.output_fname)
+    flip = config.flip
+    run(fname_molecule_input, output_fname, iter_max, n_conformers, noise_level, flip)
+    odir = output_fname.replace('.npz', '_output')
     if not os.path.exists(odir):
         os.makedirs(odir)
-    plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir)
+    plot(output_fname, odir)
+
+    # fname_flip = f"/Users/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipTrue.npz"
+    # fname_non_flip = f"/Users/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipFalse.npz"
+    # odir = f"/Users/gw/repos/xgw/experiments/penicillamine/comparison_flip_nonflip_output"
+    # if not os.path.exists(odir):
+    #     os.makedirs(odir)
+    # plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir)
+
+if __name__ == "__main__":
+    main()

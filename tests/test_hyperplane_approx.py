@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def make_marginals(seed):
+def make_marginals(seed, min_points=5, max_points=15):
     np.random.seed(seed)
-    n_points_xy = np.random.randint(5,15)
+    n_points_xy = np.random.randint(min_points, max_points+1)
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
     mu_b, sigma_b = r_factor*mu_a1, 0.2
