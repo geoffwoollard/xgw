@@ -5,11 +5,9 @@ from xgw.hyperplane_approx import construct_basis_eij, projection
 from xgw.frank_wolfe import covariance, const_cost, center_marginal
 
 
-def evaluate_cost(space_x, space_y, plan, cost, t):
+def evaluate_cost_precompute(space_x, space_y, mu, nu, cost, t):
         # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
-    mu = plan.sum(axis=1)
-    nu = plan.sum(axis=0)
     # selecting the optimale t in the CGW case, if not pre-selected
     # t = optimal_t(max_diam, d, cost, t, convex_tol)
     
@@ -18,12 +16,41 @@ def evaluate_cost(space_x, space_y, plan, cost, t):
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
-
     e_base, R = construct_basis_eij(space_x, space_y)
+    return cst_cost, e_base, R, d, t
+
+def evaluate_cost_postcompute(e_base, R, d, t, plan, cost, cst_cost):
     g_star = projection(plan, e_base)
     c_opt = vector_cost(g_star, cost, R, d, t)
     total_cost = cst_cost-2*c_opt
     return total_cost
+
+def evaluate_cost(space_x, space_y, plan, cost, t):
+    mu = plan.sum(axis=1)
+    nu = plan.sum(axis=0)
+    cst_cost, e_base, R, d, t = evaluate_cost_precompute(space_x, space_y, mu, nu, cost, t)
+    total_cost = evaluate_cost_postcompute(e_base, R, d, t, plan, cost, cst_cost)
+    return total_cost
+
+# def evaluate_cost(space_x, space_y, plan, cost, t):
+#         # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
+#     d = space_x.shape[-1]
+#     mu = plan.sum(axis=1)
+#     nu = plan.sum(axis=0)
+#     # selecting the optimale t in the CGW case, if not pre-selected
+#     # t = optimal_t(max_diam, d, cost, t, convex_tol)
+    
+#     space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+#     # Computing constant cost
+#     sigma_x = covariance(space_x, mu)
+#     sigma_y = covariance(space_y, nu)
+#     cst_cost = const_cost(sigma_x, sigma_y, cost, t)
+
+#     e_base, R = construct_basis_eij(space_x, space_y)
+#     g_star = projection(plan, e_base)
+#     c_opt = vector_cost(g_star, cost, R, d, t)
+#     total_cost = cst_cost-2*c_opt
+#     return total_cost
 
 def make_simple_marginals(seed, d, min_points=30, max_points=30):
     np.random.seed(seed)
