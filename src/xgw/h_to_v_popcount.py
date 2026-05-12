@@ -229,8 +229,11 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            # return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
-            return self._build_adjacency_subset_sparse_chunks(masks, self.D_chunk_size)  
+            if max(masks) < 2**64:
+                return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
+            else:
+                logger.warning("Masks exceed 64 bits, falling back to non-vectorized sparse chunked adjacency.")
+                return self._build_adjacency_subset_sparse_chunks(masks, self.D_chunk_size)  
         else:
             return self._build_adjacency_subset_dense(masks)
 
@@ -253,6 +256,7 @@ class ExtremePointPolytopeSparse:
         
         for j_start in range(0, n, chunk_size):
             j_end = min(j_start + chunk_size, n)
+            logger.info(f'Building adjacency for columns {j_start} to {j_end} (total {n})')
             
             for local_j, j in enumerate(range(j_start, j_end)):
                 m_j = masks[j]
