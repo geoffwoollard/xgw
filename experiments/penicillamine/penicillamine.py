@@ -10,6 +10,7 @@ import pandas as pd
 from dataclasses import dataclass
 from multiprocessing import Pool
 import itertools
+from scipy.stats import ks_2samp, mannwhitneyu
 
 from xgw.gromov_wasserstein_m_dist import gw_m_convex
 from xgw.evalulate_fixed_plan import evaluate_cost, evaluate_cost_precompute, evaluate_cost_postcompute
@@ -93,8 +94,15 @@ def optimize_by_enumeration_pool(conformer_1, conformer_2, n_points, t, n_proces
             best_plan = id_plan[list(perm)]
     
     return best_cost, best_plan
-    
-def run(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level_config, flip, solution_method, n_processes):
+
+def plan_to_permutation(plan):
+    """Extract permutation from plan matrix (identity permutation with reordering)."""
+    # Find the column index with max value (0.11111111) for each row
+    perm = np.argmax(plan, axis=1)
+    return tuple(perm)
+
+def run(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level_config, flip, solution_method, n_processes, random_seed):
+    np.random.seed(random_seed)
     coords, _ = read_molecule(fname_molecule_input)
     points = center_and_normalize(coords)
     noise_levels = np.linspace(noise_level_config.min, noise_level_config.max, n_conformers)
@@ -110,48 +118,51 @@ def run(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level_
 
     mu = np.ones(len(points)) / len(points)
 
-    cgws = np.zeros((n_conformers, n_conformers))
+    cgw2s = np.zeros((n_conformers, n_conformers))
     rmsds = np.zeros((n_conformers, n_conformers))
     rmsds_otalignment = np.zeros((n_conformers, n_conformers))
     plans = np.zeros((n_conformers, n_conformers, len(points), len(points)))
-
+    permutations = np.zeros((n_conformers, n_conformers, len(points)), dtype=object)
     for i in range(n_conformers):
-        for j in range(i, n_conformers):            
-            conformer_j = deepcopy(conformers[j])
-            if flip:
-                conformer_j[:, 0] *= -1
+        for j in range(i, n_conformers):    
+            if j >= i:        
+                conformer_j = deepcopy(conformers[j])
+                if flip:
+                    conformer_j[:, 0] *= -1
 
-            if solution_method == 'polytope':
-                cgw2, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
-                                                    p_plus_implementation='h_to_v_popcount_sparse', 
-                                                    p_minus_implementation='v_to_h_dual', 
-                                                    p_minus_dual_implementation='h_to_v_popcount_sparse') 
-            elif solution_method == 'enumeration':                        
-                cgw2, plan = optimize_by_enumeration(conformers[i], conformer_j, len(points), t)
-            elif solution_method == 'enumeration_pool':                        
-                cgw2, plan = optimize_by_enumeration_pool(conformers[i], conformer_j, len(points), t, n_processes)
+                if solution_method == 'polytope':
+                    cgw2, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+                                                        p_plus_implementation='h_to_v_popcount_sparse', 
+                                                        p_minus_implementation='v_to_h_dual', 
+                                                        p_minus_dual_implementation='h_to_v_popcount_sparse') 
+                elif solution_method == 'enumeration':                        
+                    cgw2, plan = optimize_by_enumeration(conformers[i], conformer_j, len(points), t)
+                elif solution_method == 'enumeration_pool':                        
+                    cgw2, plan = optimize_by_enumeration_pool(conformers[i], conformer_j, len(points), t, n_processes)
 
-            elif solution_method == 'id':
-                plan = np.eye(len(points)) / len(points)
-                cgw2 = evaluate_cost(conformers[i], conformer_j, plan, 'CGW', t)
-            else:
-                raise ValueError(f'Unknown solution method: {solution_method}')
+                elif solution_method == 'id':
+                    plan = np.eye(len(points)) / len(points)
+                    cgw2 = evaluate_cost(conformers[i], conformer_j, plan, 'CGW', t)
+                else:
+                    raise ValueError(f'Unknown solution method: {solution_method}')
 
-            cgws[i, j] = cgws[j, i] = np.sqrt(cgw2)
-            plans[i, j] = plans[j, i] = plan
+                cgw2s[i, j] = cgw2s[j, i] = cgw2
+                plans[i, j] = plans[j, i] = plan
 
-            # Compute RMSD
-            optimal_alignment = conformer_j[plan.argmax(axis=1)]
-            rmsds_otalignment[i, j] = rmsds_otalignment[j, i] = np.linalg.norm(conformers[i] - optimal_alignment) / np.sqrt(len(points))
+                # Compute RMSD
+                optimal_alignment = conformer_j[plan.argmax(axis=1)]
+                rmsds_otalignment[i, j] = rmsds_otalignment[j, i] = np.linalg.norm(conformers[i] - optimal_alignment) / np.sqrt(len(points))
 
-            rmsd = np.linalg.norm(conformers[i] - conformers[j]) / np.sqrt(len(points))
-            rmsds[i, j] = rmsds[j, i] = rmsd
+                rmsd = np.linalg.norm(conformers[i] - conformer_j) / np.sqrt(len(points))
+                rmsds[i, j] = rmsds[j, i] = rmsd
+                permutations[i,j] = permutations[j, i] = plan_to_permutation(plan)
 
-    np.savez(fname_output, conformers=conformers, noise=noise, cgws=cgws, rmsds=rmsds, plans=plans, rmsds_otalignment=rmsds_otalignment)
+    np.savez(fname_output, conformers=conformers, noise=noise, cgw2s=cgw2s, rmsds=rmsds, plans=plans, rmsds_otalignment=rmsds_otalignment)
 
 def plot(fname, odir):
     data = np.load(fname)
-    cgws = data['cgws']
+    cgw2s = data['cgw2s']
+    cgws = np.sign(cgw2s) * np.sqrt(np.abs(cgw2s))
     rmsds = data['rmsds']
 
     plt.rcParams.update({
@@ -213,27 +224,13 @@ def plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir):
     data_flip = np.load(fname_flip)
     data_non_flip = np.load(fname_non_flip)
 
-    rmsd_scale = 1000
-    cgw_scale = 10**6
+    rmsd_scale = 1 #1000
+    cgw_scale = 1 # 10**6
     cgws_flip = data_flip['cgws'] * cgw_scale
     rmsds_flip = data_flip['rmsds'] * rmsd_scale
     cgws_non_flip = data_non_flip['cgws'] * cgw_scale
     rmsds_non_flip = data_non_flip['rmsds'] * rmsd_scale
 
-    # _, axes = plt.subplots(2, 1, figsize=(5, 12))
-    # # share x axis
-    # axes[1].scatter(y=cgws_flip.flatten(), x=rmsds_flip.flatten(), alpha=1, s=50)
-    # axes[0].scatter(y=cgws_non_flip.flatten(), x=rmsds_non_flip.flatten(), alpha=1, s=50)
-    # axes[1].set_ylabel('CGW')
-    # axes[1].set_xlabel('RMSD')
-    # axes[0].set_title('Without Reflection')
-    # axes[1].set_title('With Reflection')
-    # axes[0].set_xlim(axes[1].get_xlim())
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(odir, 'cgw_vs_rmsd_flip_vs_nonflip.svg'), dpi=300)
-    # plt.clf()
-        # _, axes = plt.subplots(2, 1, figsize=(5, 12))
-    # # share x axis
     _, axis = plt.subplots(figsize=(5, 5))
     axis.scatter(y=cgws_non_flip.flatten(), x=rmsds_non_flip.flatten(), alpha=1, s=50, color='black')
     axis.set_ylabel('CGW')
@@ -246,12 +243,26 @@ def plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir):
 
     # Boxplots
     upper_triangle_indices = np.triu_indices_from(cgws_flip, k=1)
-    axis.boxplot([cgws_non_flip[upper_triangle_indices].flatten(), cgws_flip[upper_triangle_indices].flatten()], labels=['Without Reflection', 'With Reflection'])
+    
+    bp = axis.boxplot(
+        [cgws_non_flip[upper_triangle_indices].flatten(), 
+         cgws_flip[upper_triangle_indices].flatten()], 
+        labels=['Without Reflection', 'With Reflection'],
+        widths=0.6,
+    )
     axis.set_ylabel('CGW Distance')
     # axis.set_title('Boxplot Comparison')
     plt.tight_layout()
     plt.savefig(os.path.join(odir, 'cgw_hist.pdf'), dpi=300)
     plt.clf()
+
+    ks_statistic, ks_p_value = ks_2samp(cgws_non_flip[upper_triangle_indices].flatten(), 
+         cgws_flip[upper_triangle_indices].flatten())
+
+    mw_stat, mw_pval = mannwhitneyu(cgws_non_flip[upper_triangle_indices].flatten(), 
+            cgws_flip[upper_triangle_indices].flatten())
+    
+    return {'ks_statistic': ks_statistic, 'ks_p_value': ks_p_value, 'mw_stat': mw_stat, 'mw_pval': mw_pval}
 
 
 @dataclass
@@ -269,6 +280,7 @@ class Config:
     flip: bool 
     solution_method: str
     n_processes: int
+    random_seed: int
 
 @hydra.main(version_base=None, config_path=".", config_name="config")
 def main(config: Config):
@@ -283,18 +295,13 @@ def main(config: Config):
     fname_molecule_input = config.fname_molecule_input
     output_fname = os.path.join(output_dir, config.output_fname)
     flip = config.flip
-    run(fname_molecule_input, output_fname, iter_max, n_conformers, noise_level, flip, config.solution_method, config.n_processes)
+    run(fname_molecule_input, output_fname, iter_max, n_conformers, noise_level, flip, config.solution_method, config.n_processes, config.random_seed)
     odir = output_fname.replace('.npz', '_output')
     if not os.path.exists(odir):
         os.makedirs(odir)
     plot(output_fname, odir)
 
-    # fname_flip = f"/Users/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipTrue.npz"
-    # fname_non_flip = f"/Users/gw/repos/xgw/experiments/penicillamine/penicillamine_conformers_nconfcormers{n_conformers}_noiselevel{noise_level}_itermax{iter_max}_flipFalse.npz"
-    # odir = f"/Users/gw/repos/xgw/experiments/penicillamine/comparison_flip_nonflip_output"
-    # if not os.path.exists(odir):
-    #     os.makedirs(odir)
-    # plot_flip_vs_non_flip(fname_flip, fname_non_flip, odir)
+
 
 if __name__ == "__main__":
     main()
