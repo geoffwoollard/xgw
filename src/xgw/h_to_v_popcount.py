@@ -195,7 +195,7 @@ class ExtremePointPolytopeSparse:
     # --------------------------------------------------
     # Initialization
     # --------------------------------------------------
-    def __init__(self, E, masks, A=None, b=None, D_chunk_size=10_000, use_D_sparse=True):
+    def __init__(self, E, masks, A=None, b=None, D_chunk_size=30_000, use_D_sparse=True):
         self.E = np.asarray(E, float)
         self.masks = np.array(masks, dtype=object)
 
@@ -287,9 +287,10 @@ class ExtremePointPolytopeSparse:
         else:
             masks = np.asarray(masks, dtype=object)
         
-        # Process chunks of columns
+        logger.info('Process chunks of columns')
         for j_start in range(0, n, chunk_size):
             j_end = min(j_start + chunk_size, n)
+            logger.info(f'Processing columns {j_start} to {j_end}')
             masks_j_chunk = masks[j_start:j_end]
             
             # pairwise bitwise AND: all rows vs chunk of columns

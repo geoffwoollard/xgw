@@ -570,7 +570,7 @@ def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
 
 
 def projection(pi, e_base):
-    logger.info(f'e_base {e_base.shape}, pi {pi.shape}')
+    logger.info(f'e_base {e_base.shape}, pi {pi.shape}, trace(pi) {np.trace(pi) / np.sum(pi) * len(pi)}')
     return np.einsum('ijk,ij->k', e_base, pi).reshape(-1,)
 
 
