@@ -229,8 +229,8 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
-            # return self._build_adjacency_subset_sparse_chunks(masks)  
+            # return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
+            return self._build_adjacency_subset_sparse_chunks(masks, self.D_chunk_size)  
         else:
             return self._build_adjacency_subset_dense(masks)
 
@@ -244,10 +244,10 @@ class ExtremePointPolytopeSparse:
                     D[i, j] = D[j, i] = True
         return D
     
-    def _build_adjacency_subset_sparse_chunks(self, masks):
+    def _build_adjacency_subset_sparse_chunks(self, masks, chunk_size):
         """Build sparse adjacency for a subset of masks (chunked)."""
         n = len(masks)
-        chunk_size = self.D_chunk_size
+        # chunk_size = self.D_chunk_size
         
         rows, cols = [], []
         
@@ -282,12 +282,13 @@ class ExtremePointPolytopeSparse:
         rows, cols = [], []
         
         # Determine dtype for masks
-        if max(masks) < 2**64:
+        max_mask = max(masks)
+        if max_mask < 2**64:
             masks = np.asarray(masks, dtype=np.uint64)
         else:
             masks = np.asarray(masks, dtype=object)
         
-        logger.info(f'Process chunks of columns. masks.shape={masks.shape}, dtype={masks.dtype}')
+        logger.info(f'Process chunks of columns. max_mask={max_mask}, masks.shape={masks.shape}, dtype={masks.dtype}')
         for j_start in range(0, n, chunk_size):
             j_end = min(j_start + chunk_size, n)
             logger.info(f'Processing columns {j_start} to {j_end}')
