@@ -1,3 +1,4 @@
+from math import log2
 import numpy as np
 from scipy import sparse
 import logging
@@ -292,7 +293,7 @@ class ExtremePointPolytopeSparse:
         else:
             masks = np.asarray(masks, dtype=object)
         
-        logger.info(f'Process chunks of columns. max_mask={max_mask}, masks.shape={masks.shape}, dtype={masks.dtype}')
+        logger.info(f'Process chunks of columns. log_2 max_mask={log2(max_mask)}, masks.shape={masks.shape}, dtype={masks.dtype}')
         for j_start in range(0, n, chunk_size):
             j_end = min(j_start + chunk_size, n)
             logger.info(f'Processing columns {j_start} to {j_end}')
