@@ -287,7 +287,7 @@ class ExtremePointPolytopeSparse:
         else:
             masks = np.asarray(masks, dtype=object)
         
-        logger.info('Process chunks of columns')
+        logger.info(f'Process chunks of columns. masks.shape={masks.shape}, dtype={masks.dtype}')
         for j_start in range(0, n, chunk_size):
             j_end = min(j_start + chunk_size, n)
             logger.info(f'Processing columns {j_start} to {j_end}')
