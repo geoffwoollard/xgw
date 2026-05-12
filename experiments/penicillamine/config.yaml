@@ -1,8 +1,8 @@
 fname_molecule_input: /home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf
-n_conformers: 1
+n_conformers: 5
 noise_level: 
-  min: 0.001
-  max: 0.01
+  min: 0.0001
+  max: 0.001
 iter_max: 60
 flip: true
 output_fname: penicillamine_conformers_nconfcormers${n_conformers}_itermax${iter_max}_flip${flip}.npz
