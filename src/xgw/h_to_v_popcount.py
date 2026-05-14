@@ -269,14 +269,19 @@ class ExtremePointPolytopeSparse:
                     if shared >= self.r - 1:
                         rows.append(i)
                         cols.append(j)
-        
+
+        logger.info(f'Found {len(rows)} adjacencies (upper triangle). Building sparse COO.')
         D_upper = sparse.coo_matrix(
             (np.ones(len(rows), dtype=bool), (rows, cols)),
             shape=(n, n),
             dtype=bool
         )
+        logger.info('Symmetrize: D = D_upper + D_upper^T')
         D = D_upper + D_upper.T
-        return D.tocsr()
+        logger.info(f'Convert to CSR format')
+        D_csr = D.tocsr()
+        logger.info(f'Adjacency subset built: shape={D_csr.shape}, nnz={D_csr.nnz}')
+        return D_csr
 
     def _build_adjacency_subset_vectorized_chunked(self, masks, chunk_size=None):
         """Build adjacency matrix in chunks, assemble as sparse CSR."""
@@ -301,30 +306,36 @@ class ExtremePointPolytopeSparse:
             
             # pairwise bitwise AND: all rows vs chunk of columns
             # shape: (n, len(chunk))
+            logger.info(f'Computing pairwise bitwise AND for chunk. masks shape: {masks.shape}, chunk shape: {masks_j_chunk.shape}')
             inter = masks[:, None] & masks_j_chunk[None, :]
             
             # vectorized popcount
+            logger.info(f'Computing bit counts for chunk. inter shape: {inter.shape}')
             bitcounts = np.bitwise_count(inter)
             
-            # find adjacencies (excluding diagonal)
+            logger.info(f'Found adjacencies (excluding diagonal).')
             i_idx, local_j_idx = np.where(bitcounts >= self.r - 1)
             global_j_idx = local_j_idx + j_start
             
-            # keep only upper triangle (i < j)
+            logger.info(f'Keeping only upper triangle (i < j).')
             mask = i_idx < global_j_idx
+            logger.info('Update rows and cols for sparse COO construction.')
             rows.extend(i_idx[mask])
             cols.extend(global_j_idx[mask])
         
-        # build upper triangle COO with bool dtype
+        logger.info('Building upper triangle COO with bool dtype.')
         D_upper = sparse.coo_matrix(
             (np.ones(len(rows), dtype=bool), (rows, cols)),
             shape=(n, n),
             dtype=bool
         )
         
-        # symmetrize: D = D_upper + D_upper^T
+        logger.info('Symmetrize: D = D_upper + D_upper^T')
         D = D_upper + D_upper.T
-        return D.tocsr()
+        logger.info(f'Convert to CSR format')
+        D_csr = D.tocsr()
+        logger.info(f'Adjacency subset built: shape={D_csr.shape}, nnz={D_csr.nnz}')
+        return D_csr
 
     def _build_adjacency_subset_vectorized(self, masks):
         if max(masks) < 2**64:
