@@ -1,11 +1,11 @@
-fname_molecule_input: /home/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf
-n_conformers: 5
+fname_molecule_input: /Users/gw/repos/xgw/experiments/penicillamine/Conformer3D_COMPOUND_CID_4727.sdf
+n_conformers: 1
 noise_level: 
   min: 0.00001
   max: 0.0001
 iter_max: 60
 flip: false
 output_fname: penicillamine_conformers_nconfcormers${n_conformers}_itermax${iter_max}_flip${flip}.npz
-solution_method: id # enumeration, enumeration_pool, polytope or id
+solution_method: polytope # enumeration, enumeration_pool, polytope or id
 n_processes: 4
 random_seed: 0

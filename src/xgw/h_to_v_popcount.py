@@ -1,10 +1,46 @@
 from math import log2
 import numpy as np
 from scipy import sparse
+from numba import njit
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+@njit
+def _count_shared_bits(m1, m2):
+    return bin(m1 & m2).count('1')
+
+def _adjacency_loop(masks, chunk_size, r):
+    n = len(masks)
+    rows, cols = [], []
+    for j_start in range(0, n, chunk_size):
+        j_end = min(j_start + chunk_size, n)
+        logger.info(f'Building adjacency for columns {j_start} to {j_end} (total {n})')
+        
+        for local_j, j in enumerate(range(j_start, j_end)):
+            m_j = masks[j]
+            
+            for i in range(j):
+                m_i = masks[i]
+                shared = (m_i & m_j).bit_count()
+                
+                if shared >= r - 1:
+                    rows.append(i)
+                    cols.append(j)
+    return rows, cols
+
+@njit
+def _adjacency_loop_numba(masks, r):
+    n = len(masks)
+    rows, cols = [], []
+    for i in range(n):
+        for j in range(i + 1, n):
+            if _count_shared_bits(masks[i], masks[j]) >= r - 1:
+                rows.append(i)
+                cols.append(j)
+    return rows, cols
 
 def get_neighbours(D, idx):
     if isinstance(D, np.ndarray):
@@ -215,7 +251,7 @@ class ExtremePointPolytopeSparse:
     # --------------------------------------------------
     # Adjacency helpers
     # --------------------------------------------------
-    def _adjacent(self, m1, m2):
+    def _adjacent(self, m1, m2,):
         return (m1 & m2).bit_count() >= self.r - 1
 
     def _build_adjacency(self):
@@ -247,29 +283,14 @@ class ExtremePointPolytopeSparse:
                 if (masks[i] & masks[j]).bit_count() >= self.r - 1:
                     D[i, j] = D[j, i] = True
         return D
-    
+
     def _build_adjacency_subset_sparse_chunks(self, masks, chunk_size):
         """Build sparse adjacency for a subset of masks (chunked)."""
-        n = len(masks)
-        # chunk_size = self.D_chunk_size
-        
-        rows, cols = [], []
-        
-        for j_start in range(0, n, chunk_size):
-            j_end = min(j_start + chunk_size, n)
-            logger.info(f'Building adjacency for columns {j_start} to {j_end} (total {n})')
-            
-            for local_j, j in enumerate(range(j_start, j_end)):
-                m_j = masks[j]
-                
-                for i in range(j):
-                    m_i = masks[i]
-                    shared = (m_i & m_j).bit_count()
-                    
-                    if shared >= self.r - 1:
-                        rows.append(i)
-                        cols.append(j)
+        # chunk_size = self.D_chunk_size    
 
+        rows, cols = _adjacency_loop(masks, self.r)
+        n = len(masks)
+        
         logger.info(f'Found {len(rows)} adjacencies (upper triangle). Building sparse COO.')
         D_upper = sparse.coo_matrix(
             (np.ones(len(rows), dtype=bool), (rows, cols)),
