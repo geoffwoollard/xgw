@@ -33,6 +33,9 @@ def _adjacency_loop(masks, chunk_size, r):
 
 @njit
 def _adjacency_loop_numba(masks, r):
+    ''' The issue is that Numba's @njit can't handle Python object dtype arrays (which store arbitrary-precision integers). 
+    When masks exceed 64 bits, they're stored as Python int objects, which Numba can't compile.
+    '''
     n = len(masks)
     rows, cols = [], []
     for i in range(n):
