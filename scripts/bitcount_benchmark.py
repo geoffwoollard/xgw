@@ -62,7 +62,7 @@ def adjacency_numpy(masks, r):
 
     for j in range(n):
         shared = np.bitwise_and(masks[:j], masks[j])
-        bits = np.bit_count(shared)
+        bits = np.bitwise_count(shared)
 
         count += np.count_nonzero(bits >= (r - 1))
 
