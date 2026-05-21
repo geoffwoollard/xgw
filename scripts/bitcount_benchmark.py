@@ -127,13 +127,13 @@ def adjacency_cupy(masks, r):
     
     # Find upper triangle matches
     i_idx, j_idx = cp.where((bits >= (r - 1)) & (cp.arange(n)[:, None] < cp.arange(n)[None, :]))
-    
-    rows = cp.asnumpy(i_idx)
-    cols = cp.asnumpy(j_idx)
 
     cp.cuda.Stream.null.synchronize()
     dt = time.perf_counter() - t0
-    
+
+    rows = cp.asnumpy(i_idx)
+    cols = cp.asnumpy(j_idx)
+
     D_upper = sparse.coo_matrix(
         (np.ones(len(rows), dtype=bool), (rows, cols)),
         shape=(n, n), dtype=bool
@@ -141,7 +141,7 @@ def adjacency_cupy(masks, r):
     D = D_upper + D_upper.T
     return D.tocsr(), dt
 
-    
+
 if __name__ == "__main__":
     n = 5000
     r = 8
