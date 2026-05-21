@@ -269,7 +269,7 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            if max(masks) < 2**64:
+            if False :#max(masks) < 2**64:
                 return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
             else:
                 logger.warning("Masks exceed 64 bits, falling back to non-vectorized sparse chunked adjacency.")
