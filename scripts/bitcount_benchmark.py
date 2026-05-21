@@ -79,26 +79,57 @@ def adjacency_numpy(masks, r):
     return D.tocsr(), dt
 
 
+# def adjacency_cupy(masks, r):
+#     if not HAS_CUPY:
+#         raise RuntimeError("cupy not installed")
+
+#     masks_gpu = cp.asarray(masks)
+#     n = len(masks)
+#     rows, cols = [], []
+
+#     _ = cp.bitwise_and(masks_gpu[:1], masks_gpu[0])
+#     cp.cuda.Stream.null.synchronize()
+
+#     t0 = time.perf_counter()
+
+#     for j in range(n):
+#         shared = cp.bitwise_and(masks_gpu[:j], masks_gpu[j])
+#         bits = cp.bitwise_count(shared)
+#         match_idx = cp.where(bits >= (r - 1))[0]
+        
+#         rows.extend(cp.asnumpy(match_idx))
+#         cols.extend([j] * len(match_idx))
+
+#     cp.cuda.Stream.null.synchronize()
+#     dt = time.perf_counter() - t0
+    
+#     D_upper = sparse.coo_matrix(
+#         (np.ones(len(rows), dtype=bool), (rows, cols)),
+#         shape=(n, n), dtype=bool
+#     )
+#     D = D_upper + D_upper.T
+#     return D.tocsr(), dt
+
+
 def adjacency_cupy(masks, r):
     if not HAS_CUPY:
         raise RuntimeError("cupy not installed")
 
     masks_gpu = cp.asarray(masks)
     n = len(masks)
-    rows, cols = [], []
-
-    _ = cp.bitwise_and(masks_gpu[:1], masks_gpu[0])
-    cp.cuda.Stream.null.synchronize()
 
     t0 = time.perf_counter()
 
-    for j in range(n):
-        shared = cp.bitwise_and(masks_gpu[:j], masks_gpu[j])
-        bits = cp.bitwise_count(shared)
-        match_idx = cp.where(bits >= (r - 1))[0]
-        
-        rows.extend(cp.asnumpy(match_idx))
-        cols.extend([j] * len(match_idx))
+    # Vectorize: compare all pairs at once using broadcasting
+    # masks_gpu[:, None] shape (n, 1), masks_gpu[None, :] shape (1, n)
+    shared = cp.bitwise_and(masks_gpu[:, None], masks_gpu[None, :])  # (n, n)
+    bits = cp.bitwise_count(shared)  # (n, n)
+    
+    # Find upper triangle matches
+    i_idx, j_idx = cp.where((bits >= (r - 1)) & (cp.arange(n)[:, None] < cp.arange(n)[None, :]))
+    
+    rows = cp.asnumpy(i_idx)
+    cols = cp.asnumpy(j_idx)
 
     cp.cuda.Stream.null.synchronize()
     dt = time.perf_counter() - t0
@@ -110,7 +141,7 @@ def adjacency_cupy(masks, r):
     D = D_upper + D_upper.T
     return D.tocsr(), dt
 
-
+    
 if __name__ == "__main__":
     n = 5000
     r = 8
