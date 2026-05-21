@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from scipy import sparse
 
 # Optional GPU support
 try:
@@ -28,61 +29,64 @@ def make_masks(n, nbits=64, seed=0, use_python_int=False):
         )
 
 
+
 def adjacency_python(masks, r):
     n = len(masks)
-    count = 0
+    rows, cols = [], []
 
     t0 = time.perf_counter()
 
     for j in range(n):
         m_j = masks[j]
-
         for i in range(j):
             m_i = masks[i]
-
-            # Python int path
             shared = (int(m_i) & int(m_j)).bit_count()
-
             if shared >= r - 1:
-                count += 1
+                rows.append(i)
+                cols.append(j)
 
     dt = time.perf_counter() - t0
-    return count, dt
+    
+    D_upper = sparse.coo_matrix(
+        (np.ones(len(rows), dtype=bool), (rows, cols)),
+        shape=(n, n), dtype=bool
+    )
+    D = D_upper + D_upper.T
+    return D.tocsr(), dt
 
 
 def adjacency_numpy(masks, r):
-    """
-    CPU vectorized version using numpy uint64.
-    Requires numpy >= 1.22 for np.bit_count.
-    """
     n = len(masks)
-    count = 0
+    rows, cols = [], []
 
     t0 = time.perf_counter()
 
     for j in range(n):
         shared = np.bitwise_and(masks[:j], masks[j])
         bits = np.bitwise_count(shared)
-
-        count += np.count_nonzero(bits >= (r - 1))
+        match_idx = np.where(bits >= (r - 1))[0]
+        
+        rows.extend(match_idx)
+        cols.extend([j] * len(match_idx))
 
     dt = time.perf_counter() - t0
-    return count, dt
+    
+    D_upper = sparse.coo_matrix(
+        (np.ones(len(rows), dtype=bool), (rows, cols)),
+        shape=(n, n), dtype=bool
+    )
+    D = D_upper + D_upper.T
+    return D.tocsr(), dt
 
 
 def adjacency_cupy(masks, r):
-    """
-    GPU version using CuPy.
-    """
     if not HAS_CUPY:
         raise RuntimeError("cupy not installed")
 
     masks_gpu = cp.asarray(masks)
-
     n = len(masks)
-    count = 0
+    rows, cols = [], []
 
-    # warmup
     _ = cp.bitwise_and(masks_gpu[:1], masks_gpu[0])
     cp.cuda.Stream.null.synchronize()
 
@@ -90,45 +94,45 @@ def adjacency_cupy(masks, r):
 
     for j in range(n):
         shared = cp.bitwise_and(masks_gpu[:j], masks_gpu[j])
-
-        # unpack bits bytewise
-        bits = cp.unpackbits(
-            shared.view(cp.uint8),
-            axis=1
-        ).sum(axis=1)
-
-        count += int(cp.count_nonzero(bits >= (r - 1)).get())
+        bits = cp.bitwise_count(shared)
+        match_idx = cp.where(bits >= (r - 1))[0]
+        
+        rows.extend(cp.asnumpy(match_idx))
+        cols.extend([j] * len(match_idx))
 
     cp.cuda.Stream.null.synchronize()
     dt = time.perf_counter() - t0
-
-    return count, dt
+    
+    D_upper = sparse.coo_matrix(
+        (np.ones(len(rows), dtype=bool), (rows, cols)),
+        shape=(n, n), dtype=bool
+    )
+    D = D_upper + D_upper.T
+    return D.tocsr(), dt
 
 
 if __name__ == "__main__":
-
     n = 5000
     r = 8
 
     print(f"\nGenerating {n} masks...")
-
     masks_uint64 = make_masks(n, use_python_int=False)
     masks_object = make_masks(n, use_python_int=True)
 
     print("\n--- Python int.bit_count() ---")
-    c, t = adjacency_python(masks_object, r)
-    print(f"matches={c}")
+    D, t = adjacency_python(masks_object, r)
+    print(f"nnz={D.nnz}, shape={D.shape}")
     print(f"time={t:.3f} s")
 
     print("\n--- NumPy uint64 vectorized ---")
-    c, t = adjacency_numpy(masks_uint64, r)
-    print(f"matches={c}")
+    D, t = adjacency_numpy(masks_uint64, r)
+    print(f"nnz={D.nnz}, shape={D.shape}")
     print(f"time={t:.3f} s")
 
     if HAS_CUPY:
         print("\n--- CuPy GPU ---")
-        c, t = adjacency_cupy(masks_uint64, r)
-        print(f"matches={c}")
+        D, t = adjacency_cupy(masks_uint64, r)
+        print(f"nnz={D.nnz}, shape={D.shape}")
         print(f"time={t:.3f} s")
     else:
         print("\nCuPy not installed")
