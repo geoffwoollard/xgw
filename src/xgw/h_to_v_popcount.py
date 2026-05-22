@@ -322,7 +322,7 @@ class ExtremePointPolytopeSparse:
         # Determine dtype for masks
         max_mask = max(masks)
 
-        assert 2**64 <= max_mask and max_mask <= 2**128:
+        assert 2**64 <= max_mask and max_mask <= 2**128
         masks_hi = np.array([x >> 64 for x in masks], dtype=np.uint64)
         masks_lo = np.array([x & ((1 << 64) - 1) for x in masks], dtype=np.uint64)
         
