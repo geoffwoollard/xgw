@@ -14,7 +14,7 @@ def test_bitwise_and():
 
 
     n = 1000
-    max_bit = 60
+    max_bit = 100
     rng = np.random.default_rng(seed=42)
 
     # Generate as uint64, then convert to Python ints for larger bit widths
@@ -25,8 +25,8 @@ def test_bitwise_and():
         lo = rng.integers(low=0, high=2**64, size=(n,), dtype=np.uint64)
         hi = rng.integers(low=0, high=2**(max_bit-64), size=(n,), dtype=np.uint64)
         masks = np.array([int(hi[i]) << 64 | int(lo[i]) for i in range(n)], dtype=object)
-        print(masks)
-        print(math.log2(max(int(x) for x in masks.flatten())))
+        # print(masks)
+        # print(math.log2(max(int(x) for x in masks.flatten())))
 
     if max_bit <= 64:
         print(f"Testing bitwise count for uint64 with max_bit={max_bit} (fits in 64 bits).")
@@ -42,19 +42,19 @@ def test_bitwise_and():
     dt = time.perf_counter() - t0
     print(f"Bitwise count for dtype {masks.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
 
-    assert np.array_equal(inter_object, inter), "Bitwise AND mismatch between object and uint64 method."
 
-    # mask64 = (1 << 64) - 1
-    # lo = np.array([x & mask64 for x in ints], dtype=np.uint64)
-    # hi = np.array([x >> 64 for x in ints], dtype=np.uint64)
-    # t0 = time.perf_counter()
-    # bits_hi = np.bitwise_count(hi)
-    # bits_lo = np.bitwise_count(lo)
-    # inter = masks[:, None] & masks_j_chunk[None, :]
-    # dt = time.perf_counter() - t0
-    # print(f"Bitwise count for dtype {ints.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
+    mask64 = (1 << 64) - 1
+    masks_lo = np.array([x & mask64 for x in masks], dtype=np.uint64)
+    masks_hi = np.array([x >> 64 for x in masks], dtype=np.uint64)
+    t0 = time.perf_counter()
+    inter_lo = masks_lo[:, None] & masks_lo[None, :]
+    inter_hi = masks_hi[:, None] & masks_hi[None, :]
+    # combine hi and low
+    inter_128 = (inter_hi.astype(object) << 64) | inter_lo.astype(object)
+    dt = time.perf_counter() - t0
+    print(f"Bitwise count for dtype {masks.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
 
-    # assert np.array_equal(bits_total, bits_object), "Bitwise count mismatch between object and split uint64 method."
+    assert np.array_equal(inter_128, inter_object), "Bitwise count mismatch between object and split uint64 method."
 
     
 def test_bitwisecount():
