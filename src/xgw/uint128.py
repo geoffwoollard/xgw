@@ -40,7 +40,7 @@ def test_bitwise_and():
     t0 = time.perf_counter()
     inter_object = inter = masks[:, None] & masks[None, :]
     dt = time.perf_counter() - t0
-    print(f"Bitwise count for dtype {masks_object.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
+    print(f"Bitwise count for dtype {masks.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
 
     assert np.array_equal(inter_object, inter), "Bitwise AND mismatch between object and uint64 method."
 
