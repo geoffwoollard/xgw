@@ -269,9 +269,10 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            if max(masks) < 2**20:
+            if max(masks) < 2**64:
                 return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
             elif max(masks) < 2**128:
+                logger.warning("Masks exceed 64 bits, falling back to non-vectorized sparse chunked adjacency.")
                 return self._build_adjacency_subset_vectorized_chunked_128(masks, self.D_chunk_size)
             else:
                 logger.warning("Masks exceed 128 bits, falling back to non-vectorized sparse chunked adjacency.")
@@ -321,7 +322,7 @@ class ExtremePointPolytopeSparse:
         # Determine dtype for masks
         max_mask = max(masks)
 
-        # assert 2**64 <= max_mask and max_mask < 2**128:
+        assert 2**64 <= max_mask and max_mask <= 2**128:
         masks_hi = np.array([x >> 64 for x in masks], dtype=np.uint64)
         masks_lo = np.array([x & ((1 << 64) - 1) for x in masks], dtype=np.uint64)
         
