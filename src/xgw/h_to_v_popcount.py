@@ -269,10 +269,12 @@ class ExtremePointPolytopeSparse:
 
     def _build_adjacency_subset(self, masks, use_sparse):
         if use_sparse:
-            if max(masks) < 2**64:
+            if max(masks) < 2**20:
                 return self._build_adjacency_subset_vectorized_chunked(masks, self.D_chunk_size)
+            elif max(masks) < 2**128:
+                return self._build_adjacency_subset_vectorized_chunked_128(masks, self.D_chunk_size)
             else:
-                logger.warning("Masks exceed 64 bits, falling back to non-vectorized sparse chunked adjacency.")
+                logger.warning("Masks exceed 128 bits, falling back to non-vectorized sparse chunked adjacency.")
                 return self._build_adjacency_subset_sparse_chunks(masks, self.D_chunk_size)  
         else:
             return self._build_adjacency_subset_dense(masks)
@@ -307,6 +309,67 @@ class ExtremePointPolytopeSparse:
         logger.info(f'Adjacency subset built: shape={D_csr.shape}, nnz={D_csr.nnz}')
         return D_csr
 
+
+    def _build_adjacency_subset_vectorized_chunked_128(self, masks, chunk_size=None):
+        """Build adjacency matrix in chunks, assemble as sparse CSR."""
+        if chunk_size is None:
+            chunk_size = self.D_chunk_size
+        
+        n = len(masks)
+        rows, cols = [], []
+        
+        # Determine dtype for masks
+        max_mask = max(masks)
+
+        # assert 2**64 <= max_mask and max_mask < 2**128:
+        masks_hi = np.array([x >> 64 for x in masks], dtype=np.uint64)
+        masks_lo = np.array([x & ((1 << 64) - 1) for x in masks], dtype=np.uint64)
+        
+        logger.info(f'Process chunks of columns. log_2 max_mask={log2(max_mask)}, masks.shape={masks.shape}, dtype={masks.dtype}')
+        for j_start in range(0, n, chunk_size):
+            j_end = min(j_start + chunk_size, n)
+            logger.info(f'Processing columns {j_start} to {j_end}')
+            for is_hi, masks in enumerate([masks_hi, masks_lo]):
+                masks_j_chunk = masks[j_start:j_end]
+                
+                logger.info(f'Computing pairwise bitwise AND for chunk. masks shape: {masks.shape}, chunk shape: {masks_j_chunk.shape}')
+                inter = masks[:, None] & masks_j_chunk[None, :]
+                
+                logger.info(f'Computing bit counts for chunk. inter shape: {inter.shape}')
+                bc = np.bitwise_count(inter)
+                
+                if is_hi == 0:
+                    bitcounts_hi = bc
+                else:
+                    bitcounts_lo = bc
+            
+            bitcounts = bitcounts_hi + bitcounts_lo
+            
+            logger.info(f'Found adjacencies (excluding diagonal).')
+            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
+            global_j_idx = local_j_idx + j_start
+            
+            logger.info(f'Keeping only upper triangle (i < j).')
+            mask = i_idx < global_j_idx
+            logger.info('Update rows and cols for sparse COO construction.')
+            rows.extend(i_idx[mask])
+            cols.extend(global_j_idx[mask])
+        
+        logger.info('Building upper triangle COO with bool dtype.')
+        D_upper = sparse.coo_matrix(
+            (np.ones(len(rows), dtype=bool), (rows, cols)),
+            shape=(n, n),
+            dtype=bool
+        )
+        
+        logger.info('Symmetrize: D = D_upper + D_upper^T')
+        D = D_upper + D_upper.T
+        logger.info(f'Convert to CSR format')
+        D_csr = D.tocsr()
+        logger.info(f'Adjacency subset built: shape={D_csr.shape}, nnz={D_csr.nnz}')
+        return D_csr
+
+
     def _build_adjacency_subset_vectorized_chunked(self, masks, chunk_size=None):
         """Build adjacency matrix in chunks, assemble as sparse CSR."""
         if chunk_size is None:
@@ -319,6 +382,7 @@ class ExtremePointPolytopeSparse:
         max_mask = max(masks)
         if max_mask < 2**64:
             masks = np.asarray(masks, dtype=np.uint64)
+           
         else:
             masks = np.asarray(masks, dtype=object)
         
@@ -338,7 +402,7 @@ class ExtremePointPolytopeSparse:
             bitcounts = np.bitwise_count(inter)
             
             logger.info(f'Found adjacencies (excluding diagonal).')
-            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1)
+            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
             global_j_idx = local_j_idx + j_start
             
             logger.info(f'Keeping only upper triangle (i < j).')

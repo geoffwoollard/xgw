@@ -42,11 +42,10 @@ def test_bitwise_and():
     dt = time.perf_counter() - t0
     print(f"Bitwise count for dtype {masks.dtype} of {n}x{n} integers took {dt:.4f} seconds.")
 
-
     mask64 = (1 << 64) - 1
+    t0 = time.perf_counter()
     masks_lo = np.array([x & mask64 for x in masks], dtype=np.uint64)
     masks_hi = np.array([x >> 64 for x in masks], dtype=np.uint64)
-    t0 = time.perf_counter()
     inter_lo = masks_lo[:, None] & masks_lo[None, :]
     inter_hi = masks_hi[:, None] & masks_hi[None, :]
     # combine hi and low
