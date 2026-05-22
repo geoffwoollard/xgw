@@ -1,10 +1,22 @@
 def main():
     import numpy as np
     import time
-
+    import math
+    
     n = 1000
     max_bit = 100
-    ints = np.random.randint(low=0, high=2**max_bit, size=(n,n))
+    rng = np.random.default_rng(seed=42)
+
+    # Generate as uint64, then convert to Python ints for larger bit widths
+    if max_bit <= 64:
+        ints = rng.integers(low=0, high=2**max_bit, size=(n, n), dtype=np.uint64)
+    else:
+        # Generate pairs of uint64 and combine into larger integers
+        lo = rng.integers(low=0, high=2**64, size=(n, n), dtype=np.uint64)
+        hi = rng.integers(low=0, high=2**(max_bit-64), size=(n, n), dtype=np.uint64)
+        ints = np.array([[int(hi[i,j]) << 64 | int(lo[i,j]) for j in range(n)] for i in range(n)], dtype=object)
+        print(ints)
+        print(math.log2(max(int(x) for x in ints.flatten())))
 
     if max_bit <= 64:
         print(f"Testing bitwise count for uint64 with max_bit={max_bit} (fits in 64 bits).")
