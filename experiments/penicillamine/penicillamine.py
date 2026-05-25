@@ -51,10 +51,7 @@ def optimize_by_enumeration(conformer_1, conformer_2, n_points, t):
     id_plan = np.eye(n_points) / n_points
     mu = nu = np.ones(n_points) / n_points
     cst_cost, e_base, R, d, t = evaluate_cost_precompute(conformer_1, conformer_2, mu, nu, 'CGW', t)
-    for idx, perm in enumerate(itertools.permutations(range(n_points))):
-        # print(idx)
-        # if idx == 100_000:
-        #     assert False
+    for perm in itertools.permutations(range(n_points)):
         plan = id_plan[list(perm)] 
         total_cost = evaluate_cost_postcompute(e_base, R, d, t, plan, 'CGW', cst_cost)
         if total_cost < best_cost:
@@ -92,6 +89,9 @@ def optimize_by_enumeration_pool(conformer_1, conformer_2, n_points, t, n_proces
         if total_cost < best_cost:
             best_cost = total_cost
             best_plan = id_plan[list(perm)]
+
+    print(f'Best cost found: {best_cost}')
+    print(f'Best permutation: {perm}')
     
     return best_cost, best_plan
 
@@ -131,7 +131,7 @@ def run(fname_molecule_input, fname_output, iter_max, n_conformers, noise_level_
                     conformer_j[:, 0] *= -1
 
                 if solution_method == 'polytope':
-                    cgw2, plan, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
+                    cgw2, plan, _, _, _, _, _ = gw_m_convex(mu, conformers[i], mu, conformer_j, {'numItermax': 10**9}, cost='CGW', gap_tol=1e-15, iter_max=iter_max, t=t, FW_iter=100,
                                                         p_plus_implementation='h_to_v_popcount_sparse', 
                                                         p_minus_implementation='v_to_h_dual', 
                                                         p_minus_dual_implementation='h_to_v_popcount_sparse') 

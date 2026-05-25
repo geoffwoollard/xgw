@@ -603,8 +603,8 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
 
 def compute_hyperplane(mu, nu, g, e_base, emd_kwargs):
     cost_matrix = function_to_cost(g, e_base)
-    map, log = ot.emd(mu, nu, M=-cost_matrix, log=True, **emd_kwargs)
-    return -log['cost'], projection(map, e_base)
+    plan, log = ot.emd(mu, nu, M=-cost_matrix, log=True, **emd_kwargs)
+    return -log['cost'], projection(plan, e_base)
 
 
 def projection(pi, e_base):

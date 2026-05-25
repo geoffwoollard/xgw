@@ -195,6 +195,7 @@ def gw_m_convex(mu,
     c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
     best_dir = best_init_dir(x_minus, P_plus)
     
+    c_plus_list, c_minus_list = [c_plus], [c_minus]
     for iter in range(iter_max):
         # choose direction
         logger.info('Chosing best direction')
@@ -227,10 +228,13 @@ def gw_m_convex(mu,
         if Tcost > c_minus:
             c_minus = Tcost
             best_dir = g
-            
+        c_plus_list.append(c_plus)
+        c_minus_list.append(c_minus)
+
         if c_plus - c_minus < gap_tol:
             # x_minus = g_star
             break
+
 
     # Computing the optimal coupling:
     pi_opt = vect_to_coupling_cvx(best_dir, mu, nu, e_base, emd_kwargs)
@@ -243,7 +247,7 @@ def gw_m_convex(mu,
     logger.info(f'Final results: total loss {total_loss}, gap {gap}, bound on loss {lower_bound_on_total_loss}')
 
     
-    return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
+    return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost, c_plus_list, c_minus_list
 
 
 def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd', p_minus_implementation='cdd'):
@@ -261,6 +265,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     
     best_dir = best_init_dir(x_minus, P_plus)
 
+    c_plus_list, c_minus_list = [c_plus], [c_minus]
     for iter in range(iter_max):
         
         # choose direction
@@ -286,6 +291,8 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
             c_minus = Tcost
             x_minus = g_star
             best_dir = g
+        c_plus_list.append(c_plus)
+        c_minus_list.append(c_minus)
         if c_plus - c_minus < cost_tol:
             # x_minus = g_star
             
@@ -303,7 +310,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
     logger.info(f'Final results: total loss {total_loss}, gap {gap}, bound on loss {lower_bound_on_total_loss}')
 
     
-    return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost
+    return total_loss, pi_opt, gap, lower_bound_on_total_loss, cst_cost, c_plus_list, c_minus_list
 
         
 # def gw_m_non_convex(mu, space_x, nu, space_y, emd_kwargs, relax_level=4, cost='IGW', cost_tol=1e-5, iter_max=100, FW_iter=100, t=0.5):
