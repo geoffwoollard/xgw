@@ -522,7 +522,7 @@ def initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation='cdd
             
     return e_base, R, p_plus, p_minus
 
-def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='cdd'):
+def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation='cdd', p_minus_implementation='v_to_h_dual', p_minus_dual_implementation='h_to_v_popcount', p_plus_use_D_sparse=True, p_minus_use_D_sparse=True, p_minus_use_D_sparse_dual=True):
     '''
     Docstring for initial_box
     
@@ -544,6 +544,24 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
             vertex_list.append(g_star)
             half_plans_list.append([sigma*e_i, g_hat])
     update_box(p_plus_initial, p_minus_initial, half_plans_list, vertex_list)
+    
+    
+    if p_minus_implementation == 'cdd':
+        p_minus = p_minus_initial
+    elif p_minus_implementation == 'v_to_h_dual':
+        A_p_minus, b_p_minus = p_minus_initial.H
+        p_minus = DoubleDescription(implementation=p_minus_implementation, 
+                                                dual_implementation=p_minus_dual_implementation, 
+                                                V_initialization=np.array(p_minus_initial.V),
+                                                A_initialization=A_p_minus, 
+                                                b_initialization=b_p_minus,
+                                                use_D_sparse=p_minus_use_D_sparse,
+                                                use_D_sparse_dual=p_minus_use_D_sparse_dual)
+        p_minus.H = p_minus_initial.H
+        p_minus.V = p_minus_initial.V
+    else:
+        raise NotImplementedError(f'{p_minus_implementation} implementation is not implemented yet')
+
     if p_plus_implementation == 'h_to_v_edges':
         from xgw.h_to_v_edges import find_edges
         E_initialization = find_edges(p_plus_initial.V) if p_plus_implementation == 'h_to_v_edges' else None
@@ -552,14 +570,34 @@ def classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plu
         p_plus.H = p_plus_initial.H
     elif p_plus_implementation == 'cdd':
         p_plus = p_plus_initial
-    if p_minus_implementation == 'h_to_v_edges':
-        from xgw.h_to_v_edges import find_edges
-        E_initialization = find_edges(p_minus_initial.V) if p_minus_implementation == 'h_to_v_edges' else None
-        p_minus = DoubleDescription(implementation=p_minus_implementation, E_initialization=E_initialization)
-        p_minus.V = p_minus_initial.V
-        p_minus.H = p_minus_initial.H
-    elif p_minus_implementation == 'cdd':
-        p_minus = p_minus_initial
+    elif p_plus_implementation == 'h_to_v_popcount':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+        B_initialization = B_bool.astype(int)
+        p_plus = DoubleDescription(implementation=p_plus_implementation, 
+                                   V_initialization=V_initialization, 
+                                   B_initialization=B_initialization,
+                                   use_D_sparse=p_plus_use_D_sparse
+                                   )
+        p_plus.V = p_plus_initial.V
+        p_plus.H = p_plus_initial.H
+    elif p_plus_implementation == 'h_to_v_popcount_sparse':
+        A, b = p_plus_initial.H
+        V_initialization = np.array(p_plus_initial.V)
+        tol = 1e-5
+        B_bool = np.abs(A @ V_initialization.T - b[:, np.newaxis]) < tol
+
+        masks_initialization = masks_from_B(B_bool)
+        p_plus = DoubleDescription(implementation=p_plus_implementation,
+                                   V_initialization=V_initialization,
+                                   masks_initialization=masks_initialization,
+                                   A_initialization=A,
+                                   b_initialization=b,
+                                   use_D_sparse=p_plus_use_D_sparse)
+        p_plus.V = [np.array(v) for v in p_plus.poly.E]
+        p_plus.H = [A, b]
     return e_base, R, p_plus, p_minus
 
 

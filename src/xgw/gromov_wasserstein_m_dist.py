@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 import ot
 from ncpol2sdpa import generate_variables, SdpRelaxation
-from .frank_wolfe import _frank_wolfe_iter, covariance, const_cost, polynomial_cost, frank_wolfe_polynomial, center_marginal, _classical_gw_frank_wolfe, classical_gw_const_cost
+from .frank_wolfe import _frank_wolfe_iter, covariance, const_cost, polynomial_cost, frank_wolfe_polynomial, center_marginal, _classical_gw_frank_wolfe, classical_gw_const_cost,  linearized_cost_matrix
 from .hyperplane_approx import run_approx, initial_box, projection, function_to_cost, update_box, f_to_e, e_to_f, compute_hyperplane, classical_gw_initial_box
 from .qp_incremental_projector import OptimalProjectedCoupling
 import logging
@@ -100,6 +100,11 @@ def vector_cost(vect, cost, R, d, t):
     sigma = e_to_f(vect, R, d)
     return polynomial_cost(sigma, cost, t)
 
+def cost_grad(vect, d, R, R_inv, cost, t):
+    sigma = e_to_f(vect, R, d)
+    grad_f = linearized_cost_matrix(sigma, cost, t)
+    g = f_to_e(grad_f, R_inv)
+    return g/np.linalg.norm(g)
 
 def vect_to_coupling(x_minus, mu, nu, e_base):
     proj_dim = len(x_minus) 
@@ -141,7 +146,7 @@ def optimal_t(max_diam, d, cost, t, convex_tol, exp_upper_bound=True):
     return t 
 
 
-def new_direction_convex_slow(P_minus, x_plus, tol=1e-10):
+def new_direction_convex(P_minus, x_plus, tol=1e-10):
     # Normalized normal vectors of P_minus
     A,b =  P_minus.H
     # Finding best direction 
@@ -149,7 +154,7 @@ def new_direction_convex_slow(P_minus, x_plus, tol=1e-10):
     index = np.argmax(testing_dir)
     g = A[index]
     # checking that the point is outside P_minus
-    assert g @ x_plus - b[index]>= -tol 
+    # assert g @ x_plus - b[index]>= -tol 
     return g / np.linalg.norm(g)
 
 def gw_m_convex(mu, 
@@ -198,7 +203,7 @@ def gw_m_convex(mu,
         A_norm = np.linalg.norm(A, axis=1)
         # logger.info(f'P_minus.H {P_minus.H}')
         # logger.info(f'P_minus.A_norm, b_norm {A/A_norm[:, None]}, {b/A_norm}')
-        g = new_direction_convex_slow(P_minus, x_plus)
+        g = new_direction_convex(P_minus, x_plus)
         logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         logger.info(f'new half plane: {g}, {g_hat}')
@@ -243,7 +248,6 @@ def gw_m_convex(mu,
 
 def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=100, FW_iter=100, p_plus_implementation='cdd', p_minus_implementation='cdd'):
 
-    # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
     space_x, space_y = center_marginal(mu, space_x, nu, space_y)
     # Computing constant cost
@@ -261,7 +265,7 @@ def classical_gw(mu, space_x, nu, space_y, emd_kwargs, cost_tol=1e-5, iter_max=1
         
         # choose direction
         logger.info('Chosing best direction')
-        g = new_direction_convex_slow(P_minus, x_plus)
+        g = new_direction_convex(P_minus, x_plus)
         logger.info(f'Computing hyperhplane for direction g: {g}')
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         logger.info(f'new half plane: {g}, {g_hat}')
@@ -372,7 +376,7 @@ def gw_m_non_convex_geometric_approx(mu, space_x, nu, space_y, emd_kwargs, p_plu
     
 
 
-def _run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = 100, cost='IGW', gap_tol=1e-15, t=None, max_diam=None, convex_tol = 1e-3, p_plus_implementation='cdd'):
+def _run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = 100, cost='IGW', gap_tol=1e-5, t=None, max_diam=None, convex_tol = 1e-3, p_plus_implementation='cdd', ryner_direc=False):
 
     # This code is specifically designed for a convex cost, as IGW or CGW with a high enough t
     d = space_x.shape[-1]
@@ -382,24 +386,26 @@ def _run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = 100, cost
     # Computing constant cost
     sigma_x = covariance(space_x, mu)
     sigma_y = covariance(space_y, nu)
-    cst_cost = const_cost(sigma_x, sigma_y, cost, t)
     
     # Bounding box initialization
     e_base, R, P_plus, P_minus = initial_box(space_x, space_y, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    R_inv = np.linalg.inv(R)
     # print('Initial box with ', len(P_minus.V), ' vertices and ', P_minus.H[0].shape[0], ' half-planes.')
     # print('Vertices: ', P_minus.V)
     
     # Selection of the best direction (lagest score in the bounding box)
     c_plus, x_plus = optimal_cost_cvx(P_plus, cost, R, d, t)
-    c_minus, x_minus = optimal_cost_cvx(P_minus, cost, R, d, t)
+    c_minus, _ = optimal_cost_cvx(P_minus, cost, R, d, t)
     
     
     for iter in range(niter):
         
-        if c_plus - c_minus < gap_tol:
-            break
+        
         # choose direction
-        g = new_direction_convex_slow(P_minus, x_plus)
+        if ryner_direc:
+            g = cost_grad(x_plus, d, R, R_inv, cost, t)
+        else:
+            g = new_direction_convex(P_minus, x_plus)
         g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
         P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
         Tcost = vector_cost(g_star, cost, R, d, t)
@@ -410,6 +416,47 @@ def _run_convex_yield(mu, space_x, nu, space_y, emd_kwargs={}, niter = 100, cost
         
         if Tcost > c_minus:
             c_minus = Tcost
-            x_minus = g_star
          
-        yield P_plus, P_minus, c_plus - c_minus
+        yield P_plus, P_minus, c_plus , c_minus
+        if c_plus - c_minus < gap_tol:
+            break
+
+def _run_classical_yield(mu, space_x, nu, space_y, emd_kwargs={}, cost_tol=1e-5, niter=100, p_plus_implementation='cdd', ryner_direc=False):
+
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+    # Computing constant cost
+    g_func, _ = classical_gw_const_cost(mu, space_x, nu, space_y)
+    # Bounding box initialization
+    e_base, R, P_plus, P_minus = classical_gw_initial_box(space_x, space_y, g_func, mu, nu, emd_kwargs, p_plus_implementation=p_plus_implementation)
+    R_inv = np.linalg.inv(R)
+    # Selection of the best direction (lagest score in the bounding box)
+    c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
+    c_minus, _ = classical_gw_optimal_cost(np.array(P_minus.V), R)
+    
+
+    for iter in range(niter):
+        
+        # choose direction
+        if ryner_direc:
+            gradR  = 2*x_plus@R
+            gradR[-1] = 1
+            g = gradR@R_inv
+            g = g / np.linalg.norm(g)
+            
+        else:
+            g = new_direction_convex(P_minus, x_plus)
+        g_hat, g_star = compute_hyperplane(mu, nu, g, e_base, emd_kwargs)
+        P_plus, P_minus = update_box(P_plus, P_minus, [[g, g_hat]], [g_star])
+        vect_r = g_star@R
+        Tcost = 2*np.sum(vect_r[:-1]**2)+vect_r[-1]
+
+        # The optimal values after each iteration is updated
+        c_plus, x_plus = classical_gw_optimal_cost(np.array(P_plus.V), R)
+
+        if Tcost > c_minus:
+            c_minus = Tcost
+            x_minus = g_star
+
+        yield P_plus, P_minus, c_plus, c_minus
+        if c_plus - c_minus <  cost_tol:
+            break
