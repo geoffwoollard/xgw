@@ -619,15 +619,40 @@ class ExtremePointPolytopeSparse:
             (excluding the new constraint).
             """
             if use_sparse:
-                new_masks_array = np.asarray(new_masks)
+                if max(new_masks) < 2**64:
+                    new_masks = np.asarray(new_masks, dtype=np.uint64)
                 
-                # Pairwise bitwise AND for all pairs, excluding new_bit
-                inter = new_masks_array[:, None] & new_masks_array[None, :]
-                inter_masked = inter & ~new_bit
-                
-                # Vectorized popcount
-                bitcounts = np.bitwise_count(inter_masked)
-                
+                    # Pairwise bitwise AND for all pairs, excluding new_bit
+                    inter = new_masks_array[:, None] & new_masks_array[None, :]
+                    inter_masked = inter & ~new_bit
+                    
+                    # Vectorized popcount
+                    bitcounts = np.bitwise_count(inter_masked)
+                    
+
+                elif max(new_masks) < 2**128:
+                    # Split into 64-bit chunks
+                    mask64 = (1 << 64) - 1
+                    masks_lo = np.array([int(x) & mask64 for x in new_masks_array], dtype=np.uint64)
+                    masks_hi = np.array([int(x) >> 64 for x in new_masks_array], dtype=np.uint64)
+                    
+                    new_bit_lo = int(new_bit) & mask64
+                    new_bit_hi = int(new_bit) >> 64
+                    
+                    # Process each chunk separately
+                    inter_lo = masks_lo[:, None] & masks_lo[None, :]
+                    inter_lo_masked = inter_lo & new_bit_lo
+                    bitcounts_lo = np.bitwise_count(inter_lo_masked)
+                    
+                    inter_hi = masks_hi[:, None] & masks_hi[None, :]
+                    inter_hi_masked = inter_hi & new_bit_hi
+                    bitcounts_hi = np.bitwise_count(inter_hi_masked)
+                    
+                    bitcounts = bitcounts_hi + bitcounts_lo
+                else:
+                    logger.warning("Masks exceed 128 bits, falling back to non-vectorized sparse adjacency.")
+                    assert False, "Masks exceed 128 bits, vectorized bitwise count not implemented for this size."
+    
                 # Find upper triangle adjacencies
                 i_idx, j_idx = np.where((bitcounts >= r - 2) & (np.arange(n_new)[:, None] < np.arange(n_new)[None, :]))
                 
@@ -651,6 +676,8 @@ class ExtremePointPolytopeSparse:
                 np.fill_diagonal(N, False)
                 return N
     
+        max_new_mask = max(new_masks)
+        logger.info(f'build_N: log_2 max_new_mask={log2(max_new_mask)}, masks.shape={new_masks.shape}, dtype={new_masks.dtype}')
         N = build_N_bitwise_count(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
 
 
