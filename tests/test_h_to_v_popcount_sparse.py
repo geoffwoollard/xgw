@@ -286,4 +286,6 @@ def test_new_vertices_triangle(one_cut_corner_polys, double_one_cut_corner_polys
             assert np.all(subgraph == expected)
 
 if __name__ == "__main__":
-    test_masks_from_B([2, 3, 4, 5,6,7,8,9,10])
+    poly = cube_polytope(2, use_D_sparse=True)
+    poly.add_constraint([1, 1], 2 - 0.1)
+    print("E:\n", poly.E)

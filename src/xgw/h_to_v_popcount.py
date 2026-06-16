@@ -612,7 +612,48 @@ class ExtremePointPolytopeSparse:
                 return N
         
 
-        N = build_N(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
+        def build_N_bitwise_count(n_new, new_masks, new_bit, r, use_sparse=True):
+            """Build N matrix (n_new × n_new) efficiently using vectorized bitwise operations.
+            
+            N[i, j] = 1 iff new vertices i and j share >= r-2 constraints
+            (excluding the new constraint).
+            """
+            if use_sparse:
+                # new_masks_array = np.asarray(new_masks, dtype=object)
+                new_masks_array = new_masks
+                
+                # Pairwise bitwise AND for all pairs, excluding new_bit
+                inter = new_masks_array[:, None] & new_masks_array[None, :]
+                inter_masked = inter & ~new_bit
+                
+                # Vectorized popcount
+                bitcounts = np.bitwise_count(inter_masked)
+                
+                # Find upper triangle adjacencies
+                i_idx, j_idx = np.where((bitcounts >= r - 2) & (np.arange(n_new)[:, None] < np.arange(n_new)[None, :]))
+                
+                # Build upper triangle COO with bool dtype
+                N = sparse.coo_matrix(
+                    (np.ones(len(i_idx), dtype=bool), (i_idx, j_idx)),
+                    shape=(n_new, n_new),
+                    dtype=bool
+                )
+                # Symmetrize
+                N = N + N.T
+                return N.tocsr()
+            else:
+                # Dense fallback
+                # new_masks_array = np.asarray(new_masks, dtype=object)
+                new_masks_array = new_masks
+                inter = new_masks_array[:, None] & new_masks_array[None, :]
+                inter_masked = inter & ~new_bit
+                bitcounts = np.bitwise_count(inter_masked)
+                
+                N = (bitcounts >= r - 2).astype(bool)
+                np.fill_diagonal(N, False)
+                return N
+    
+        N = build_N_bitwise_count(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
 
 
         logger.info('# ---------- Step G: assemble new adjacency ----------')
