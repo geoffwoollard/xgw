@@ -346,15 +346,32 @@ class ExtremePointPolytopeSparse:
             
             bitcounts = bitcounts_hi + bitcounts_lo
             
+            # logger.info(f'Found adjacencies (excluding diagonal).')
+            # i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
+            # global_j_idx = local_j_idx + j_start
+            
+            # logger.info(f'Keeping only upper triangle (i < j).')
+            # mask = i_idx < global_j_idx
+            # logger.info('Update rows and cols for sparse COO construction.')
+            # rows.extend(i_idx[mask])
+            # cols.extend(global_j_idx[mask])
+            
             logger.info(f'Found adjacencies (excluding diagonal).')
-            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
+            # Pre-compute upper triangle mask
+            i_arange = np.arange(n)
+            j_arange = np.arange(j_start, j_end)
+            upper_triangle = i_arange[:, None] < j_arange[None, :]
+            
+            # Combine conditions: adjacency AND upper triangle
+            adjacency_mask = (bitcounts >= self.r - 1) & upper_triangle
+            
+            # Extract indices from boolean mask (faster than np.where)
+            i_idx, local_j_idx = np.nonzero(adjacency_mask)
             global_j_idx = local_j_idx + j_start
             
-            logger.info(f'Keeping only upper triangle (i < j).')
-            mask = i_idx < global_j_idx
             logger.info('Update rows and cols for sparse COO construction.')
-            rows.extend(i_idx[mask])
-            cols.extend(global_j_idx[mask])
+            rows.extend(i_idx)
+            cols.extend(global_j_idx)
         
         logger.info('Building upper triangle COO with bool dtype.')
         D_upper = sparse.coo_matrix(
@@ -402,15 +419,32 @@ class ExtremePointPolytopeSparse:
             logger.info(f'Computing bit counts for chunk. inter shape: {inter.shape}')
             bitcounts = np.bitwise_count(inter)
             
+            # logger.info(f'Found adjacencies (excluding diagonal).')
+            # i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
+            # global_j_idx = local_j_idx + j_start
+            
+            # logger.info(f'Keeping only upper triangle (i < j).')
+            # mask = i_idx < global_j_idx
+            # logger.info('Update rows and cols for sparse COO construction.')
+            # rows.extend(i_idx[mask])
+            # cols.extend(global_j_idx[mask])
+
             logger.info(f'Found adjacencies (excluding diagonal).')
-            i_idx, local_j_idx = np.where(bitcounts >= self.r - 1) # the bottleneck is here
+            # Pre-compute upper triangle mask
+            i_arange = np.arange(n)
+            j_arange = np.arange(j_start, j_end)
+            upper_triangle = i_arange[:, None] < j_arange[None, :]
+            
+            # Combine conditions: adjacency AND upper triangle
+            adjacency_mask = (bitcounts >= self.r - 1) & upper_triangle
+            
+            # Extract indices from boolean mask (faster than np.where)
+            i_idx, local_j_idx = np.nonzero(adjacency_mask)
             global_j_idx = local_j_idx + j_start
             
-            logger.info(f'Keeping only upper triangle (i < j).')
-            mask = i_idx < global_j_idx
             logger.info('Update rows and cols for sparse COO construction.')
-            rows.extend(i_idx[mask])
-            cols.extend(global_j_idx[mask])
+            rows.extend(i_idx)
+            cols.extend(global_j_idx)
         
         logger.info('Building upper triangle COO with bool dtype.')
         D_upper = sparse.coo_matrix(
