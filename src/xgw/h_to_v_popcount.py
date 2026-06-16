@@ -619,8 +619,7 @@ class ExtremePointPolytopeSparse:
             (excluding the new constraint).
             """
             if use_sparse:
-                # new_masks_array = np.asarray(new_masks, dtype=object)
-                new_masks_array = new_masks
+                new_masks_array = np.asarray(new_masks)
                 
                 # Pairwise bitwise AND for all pairs, excluding new_bit
                 inter = new_masks_array[:, None] & new_masks_array[None, :]
@@ -643,8 +642,7 @@ class ExtremePointPolytopeSparse:
                 return N.tocsr()
             else:
                 # Dense fallback
-                # new_masks_array = np.asarray(new_masks, dtype=object)
-                new_masks_array = new_masks
+                new_masks_array = np.asarray(new_masks)
                 inter = new_masks_array[:, None] & new_masks_array[None, :]
                 inter_masked = inter & ~new_bit
                 bitcounts = np.bitwise_count(inter_masked)
