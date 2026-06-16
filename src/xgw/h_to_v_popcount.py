@@ -711,7 +711,7 @@ class ExtremePointPolytopeSparse:
                 return N
     
         max_new_mask = max(new_masks)
-        logger.info(f'build_N: log_2 max_new_mask={log2(max_new_mask)}, len(new_masks)={len(new_masks)}, dtype={new_masks.dtype}')
+        logger.info(f'build_N: log_2 max_new_mask={log2(max_new_mask)}, len(new_masks)={len(new_masks)}')
         N = build_N_bitwise_count(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
 
 
