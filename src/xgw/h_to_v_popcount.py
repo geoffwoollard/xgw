@@ -690,8 +690,16 @@ class ExtremePointPolytopeSparse:
                     logger.warning("Masks exceed 128 bits, falling back to non-vectorized sparse adjacency.")
                     assert False, "Masks exceed 128 bits, vectorized bitwise count not implemented for this size."
     
-                # Find upper triangle adjacencies
-                i_idx, j_idx = np.where((bitcounts >= r - 2) & (np.arange(n_new)[:, None] < np.arange(n_new)[None, :]))
+                # # Find upper triangle adjacencies
+                # i_idx, j_idx = np.where((bitcounts >= r - 2) & (np.arange(n_new)[:, None] < np.arange(n_new)[None, :]))
+                
+                # Pre-compute upper triangle mask once
+                i_arange = np.arange(n_new)
+                upper_triangle = i_arange[:, None] < i_arange[None, :]
+                # Combine conditions: adjacency AND upper triangle
+                adjacency_mask = (bitcounts >= r - 2) & upper_triangle
+                # Extract indices from boolean mask (faster than np.where)
+                i_idx, j_idx = np.nonzero(adjacency_mask)
                 
                 # Build upper triangle COO with bool dtype
                 N = sparse.coo_matrix(
