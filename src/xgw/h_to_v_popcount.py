@@ -653,8 +653,8 @@ class ExtremePointPolytopeSparse:
             (excluding the new constraint).
             """
             if use_sparse:
-                if False: #max(new_masks) < 2**64:
-                    new_masks_array = np.asarray(new_masks, dtype=np.uint64)
+                if max(new_masks) < 2**64:
+                    new_masks_array = np.asarray(new_masks)
                 
                     # Pairwise bitwise AND for all pairs, excluding new_bit
                     inter = new_masks_array[:, None] & new_masks_array[None, :]
