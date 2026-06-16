@@ -654,7 +654,7 @@ class ExtremePointPolytopeSparse:
             """
             if use_sparse:
                 if max(new_masks) < 2**64:
-                    new_masks = np.asarray(new_masks, dtype=np.uint64)
+                    new_masks_array = np.asarray(new_masks, dtype=np.uint64)
                 
                     # Pairwise bitwise AND for all pairs, excluding new_bit
                     inter = new_masks_array[:, None] & new_masks_array[None, :]
@@ -667,8 +667,8 @@ class ExtremePointPolytopeSparse:
                 elif max(new_masks) < 2**128:
                     # Split into 64-bit chunks
                     mask64 = (1 << 64) - 1
-                    masks_lo = np.array([int(x) & mask64 for x in new_masks_array], dtype=np.uint64)
-                    masks_hi = np.array([int(x) >> 64 for x in new_masks_array], dtype=np.uint64)
+                    masks_lo = np.array([int(x) & mask64 for x in new_masks], dtype=np.uint64)
+                    masks_hi = np.array([int(x) >> 64 for x in new_masks], dtype=np.uint64)
                     
                     new_bit_lo = int(new_bit) & mask64
                     new_bit_hi = int(new_bit) >> 64
