@@ -653,39 +653,45 @@ class ExtremePointPolytopeSparse:
             (excluding the new constraint).
             """
             if use_sparse:
-                if max(new_masks) < 2**64:
-                    new_masks_array = np.asarray(new_masks)
-                
-                    # Pairwise bitwise AND for all pairs, excluding new_bit
-                    inter = new_masks_array[:, None] & new_masks_array[None, :]
-                    inter_masked = inter & ~new_bit
-                    
-                    # Vectorized popcount
-                    max_int = inter_masked.max()
-                    logger.info(f'Computing bit counts for N block. inter shape: {inter_masked.shape}, max_int: {max_int}, dtype: {inter_masked.dtype}')
-                    bitcounts = np.bitwise_count(inter_masked)
-                    
+                if max(new_masks) < 2**63:
+                    def bit_count_64(new_masks, new_bit):
+                        new_masks_array = np.asarray(new_masks)
+                        inter = new_masks_array[:, None] & new_masks_array[None, :] # Pairwise bitwise AND for all pairs, excluding new_bit
+                        inter_masked = inter & ~new_bit # needs to be unsigned int to avoid negative numbers'
+                        max_int = inter_masked.max()
+                        logger.info(f'Computing bit counts for N block. inter shape: {inter_masked.shape}, max_int: {max_int}, dtype: {inter_masked.dtype}')
+                        bitcounts = np.bitwise_count(inter_masked)
+                        return bitcounts
+
+                    bitcounts = bit_count_64(new_masks, new_bit)
+                                        
 
                 # BUGGY???
-                # elif max(new_masks) < 2**128:
-                #     # Split into 64-bit chunks
-                #     mask64 = (1 << 64) - 1
-                #     masks_lo = np.array([int(x) & mask64 for x in new_masks], dtype=np.uint64)
-                #     masks_hi = np.array([int(x) >> 64 for x in new_masks], dtype=np.uint64)
-                    
-                #     new_bit_lo = int(new_bit) & mask64
-                #     new_bit_hi = int(new_bit) >> 64
-                    
-                #     # Process each chunk separately
-                #     inter_lo = masks_lo[:, None] & masks_lo[None, :]
-                #     inter_lo_masked = inter_lo & new_bit_lo
-                #     bitcounts_lo = np.bitwise_count(inter_lo_masked)
-                    
-                #     inter_hi = masks_hi[:, None] & masks_hi[None, :]
-                #     inter_hi_masked = inter_hi & new_bit_hi
-                #     bitcounts_hi = np.bitwise_count(inter_hi_masked)
-                    
-                #     bitcounts = bitcounts_hi + bitcounts_lo
+                elif max(new_masks) < 2**127:
+                    # Split into 64-bit chunks
+                    def bit_count_128(new_masks, new_bit):
+                        '''
+                        Notes: additive so can combine counts from both halves. extend to 256 bits by adding more chunks
+                        '''
+                        mask64 = (1 << 64) - 1
+                        masks_lo = np.array([int(x) & mask64 for x in new_masks], dtype=np.int64)
+                        masks_hi = np.array([int(x) >> 64 for x in new_masks], dtype=np.int64)
+                        
+                        new_bit_lo = int(new_bit) & mask64
+                        new_bit_hi = int(new_bit) >> 64
+                        
+                        # Process each chunk separately
+                        inter_lo = masks_lo[:, None] & masks_lo[None, :]
+                        inter_lo_masked = inter_lo & ~new_bit_lo
+                        bitcounts_lo = np.bitwise_count(inter_lo_masked)
+                        
+                        inter_hi = masks_hi[:, None] & masks_hi[None, :]
+                        inter_hi_masked = inter_hi & ~new_bit_hi
+                        bitcounts_hi = np.bitwise_count(inter_hi_masked)
+                        
+                        bitcounts = bitcounts_hi + bitcounts_lo 
+                        return bitcounts
+                    bitcounts = bit_count_128(new_masks, new_bit)
                 else:
                     logger.warning("Masks exceed 128 bits, falling back to non-vectorized sparse adjacency.")
                     assert False, "Masks exceed 128 bits, vectorized bitwise count not implemented for this size."
