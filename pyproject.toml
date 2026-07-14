@@ -45,6 +45,8 @@ dependencies = [
   "numba",
   "pypoman",
   "ncpol2sdpa",
+  "gemmi",
+  "hydra-core",
 ]
 
 

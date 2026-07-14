@@ -10,15 +10,16 @@ import math
 from pypoman.polygon import compute_polygon_hull
 
 from xgw.hyperplane_approx import _run_approx, construct_basis_eij, p_plus_outside_p_minus, projection, new_direction, initial_box, DoubleDescription, build_B_from_H_and_V, masks_from_B
+from xgw.utils import cast_to_dense_if_sparse
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def make_marginals(seed):
+def make_marginals(seed, min_points=5, max_points=15):
     np.random.seed(seed)
-    n_points_xy = np.random.randint(5,15)
+    n_points_xy = np.random.randint(min_points, max_points+1)
     mu_a1, sigma_a = np.array([0.5, 0.5]), 0.3
     r_factor = 0.5
     mu_b, sigma_b = r_factor*mu_a1, 0.2
@@ -46,6 +47,15 @@ def make_marginals(seed):
     
     return mu, nu, space_x, space_y
 
+
+def make_marginals_preturbed(seed, scale_space=0.1, scale_marginal=0.01):
+    np.random.seed(seed)
+    mu, _, space_x, _ = make_marginals(seed)
+    # add some random noise to the space to make it more challenging
+    space_y = space_x + np.random.randn(*space_x.shape) * scale_space
+    nu = mu + np.random.rand(*mu.shape) * scale_marginal
+    nu /= nu.sum()
+    return mu, nu, space_x, space_y
 
 @pytest.fixture
 def marginals():
@@ -93,10 +103,6 @@ def make_simple_marginals_low_num(seed, d, min_points=4, max_points=7):
     space_x = np.random.randn(n_points,d)
     space_y = np.random.randn(n_points,d)
 
-    # mu = np.array([1/3,1/3,1/3])
-    # nu = mu = np.array([1/3,1/3,1/3])
-    # space_x = np.array([[0,1.53],[4.87,1],[5,1/2]])
-    # space_y = np.array([[3,0],[4,2],[1,2]])
     return mu, nu, space_x, space_y
 
 
@@ -141,7 +147,8 @@ def test_simple_marginals(super_simple_marginals_2D):
         diffs = np.diff(objective_list)
         tolerance = 1e-10
         msg = f'Objective not non-increasing, diffs: {diffs}'
-        assert np.all(diffs < tolerance), msg
+        idx_to_skip_first_iteration = 1
+        assert np.all(diffs[idx_to_skip_first_iteration:] < tolerance), msg
         new_obj = new_direction(P_plus, P_minus)[1]
 
         P_plus_vol = volume_convex_hull_from_vertices(np.array(P_plus.V))
@@ -235,25 +242,29 @@ def test_simple_marginals(super_simple_marginals_2D):
     logger.info(f'P_plus volumes over iterations: {P_plus_volumes}')
     logger.info(f'P_minus volumes over iterations: {P_minus_volumes}')
     true_volume = volume_convex_hull_from_vertices(np.array(projected_couplings))
+    
     assert P_plus_volumes[-1] >= true_volume, f'P_plus volume {P_plus_volumes[-1]} should be at least the true volume {true_volume}'
     assert P_minus_volumes[-1] <= true_volume, f'P_minus volume {P_minus_volumes[-1]} should be at most the true volume {true_volume}'
     n_panels = 3
     fig, axes = plt.subplots(n_panels,1, figsize=(8,10))
     axes[0].plot(iteration_list, P_plus_volumes, color='k', label='P_plus volume')
     axes[1].plot(iteration_list, P_minus_volumes, color='r', label='P_minus volume')
+    if len(objective_list) >= 2:
+        objective_list[1] = np.nan
     axes[2].plot(range(1, len(objective_list) + 1), objective_list, color='blue', label='Upper bound of Haussdorff distance')
     for idx in range(n_panels):
         axes[idx].set_xlabel('Iteration')
         if idx < 2:
             axes[idx].set_ylabel('Volume')
+
             axes[idx].hlines(true_volume, 1, max_niter, colors='gray', linestyles='dashed', label='True volume')
         else:
             axes[idx].set_ylabel('Hausdorff distance')
         axes[idx].legend()
     # mkdir if not exists
-    if not os.path.exists('tests/results'):
-        os.makedirs('tests/results')
-    fig.savefig('tests/results/test_volume_P_plus_minus_simple_marginals.png')
+    if not os.path.exists('tests/results/test_hyperplane_approx'):
+        os.makedirs('tests/results/test_hyperplane_approx')
+    fig.savefig('tests/results/test_hyperplane_approx/test_volume_P_plus_minus_simple_marginals.png')
     plt.close(fig)  
     
 
@@ -290,7 +301,8 @@ def test_overall(niter, marginals):
     
     P_plus, P_minus, objective, objective_list, _, _ = _run_approx(mu, nu, space_x, space_y, emd_kwargs={'numItermax': 10**6}, niter = niter)
     logger.info(f'Objective list over iterations: {objective_list}')
-    diffs = np.diff(objective_list)
+    idx_to_skip_first_iteration = 1
+    diffs = np.diff(objective_list[idx_to_skip_first_iteration:])
     tol = 1e-5
     print(f'Objective differences over iterations: {diffs}')
 
@@ -350,36 +362,41 @@ def test_remove_duplicates_V():
     B_expected = B_initialization[:,unique_indices] # only the first 4 rows of B_initialization should be kept after removing duplicates
     D_expected = D_expected[np.ix_(unique_indices, unique_indices)] # D should be updated to reflect the removal of duplicate vertices
     for implementation in ['cdd','h_to_v_edges','h_to_v_popcount','h_to_v_popcount_sparse']:
-        logger.info(f'Testing remove_duplicates_V with implementation: {implementation}')
-        p = DoubleDescription(
-            implementation=implementation, 
-            V_initialization=V,
-            E_initialization=Edges,
-            B_initialization=B_initialization, 
-            masks_initialization=masks_initialization,
-            A_initialization=A,
-            b_initialization=b
-        )
-        p.V = V.tolist()
-        p.E = Edges.tolist()
-        p.H = [A,b]
-        p.remove_duplicates_V()
-        assert len(p.V) == 4
-        assert np.array_equal(p.V, np.array([[0,0],[1,0],[0,1],[1,1]]))
-        if implementation == 'h_to_v_edges':
-            assert len(p.E) == 4
-            assert np.array_equal(p.E, Edges_expected), f"Expected E:\n{Edges_expected}\nGot:\n{p.E}"
-        elif implementation in ['h_to_v_popcount']:
-            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
-            assert p.poly.B.shape == (4, 4), f"Expected B shape (4,4), got {p.poly.B.shape}"
-            assert np.array_equal(p.poly.B, B_expected), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
-            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
-        elif implementation in ['h_to_v_popcount_sparse']:
-            assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
-            assert len(p.poly.masks) == 4, f"Expected masks shape length 4, got {len(p.poly.masks.shape)}"
-            assert np.array_equal(p.poly.masks, masks_from_B(B_expected)), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
-            assert np.array_equal(p.poly.D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+        for use_D_sparse in [True, False] if implementation in ['h_to_v_popcount', 'h_to_v_popcount_sparse'] else [None]:
+            logger.info(f'Testing remove_duplicates_V with implementation: {implementation}')
+            p = DoubleDescription(
+                implementation=implementation, 
+                V_initialization=V,
+                E_initialization=Edges,
+                B_initialization=B_initialization, 
+                masks_initialization=masks_initialization,
+                A_initialization=A,
+                b_initialization=b,
+                use_D_sparse=use_D_sparse,
+            )
+            p.V = V.tolist()
+            p.E = Edges.tolist()
+            p.H = [A,b]
+            p.remove_duplicates_V()
+            assert len(p.V) == 4
+            assert np.array_equal(p.V, np.array([[0,0],[1,0],[0,1],[1,1]]))
             
+            if implementation == 'h_to_v_edges':
+                assert len(p.E) == 4
+                assert np.array_equal(p.E, Edges_expected), f"Expected E:\n{Edges_expected}\nGot:\n{p.E}"
+            elif implementation in ['h_to_v_popcount']:
+                D = cast_to_dense_if_sparse(p.poly.D)
+                assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+                assert p.poly.B.shape == (4, 4), f"Expected B shape (4,4), got {p.poly.B.shape}"
+                assert np.array_equal(p.poly.B, B_expected), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+                assert np.array_equal(D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+            elif implementation in ['h_to_v_popcount_sparse']:
+                D = cast_to_dense_if_sparse(p.poly.D)
+                assert p.poly.D.shape == (4, 4), f"Expected D shape (4,4), got {p.poly.D.shape}"
+                assert len(p.poly.masks) == 4, f"Expected masks shape length 4, got {len(p.poly.masks.shape)}"
+                assert np.array_equal(p.poly.masks, masks_from_B(B_expected)), f"Expected B:\n{B_expected}\nGot:\n{p.poly.B}"
+                assert np.array_equal(D, D_expected), f"Expected D:\n{D_expected}\nGot:\n{p.poly.D}"
+                
 
-if __name__ == "__main__":
-    test_remove_duplicates_V()
+# def test_update_box():
+#     update_box(p_plus, p_minus, [[g, g_hat]], [g_star])

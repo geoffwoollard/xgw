@@ -58,14 +58,12 @@ def affine_subspace_basis(points, normal_vec):
 
     return  Q
 
-
 def project_to_subspace(x,  Q):
     """
     Project x into coordinates of the subspace.
     Returns coordinates in R^(d-1)
     """
     return Q.T @ x 
-
 
 def reindex_pairs(pairs, excluded, n):
     excluded = np.asarray(excluded)
@@ -81,7 +79,6 @@ def reindex_pairs(pairs, excluded, n):
 
     # Step 3: apply mapping to pairs
     return new_index[pairs]
-
 
 def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     excluded = np.asarray(excluded)
@@ -105,7 +102,6 @@ def reindex_pairs_with_new(pairs, n_old, excluded, n_new):
     # --- Apply to all pairs ---
     return mapping[pairs]
 
-
 @njit
 def compute_constraints_matching(vertex_test, dim):
     # vertex_test of dimension n_constraints by n_points, boolean array of points solving constraints
@@ -117,7 +113,6 @@ def compute_constraints_matching(vertex_test, dim):
             # detecting the points solving the same dim-1 constraints
             final_mat[i,j] =  np.sum(common_constr) == dim-1
     return final_mat
-
 
 def find_edges(points):
     dim = points[0].shape[0]
