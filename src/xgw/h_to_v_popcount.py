@@ -662,7 +662,7 @@ class ExtremePointPolytopeSparse:
                     
                     # Vectorized popcount
                     max_int = inter_masked.max()
-                    logger.info(f'Computing bit counts for N block. inter shape: {inter_masked.shape}, max_int: {max_int}, dtype: {inter_masked.dtype}')
+                    logger.info(f'Computing bit counts for N block. inter shape: {inter_masked.shape}, log2(max_int): {np.log2(max_int)}, dtype: {inter_masked.dtype}')
                     bitcounts = np.bitwise_count(inter_masked)
                     
 
@@ -722,7 +722,7 @@ class ExtremePointPolytopeSparse:
                 return N
     
         max_new_mask = max(new_masks)
-        logger.info(f'build_N: log_2 max_new_mask={log2(max_new_mask)}, len(new_masks)={len(new_masks)}')
+        logger.info(f'build_N: log_2(max_new_mask)={log2(max_new_mask)}, len(new_masks)={len(new_masks)}')
         N = build_N_bitwise_count(n_new, new_masks, new_bit, self.r, use_sparse=self.use_D_sparse)
 
 
