@@ -1,0 +1,19 @@
+pdb: my_morph.pdb
+atoms:
+  - N
+  - CA
+  - C
+  - O
+rmsd: true
+classical_gw: true
+cgw: true
+# Set to null to choose t from the maximum squared radius after centering each pair.
+cgw_t: null
+output: metrics.png
+csv: null
+strict: false
+show: false
+
+hydra:
+  job:
+    chdir: false
