@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig
+from xgw.evalulate_fixed_plan import evaluate_cost
 
 AtomKey = tuple[str, str, str, str]
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
@@ -90,13 +91,36 @@ def classical_gw(reference: np.ndarray, coordinates: np.ndarray) -> float:
     return float(np.mean(difference * difference))
 
 
+def identity_cgw(
+    reference: np.ndarray, coordinates: np.ndarray, t: float | None = None
+) -> tuple[float, float]:
+    """Return CGW at the uniform identity coupling for centered point clouds."""
+    reference_centered = reference - reference.mean(axis=0)
+    coordinates_centered = coordinates - coordinates.mean(axis=0)
+    if t is None:
+        r2_max = max(
+            np.max(np.sum(reference_centered * reference_centered, axis=1)),
+            np.max(np.sum(coordinates_centered * coordinates_centered, axis=1)),
+        )
+        t = 8 * r2_max / (2 + 8 * r2_max)
+    if not 0 <= t <= 1:
+        raise ValueError(f"cgw_t must be between 0 and 1, got {t}")
+    plan = np.eye(len(reference_centered)) / len(reference_centered)
+    value = evaluate_cost(
+        reference_centered, coordinates_centered, plan, "CGW", t
+    )
+    return float(value), t
+
+
 def model_metrics(
     models: list[dict[AtomKey, np.ndarray]],
     *,
     compute_rmsd: bool,
     compute_classical_gw: bool,
+    compute_cgw: bool,
+    cgw_t: float | None = None,
     strict: bool = False,
-) -> tuple[dict[str, np.ndarray], list[int]]:
+) -> tuple[dict[str, np.ndarray], list[int], list[float]]:
     """Calculate requested metrics and matched-atom counts for each model."""
     reference = models[0]
     values: dict[str, list[float]] = {}
@@ -104,7 +128,10 @@ def model_metrics(
         values["rmsd_angstrom"] = []
     if compute_classical_gw:
         values["classical_gw_angstrom4"] = []
+    if compute_cgw:
+        values["cgw2_identity"] = []
     counts: list[int] = []
+    cgw_t_values: list[float] = []
     for index, model in enumerate(models, start=1):
         common = sorted(reference.keys() & model.keys())
         if strict and model.keys() != reference.keys():
@@ -123,8 +150,16 @@ def model_metrics(
             values["classical_gw_angstrom4"].append(
                 classical_gw(ref_xyz, model_xyz)
             )
+        if compute_cgw:
+            cgw2, effective_t = identity_cgw(ref_xyz, model_xyz, cgw_t)
+            values["cgw2_identity"].append(cgw2)
+            cgw_t_values.append(effective_t)
         counts.append(len(common))
-    return {name: np.asarray(metric) for name, metric in values.items()}, counts
+    return (
+        {name: np.asarray(metric) for name, metric in values.items()},
+        counts,
+        cgw_t_values,
+    )
 
 
 def parse_atom_names(values: Iterable[str]) -> set[str]:
@@ -145,8 +180,8 @@ def resolve_input_path(value: str) -> Path:
 
 @hydra.main(version_base=None, config_path=".", config_name="config")
 def main(config: DictConfig) -> None:
-    if not config.rmsd and not config.classical_gw:
-        raise ValueError("enable at least one metric: rmsd and/or classical_gw")
+    if not config.rmsd and not config.classical_gw and not config.cgw:
+        raise ValueError("enable at least one metric: rmsd, classical_gw, and/or cgw")
 
     atom_names = parse_atom_names(config.atoms)
     pdb_path = resolve_input_path(config.pdb)
@@ -155,10 +190,12 @@ def main(config: DictConfig) -> None:
     models = read_models(pdb_path, atom_names)
     if len(models) < 2:
         raise ValueError("the PDB must contain at least two models")
-    metrics, counts = model_metrics(
+    metrics, counts, cgw_t_values = model_metrics(
         models,
         compute_rmsd=config.rmsd,
         compute_classical_gw=config.classical_gw,
+        compute_cgw=config.cgw,
+        cgw_t=config.cgw_t,
         strict=config.strict,
     )
     indices = np.arange(1, len(models) + 1)
@@ -180,6 +217,23 @@ def main(config: DictConfig) -> None:
             label="Classical GW",
         )
         gw_ax.set_ylabel(r"Identity-coupling classical GW ($\mathrm{\AA}^4$)")
+    if config.cgw:
+        if config.rmsd or config.classical_gw:
+            cgw_ax = ax.twinx()
+            if config.rmsd and config.classical_gw:
+                cgw_ax.spines["right"].set_position(("outward", 65))
+        else:
+            cgw_ax = ax
+        if cgw_ax not in axes:
+            axes.append(cgw_ax)
+        cgw_ax.plot(
+            indices,
+            metrics["cgw2_identity"],
+            marker="^",
+            color="tab:green",
+            label="CGW (identity)",
+        )
+        cgw_ax.set_ylabel("Identity-coupling CGW objective")
     ax.set_xlabel("Model index")
     ax.set_xticks(indices if len(indices) <= 20 else ax.get_xticks())
     ax.grid(alpha=0.3)
@@ -204,6 +258,8 @@ def main(config: DictConfig) -> None:
         )
     print(f"Compared {len(models)} models using {','.join(sorted(atom_names))}")
     print(f"Matching atoms per model: {min(counts)}-{max(counts)}")
+    if cgw_t_values:
+        print(f"CGW t range: {min(cgw_t_values):.8g}-{max(cgw_t_values):.8g}")
     print(f"Saved plot to {output_path}")
     if csv_path:
         print(f"Saved values to {csv_path}")
