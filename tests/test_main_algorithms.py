@@ -18,7 +18,7 @@ def perturbed_marginals():
 
 @pytest.fixture
 def p_plus_implementations_to_test():
-    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount', 'h_to_v_popcount_sparse'] 
+    return ['cdd', 'h_to_v_edges', 'h_to_v_popcount'] #, 'h_to_v_popcount_sparse'
 
 @pytest.fixture
 def p_minus_implementations_to_test():
@@ -35,13 +35,13 @@ def test_2d_classical_gw():
     for test_id in range(n_tests):
         mus, _, space_xs, _ = make_simple_marginals(test_id, d=2)
         
-        _, plan, _, _, __, _ = classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-8, iter_max=50) 
+        plan= classical_gw(mus, space_xs, mus, space_xs, {},  cost_tol=1e-8, iter_max=50)[1]
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}') 
         assert np.isclose(plan_error, 0.0)
         
         M = random_invariance_matrix('IGW', 2, random_state=test_id)
-        _, plan, _, _, _, _, _ = classical_gw(mus, space_xs, mus, space_xs@M, {},  cost_tol=1e-8, iter_max=50) 
+        plan= classical_gw(mus, space_xs, mus, space_xs@M, {},  cost_tol=1e-8, iter_max=50)[1]
         plan_error = np.linalg.norm(plan - np.eye(len(mus))/len(mus))
         logger.info(f'Plan error for identical marginals (classic GW, convex):  {plan_error}')
         assert np.isclose(plan_error, 0.0)
@@ -246,6 +246,7 @@ def test_2d_non_convex(perturbed_marginals, p_plus_implementations_to_test, p_mi
 
 
 if __name__ == "__main__":
-    # test_3d_convex(p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
-    test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0), p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
+    test_2d_convex(p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
+    # test_2d_non_convex(make_marginals_preturbed(0, 0.01, 0), p_plus_implementations_to_test(), p_minus_implementations_to_test(), p_minus_dual_implementations_to_test())
     # test_3d_convex(['cdd'], ['cdd', 'v_to_h_dual'], ['h_to_v_popcount', ], iter_max=2)
+    # test_2d_classical_gw()

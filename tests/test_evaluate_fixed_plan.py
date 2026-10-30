@@ -14,7 +14,7 @@ def test_evaluate_cost():
             r_max = max(np.linalg.norm(space_xs, axis=1).max(), np.linalg.norm(space_ys, axis=1).max())
             space_xs /= r_max
             space_ys /= r_max
-            total_loss, plan, _, _, _ = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-5, iter_max=50, t=t)
+            total_loss, plan= gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-5, iter_max=50, t=t)[:2]
             total_loss_direct_eval = evaluate_cost(space_xs, space_ys, plan, cost, t)
             assert np.isclose(total_loss, total_loss_direct_eval, atol=1e-6), f"Cost from GW: {total_loss}, Cost from evaluation: {total_loss_direct_eval}, seed: {seed}, cost: {cost}"
 
@@ -22,7 +22,7 @@ def test_evaluate_cost():
             r_max = max(np.linalg.norm(space_xs, axis=1).max(), np.linalg.norm(space_ys, axis=1).max())
             space_xs /= r_max
             space_ys /= r_max
-            total_loss, plan, _, _, _ = gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-5, iter_max=50, t=t)
+            total_loss, plan= gw_m_convex(mus, space_xs, nus, space_ys, {}, cost=cost, gap_tol=1e-5, iter_max=50, t=t)[:2]
             total_loss_direct_eval = evaluate_cost(space_xs, space_ys, plan, cost, t)
             assert np.isclose(total_loss, total_loss_direct_eval, atol=1e-6), f"Cost from GW: {total_loss}, Cost from evaluation: {total_loss_direct_eval}, seed: {seed}, cost: {cost}"
 
