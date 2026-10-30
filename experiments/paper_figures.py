@@ -6,7 +6,7 @@ from scipy.spatial import Delaunay
 import math
 from xgw.hyperplane_approx import _run_approx_yield, projection, construct_basis_eij
 from xgw.gromov_wasserstein_m_dist import _run_convex_yield,  _run_classical_yield
-from xgw.frank_wolfe import _frank_wolfe_iter
+from xgw.frank_wolfe import _frank_wolfe_iter, _frank_wolfe_iter_entropy_rand_init
 
 
 def volume_convex_hull_from_vertices(vertices):
@@ -265,6 +265,77 @@ def FW_convergence_rate(n_points, niter, d, cost):
     fig.savefig(f'experiments/figures/FW_{cost}_cost_convergence_d{d}_{n_points}points.svg', format='svg')
     plt.close(fig)  
     
+    
+def FW_convergence_rate_entropy_low_points(n_points, niter, d, cost, reg, seed=None):
+    
+    objective_list = []
+    coupli_list = []
+    mu, nu, space_x, space_y = figure_random_pointcloud(d, n_points)
+    d = len(space_x[0])
+    for elem in tqdm(_frank_wolfe_iter_entropy_rand_init(mu, space_x, nu, space_y, reg, cost=cost, iter_max=niter, seed=seed)) :
+        objective, coupling, _= elem
+        objective_list.append(objective)
+        coupli_list.append(coupling)
+        final_plan = coupling
+    diff = np.array(objective_list)
+    diff = diff-diff[-1]
+    diff = diff[:-1]
+    coupls = np.array(coupli_list)
+    coupls = coupls - coupls[-1]
+    coupls = coupls[:-1]
+    coupls = [np.linalg.norm(val) for val in coupls ]
+    
+    n_panels = 2
+    plt.rc('font', size=12)
+    fig, axes = plt.subplots(n_panels,1)
+    axes[0].plot(range(1, len(diff) + 1), coupls, color='k', label=r'Plan error')
+    axes[1].plot(range(1, len(diff) + 1), diff, color='blue', label=r' Cost error')
+    for idx in range(n_panels):
+        axes[idx].set_xlabel('Iteration')
+        if idx ==0:
+            axes[idx].set_ylabel('Error')
+        else:
+            axes[idx].set_ylabel('Error')
+            axes[idx].set_yscale('log')
+        axes[idx].legend()
+    # # mkdir if not exists
+    if not os.path.exists('experiments/figures'):
+        os.makedirs('experiments/figures')
+    fig.suptitle(f'Frank-Wolfe convergence, \n {n_points} points in marginals, dimension {d}' )
+    plt.tight_layout()
+    fig.savefig(f'experiments/figures/entropic_FW_{cost}_cost_convergence_d{d}_{n_points}points.svg', format='svg')
+    plt.close(fig)  
+    
+def FW_convergence_rate_entropy_high_points(n_points, niter, d, cost, reg, tol = 1e-7, seed=None):
+    
+    objective_list = []
+    mu, nu, space_x, space_y = figure_random_pointcloud(d, n_points)
+    d = len(space_x[0])
+    for elem in tqdm(_frank_wolfe_iter_entropy_rand_init(mu, space_x, nu, space_y, reg, cost=cost, iter_max=niter, seed=seed, tol = tol)) :
+        objective = elem[0]
+        objective_list.append(objective)
+    diff = np.array(objective_list)
+    diff = diff[:-1] - diff[1:]
+    
+    n_panels = 1
+    plt.rc('font', size=12)
+    fig, axes = plt.subplots(n_panels,1)
+    axes.plot(range(1, len(diff) + 1), diff, color='blue', label=r' Cost error')
+    axes.set_xlabel('Iteration')
+    
+    axes.set_ylabel('Error')
+
+    axes.set_yscale('log')
+    axes.legend()
+    # # mkdir if not exists
+    if not os.path.exists('experiments/figures'):
+        os.makedirs('experiments/figures')
+    fig.suptitle(f'Frank-Wolfe convergence, \n {n_points} points in marginals, dimension {d}' )
+    plt.tight_layout()
+    fig.savefig(f'experiments/figures/entropic_FW_{cost}_cost_convergence_d{d}_{n_points}points.svg', format='svg')
+    plt.close(fig)  
+    
+    
 if __name__ == "__main__":
     # bounding_box_convergence_rate_vol_2d(10, 350)
     # bounding_box_convergence_rate_vol_2d(50, 500)
@@ -273,11 +344,11 @@ if __name__ == "__main__":
     # bounding_box_convergence_rate(50, 500, 2)
     # convex_cost_convergence_rate(2000, 200, 2,'IGW',ryner_direc=False)
     # convex_cost_convergence_rate(2000, 200, 2,'IGW',ryner_direc=True)
-    convex_cost_convergence_rate(200, 400, 2,'IGW',ryner_direc=False)
-    convex_cost_convergence_rate(2000, 100, 2,'IGW',ryner_direc=True)
-    convex_cost_convergence_rate(2000, 100, 2,'IGW',ryner_direc=False)
-    convex_cost_convergence_rate(2000, 300, 2,'IGW',ryner_direc=True)
-    convex_cost_convergence_rate(2000, 300, 2,'IGW',ryner_direc=False)
+    # convex_cost_convergence_rate(200, 400, 2,'IGW',ryner_direc=False)
+    # convex_cost_convergence_rate(2000, 100, 2,'IGW',ryner_direc=True)
+    # convex_cost_convergence_rate(2000, 100, 2,'IGW',ryner_direc=False)
+    # convex_cost_convergence_rate(2000, 300, 2,'IGW',ryner_direc=True)
+    # convex_cost_convergence_rate(2000, 300, 2,'IGW',ryner_direc=False)
     # convex_cost_convergence_rate(100, 500, 2,'IGW')
     # convex_cost_convergence_rate(5000, 500, 2,'IGW')
     # convex_cost_convergence_rate(10, 35, 3,'IGW')
@@ -288,3 +359,12 @@ if __name__ == "__main__":
     # classical_gw_convergence_rate(300, 300, 2,ryner_direc=False)
     # classical_gw_convergence_rate(10, 35, 3,ryner_direc=False)
     # classical_gw_convergence_rate(10, 35, 3,ryner_direc=True)
+    # FW_convergence_rate_entropy_low_points(10000, 500, 2, 'IGW',0.1, seed=None)
+    # FW_convergence_rate_entropy_high_points(10000, 500, 2, 'CGW',0.5, tol= 1e-5, seed=None)
+    
+    
+    
+    # FW_convergence_rate_entropy_high_points(10000, 500, 3, 'IGW',0.2, tol= 1e-7, seed=None)
+    # FW_convergence_rate_entropy_high_points(10000, 500, 3, 'CGW',0.2, tol= 1e-7, seed=None)
+    FW_convergence_rate_entropy_high_points(25000, 500, 2, 'IGW',0.2, tol= 1e-7, seed=None)
+    # FW_convergence_rate_entropy_high_points(10000, 500, 2, 'CGW',0.2, tol= 1e-7, seed=None)

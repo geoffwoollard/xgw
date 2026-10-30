@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit
 import ot
 import logging
+from scipy import stats
 
 from .hyperplane_approx import projection
 
@@ -169,9 +170,10 @@ def optimize_deg_3_polynomial(alpha, beta, gamma, delta):
 def line_search_CGW_2d(sigma_1, sigma_0, t):
     n1 = sq_norm(sigma_1)
     n0 = sq_norm(sigma_0)
+    n10 = np.sum(sigma_0*sigma_1)
     alpha, beta, gamma = dgw_2d_polynomial(sigma_1, sigma_0)
-    alpha = t*(n1+n0) + (1-t)*alpha
-    beta = -2*t*n0 + (1-t)*beta 
+    alpha = t*(n1+n0-2*n10) + (1-t)*alpha
+    beta = 2*t*(n10-n0) + (1-t)*beta 
     gamma = t*n0 + (1-t)*gamma
     
     T, tau = optimize_deg_2_polynomial(alpha, beta, gamma)
@@ -229,10 +231,11 @@ def line_search_DGW_3d(sigma_1, sigma_0):
 def line_search_CGW_3d(sigma_1, sigma_0, t):
     n1 = sq_norm(sigma_1)
     n0 = sq_norm(sigma_0)
+    n10 = np.sum(sigma_0*sigma_1)
     alpha, beta, gamma, delta = dgw_3d_polynomial(sigma_1, sigma_0)
     
-    beta = t*(n1+n0) + (1-t)*beta
-    gamma = -2*t*n0 + (1-t)*gamma
+    beta = t*(n1+n0-2*n10) + (1-t)*beta
+    gamma = 2*t*(n10-n0) + (1-t)*gamma
     delta = t*n0 + (1-t)*delta
     
     T, tau = optimize_deg_3_polynomial(alpha, beta, gamma, delta)
@@ -287,7 +290,7 @@ def center_marginal(mu, space_x, nu, space_y):
 #         yield pi_n_1_hat, M_pi_n, M_pi_val
 
 
-def _frank_wolfe_iter(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
+def _frank_wolfe_iter(mu, space_x, nu, space_y, tol= 1e-5, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
@@ -306,14 +309,47 @@ def _frank_wolfe_iter(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max 
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
         # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
-        if tau == 0:
+        if tau == 0 or 2*(T-old_T)< tol:
             break
+        old_T = T
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
         yield initial_cost-2*T, pi_n, initial_cost-2*initial_coupling_cost
+        
+def _frank_wolfe_iter_entropy_rand_init(mu, space_x, nu, space_y, reg, tol= 1e-5, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}, seed = None):
+    if pi_n is None:
+        pi_n = np.outer(mu, nu)
+    
+    sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
+    space_x, space_y = center_marginal(mu, space_x, nu, space_y)
+    sigma_x = covariance(space_x, mu)
+    sigma_y = covariance(space_y, nu)
+    initial_cost = const_cost(sigma_x, sigma_y, cost, t)
+    # print(f' \n initial_cost', initial_cost)
+    initial_coupling_cost = polynomial_cost(np.array(cross_covariance(space_x, space_y, pi_n)), cost, t)
+    # print(f' initial coupling_cost', initial_cost-2*initial_coupling_cost)
+    vect = stats.uniform_direction.rvs(space_x.shape[1]*space_y.shape[1], random_state = np.random.default_rng(seed))
+    M_pi_n = vect.reshape((space_x.shape[1], space_y.shape[1]))
+    print(M_pi_n)
+    old_T = None
+    for it in range(iter_max):
+        lin_cost = linearized_cost_function(space_x, space_y, M_pi_n)
+        pi_n_1_hat = ot.sinkhorn(mu, nu, -lin_cost ,reg, **emd_kwargs) #  bregman.sinkhorn_log bregman.sinkhorn_stabilized bregman.sinkhorn_epsilon_scaling
+        sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
+        T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
+        # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
+        if old_T is not None:
+            if tau == 0 or 2*(T-old_T)< tol:
+                break
+        old_T = T
+        pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
+        pi_n = pi_n_1
+        sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
+        M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
+        yield initial_cost-2*T, pi_n, initial_cost-2*initial_coupling_cost
  
     
-def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
+def frank_wolfe_gw(mu, space_x, nu, space_y, tol= 1e-5, cost='IGW', pi_n=None, iter_max = 50, t=0.5, emd_kwargs = {}):
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
@@ -324,6 +360,7 @@ def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
     # print(f' \n initial_cost', initial_cost)
     initial_coupling_cost = polynomial_cost(np.array(cross_covariance(space_x, space_y, pi_n)), cost, t)
     # print(f' initial coupling_cost', initial_cost-2*initial_coupling_cost)
+    old_T = None
     for it in range(iter_max):
         sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
         M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
@@ -332,14 +369,17 @@ def frank_wolfe_gw(mu, space_x, nu, space_y, cost='IGW', pi_n=None, iter_max = 5
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
         # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
-        if tau <= 0:
-            break
+        if old_T is not None:
+            if tau == 0 or 2*(T-old_T)< tol:
+                break
+        old_T = T
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
     return initial_cost-2*T, pi_n, initial_cost-2*initial_coupling_cost
 
 
-def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max = 50, t=0.5, emd_kwargs={}):
+def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', tol= 1e-5, iter_max = 50, t=0.5, emd_kwargs={}):
+    old_T = None
     for _ in range(iter_max):
         logger.info(f"FW it {_}")
         sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
@@ -348,25 +388,27 @@ def frank_wolfe_polynomial(mu, space_x, nu, space_y, pi_n, cost='IGW', iter_max 
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
-        if tau == 0:
-            break
+        if old_T is not None:
+            if tau == 0 or 2*(T-old_T)< tol:
+                break
+        old_T = T
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
     return T, pi_n
     
     
-def classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n=None, iter_max = 50, emd_kwargs = {}):
+def classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n=None,  tol= 1e-5, iter_max = 50, emd_kwargs = {}):
     if pi_n is None:
         pi_n = np.outer(mu, nu)
     
     space_x, space_y = center_marginal(mu, space_x, nu, space_y)
     g_func, initial_cost = classical_gw_const_cost(mu, space_x, nu, space_y)
     
-    T, pi_n, initial_coupling_cost = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func)
+    T, pi_n, initial_coupling_cost = _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, tol=tol, iter_max = iter_max, emd_kwargs=emd_kwargs )
     
     return initial_cost-4*T, pi_n, initial_cost-4*initial_coupling_cost
 
-def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, iter_max = 50, emd_kwargs = {}):
+def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, tol= 1e-5, iter_max = 50, emd_kwargs = {}):
     initial_coupling_cost = classical_gw_cost(space_x, space_y, pi_n, g_func)
     T = initial_coupling_cost
     for it in range(iter_max):
@@ -375,7 +417,7 @@ def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, iter_max =
         lin_cost = 2*linearized_cost_function(space_x, space_y, M_pi_n) + g_func
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
         new_cost = classical_gw_cost(space_x, space_y, pi_n_1_hat, g_func)
-        if new_cost <= T:
+        if new_cost <= T + tol:
             break
         T =  new_cost
         pi_n = pi_n_1_hat
