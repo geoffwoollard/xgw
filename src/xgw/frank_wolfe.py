@@ -92,13 +92,13 @@ def classical_gw_cost( space_x, space_y, pi_n, g):
 @njit
 def linearized_cost_matrix(sigma, cost, t):
     if cost == 'IGW':
-        return sigma
+        return 2*sigma
     elif cost == 'DGW':
         l=len(sigma)
-        return factorial(l-1)*matrix_cofactor_low_dim(sigma)
+        return factorial(l)*matrix_cofactor_low_dim(sigma)
     elif cost == 'CGW':
         l=len(sigma)
-        return t*sigma + (1-t)*factorial(l-1)*matrix_cofactor_low_dim(sigma)
+        return t*2*sigma + (1-t)*factorial(l)*matrix_cofactor_low_dim(sigma)
     else:
         raise ValueError('Cost not implemented')
 #########
@@ -301,6 +301,7 @@ def _frank_wolfe_iter(mu, space_x, nu, space_y, tol= 1e-5, cost='IGW', pi_n=None
     # print(f' \n initial_cost', initial_cost)
     initial_coupling_cost = polynomial_cost(np.array(cross_covariance(space_x, space_y, pi_n)), cost, t)
     # print(f' initial coupling_cost', initial_cost-2*initial_coupling_cost)
+    old_T = None
     for it in range(iter_max):
         sigma_pi_n = cross_covariance(space_x, space_y, pi_n)
         M_pi_n = linearized_cost_matrix(sigma_pi_n, cost, t)
@@ -309,8 +310,9 @@ def _frank_wolfe_iter(mu, space_x, nu, space_y, tol= 1e-5, cost='IGW', pi_n=None
         sigma_pi_n_1_hat = cross_covariance(space_x, space_y, pi_n_1_hat)
         T, tau = line_search(sigma_pi_n_1_hat, sigma_pi_n, cost, t) 
         # print(f"it {it}: tau={tau}, {cost}^2_cost={initial_cost-2*T}", end=' ')
-        if tau == 0 or 2*(T-old_T)< tol:
-            break
+        if old_T is not None:
+            if tau == 0 or 2*(T-old_T)< tol:
+                break
         old_T = T
         pi_n_1 = tau*pi_n_1_hat + (1-tau)*pi_n
         pi_n = pi_n_1
@@ -414,7 +416,7 @@ def _classical_gw_frank_wolfe(mu, space_x, nu, space_y, pi_n, g_func, tol= 1e-5,
     for it in range(iter_max):
         logger.info(f"FW it {it}")
         M_pi_n = cross_covariance(space_x, space_y, pi_n)
-        lin_cost = 2*linearized_cost_function(space_x, space_y, M_pi_n) + g_func
+        lin_cost = 16*linearized_cost_function(space_x, space_y, M_pi_n) + 4*g_func
         pi_n_1_hat = ot.emd(mu, nu, -lin_cost, **emd_kwargs)
         new_cost = classical_gw_cost(space_x, space_y, pi_n_1_hat, g_func)
         if new_cost <= T + tol:

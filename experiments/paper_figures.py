@@ -352,7 +352,7 @@ if __name__ == "__main__":
     # convex_cost_convergence_rate(100, 500, 2,'IGW')
     # convex_cost_convergence_rate(5000, 500, 2,'IGW')
     # convex_cost_convergence_rate(10, 35, 3,'IGW')
-    # FW_convergence_rate(1000, 29, 3,'DGW')
+    # FW_convergence_rate(1000, 200, 3,'DGW')
     # FW_convergence_rate(1000, 200, 3,'IGW')
     # FW_convergence_rate(1000, 200, 3,'CGW')
     # classical_gw_convergence_rate(300, 300, 2,ryner_direc=True)
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     
     
     
-    # FW_convergence_rate_entropy_high_points(10000, 500, 3, 'IGW',0.2, tol= 1e-7, seed=None)
-    # FW_convergence_rate_entropy_high_points(10000, 500, 3, 'CGW',0.2, tol= 1e-7, seed=None)
-    FW_convergence_rate_entropy_high_points(25000, 500, 2, 'IGW',0.2, tol= 1e-7, seed=None)
-    # FW_convergence_rate_entropy_high_points(10000, 500, 2, 'CGW',0.2, tol= 1e-7, seed=None)
+    FW_convergence_rate_entropy_high_points(10000, 500, 3, 'IGW',0.2, tol= 1e-6, seed=None)
+    FW_convergence_rate_entropy_high_points(10000, 500, 3, 'CGW',0.2, tol= 1e-6, seed=None)
+    FW_convergence_rate_entropy_high_points(10000, 500, 2, 'IGW',0.2, tol= 1e-6, seed=None)
+    FW_convergence_rate_entropy_high_points(10000, 500, 2, 'CGW',0.2, tol= 1e-6, seed=None)
